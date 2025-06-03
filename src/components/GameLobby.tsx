@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useGameSocket } from '@/hooks/useSocket'
+import toast from 'react-hot-toast'
 
 export default function GameLobby() {
     const { isConnected, roomInfo, playerRole, joinRoom, error } = useGameSocket()
     const [roomId, setRoomId] = useState<string>('')
     const [userId, setUserId] = useState<string>('')
     const [username, setUsername] = useState<string>('')
+    const router = useRouter()
 
     const handleJoinRoom = () => {
         if (roomId.trim() && userId.trim() && username.trim()) {
@@ -20,21 +23,29 @@ export default function GameLobby() {
         setRoomId(newRoomId)
     }
 
-    return (
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
-            <h1 className="text-2xl font-bold mb-4">線上桌遊大廳</h1>
+    useEffect(() => {
+        if (roomInfo?.isReady) {
+            toast.success('房間已滿，可以開始遊戲！')
+            // 假設你有 roomInfo.roomId 與 username
+            router.push(`/game/${roomInfo.roomId}?username=${encodeURIComponent(username)}`)
+        }
+    }, [roomInfo])
 
-            {/* 連接狀態 */}
-            <div className="mb-4">
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${isConnected
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
-                    }`}>
-                    {isConnected ? '● 已連接' : '● 未連接'}
-                </span>
-            </div>
+    return ((<div className="max-w-md mx-auto w-full bg-white rounded-lg shadow-lg p-3" >
+        <h1 className="text-2xl text-blue-700 font-bold mb-4">Lobby</h1>
 
-            {!roomInfo ? (
+        {/* 連接狀態 */}
+        <div className="mb-4">
+            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${isConnected
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+                }`}>
+                {isConnected ? '● 已連接' : '● 未連接'}
+            </span>
+        </div>
+
+        {
+            !roomInfo ? (
                 // 加入房間前的設定
                 <div className="space-y-4">
                     <div>
@@ -45,20 +56,20 @@ export default function GameLobby() {
                             type="text"
                             value={userId}
                             onChange={(e) => setUserId(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-black"
                             placeholder="輸入你的用戶 ID"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 ">
                             用戶名稱
                         </label>
                         <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-black"
                             placeholder="輸入你的名稱"
                         />
                     </div>
@@ -72,7 +83,7 @@ export default function GameLobby() {
                                 type="text"
                                 value={roomId}
                                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-black"
                                 placeholder="輸入房間 ID"
                             />
                             <button
@@ -103,17 +114,17 @@ export default function GameLobby() {
                 <div className="space-y-4">
                     <div className="p-4 bg-blue-50 rounded-lg">
                         <h3 className="font-semibold text-blue-800">房間資訊</h3>
-                        <p>房間 ID: <span className="font-mono">{roomInfo.roomId}</span></p>
-                        <p>你的角色: <span className="font-semibold text-blue-600">{playerRole}</span></p>
-                        <p>人數: {roomInfo.userCount}/2</p>
+                        <p className='text-black'>房間 ID: <span className="font-semibold text-blue-600">{roomInfo.roomId}</span></p>
+                        <p className='text-black'>你的角色: <span className="font-semibold text-blue-600">{playerRole}</span></p>
+                        <p className='text-black'> 人數: {roomInfo.userCount}/2</p>
                     </div>
 
                     <div>
-                        <h4 className="font-semibold mb-2">房間成員</h4>
+                        <h4 className="font-semibold mb-2 text-blue-800">房間成員</h4>
                         <div className="space-y-2">
                             {roomInfo.users.map((user, index) => (
                                 <div key={user.userId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span>{user.username}</span>
+                                    <span className="font-semibold text-blue-600">{user.username}</span>
                                     <span className="text-sm text-gray-500">
                                         玩家 {index + 1} {user.userId === userId && '(你)'}
                                     </span>
@@ -121,18 +132,9 @@ export default function GameLobby() {
                             ))}
                         </div>
                     </div>
-
-                    {roomInfo.isReady ? (
-                        <div className="p-3 bg-green-100 border border-green-400 text-green-700 rounded">
-                            ✅ 房間已滿，可以開始遊戲！
-                        </div>
-                    ) : (
-                        <div className="p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                            ⏳ 等待另一位玩家加入...
-                        </div>
-                    )}
                 </div>
-            )}
-        </div>
+            )
+        }
+    </div >)
     )
 }

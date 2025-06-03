@@ -1,19 +1,11 @@
+import { shuffle } from 'lodash'
+
 import { Server as SocketIOServer, Socket } from 'socket.io'
 import { Server as HttpServer } from 'http'
+import { Geisha, Card, GameRoom, UserInfo, Players, } from '../types/game/hanamikoji'
+import toast from 'react-hot-toast'
 
-interface UserInfo {
-    socketId: string
-    userId: string
-    username: string
-    joinTime: number
-}
 
-interface GameRoom {
-    roomId: string
-    users: UserInfo[]
-    createdAt: number
-    // gameState?: any  // 遊戲狀態
-}
 
 class SocketManager {
     private static instance: SocketManager
@@ -127,6 +119,7 @@ class SocketManager {
             roomInfo: this.getRoomInfo(roomId)
         })
 
+        toast(`用戶 ${username}(${userId}) 作為 ${playerRole} 加入房間 ${roomId}`)
         console.log(`用戶 ${username}(${userId}) 作為 ${playerRole} 加入房間 ${roomId}`)
     }
 
@@ -186,6 +179,75 @@ class SocketManager {
             })),
             isReady: room.users.length === 2
         }
+    }
+
+    private initializeHanamikojiGame(roomId: string): void {
+        const room = this.rooms.get(roomId)
+        if (!room || room.users.length !== 2) return
+
+        // 1. 初始化藝伎
+        const geishas: Geisha[] = [
+            { id: 1, name: '櫻', score: 2 },
+            { id: 2, name: '梅', score: 2 },
+            { id: 3, name: '菊', score: 2 },
+            { id: 4, name: '蘭', score: 3 },
+            { id: 5, name: '楓', score: 3 },
+            { id: 6, name: '牡丹', score: 4 },
+            { id: 7, name: '菖蒲', score: 5 }
+        ]
+
+        // 2. 初始化卡牌（每位藝伎的卡牌數與分數相同）
+        const allCards: Card[] = geishas.flatMap(g =>
+            Array(g.score).fill(null).map((_, i) => ({
+                geishaId: g.id,
+                cardId: `${g.id}-${i}`
+            }))
+        )
+
+        // 3. 洗牌並移除一張
+        const shuffledCards = shuffle(allCards)
+        shuffledCards.pop() // 移除一張卡
+
+        // 4. 分發手牌
+        const players = room.users.map(user => user.userId)
+        const playerStates: Players = {
+            [players[0]]: {
+                userId: players[0],
+                username: room.users[0].username,
+                hand: shuffledCards.slice(0, 6),
+                actionsUsed: [],
+                revealed: [],
+                protected: [],
+                discarded: []
+            },
+            [players[1]]: {
+                userId: players[1],
+                username: room.users[1].username,
+                hand: shuffledCards.slice(6, 12),
+                actionsUsed: [],
+                revealed: [],
+                protected: [],
+                discarded: []
+            }
+        }
+
+
+        // 5. 設定遊戲狀態
+        room.gameState = {
+            phase: 'playing',
+            round: 1,
+            geishas,
+            table: {},
+            players: playerStates,
+            currentPlayer: players[0], // 由房主先開始
+            availableActions: [1, 2, 3, 4]
+        }
+
+        // 6. 通知玩家遊戲開始
+        this._io?.to(roomId).emit('gameUpdate', {
+            action: { type: 'GAME_START' },
+            roomInfo: this.getRoomInfo(roomId)
+        })
     }
 
     // 公開方法

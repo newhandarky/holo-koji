@@ -1,17 +1,18 @@
-// src/pages/GameRoom/index.tsx - 增加房間代碼顯示
+// src/pages/GameRoom/index.tsx - 增加房間代碼顯示和環境支援
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
+import config from '../../config/environment';
 
 /**
- * GameRoom 組件：增加房間代碼顯示和複製功能
+ * GameRoom 組件：增加房間代碼顯示和複製功能，支援環境配置
  */
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
-    const { isConnected } = useWebSocket('ws://localhost:3001');
+    const { isConnected, getConnectionInfo } = useWebSocket();
     const [showRoomCode, setShowRoomCode] = useState(false);
 
     // 調試輸出
@@ -23,6 +24,8 @@ const GameRoom: React.FC = () => {
         console.log('  - 遊戲階段:', state.phase);
         console.log('  - 遊戲 ID:', state.gameId);
         console.log('  - WebSocket 連線:', isConnected);
+        console.log('  - 環境:', process.env.NODE_ENV);
+        console.log('  - WebSocket URL:', config.websocketUrl);
     }, [state, roomId, isConnected]);
 
     // 複製房間代碼
@@ -51,6 +54,9 @@ const GameRoom: React.FC = () => {
                 <div className="text-center text-white">
                     <div className="spinner-custom mb-3"></div>
                     <h3>連接伺服器中...</h3>
+                    <small className="text-muted">
+                        正在連接到: {config.websocketUrl}
+                    </small>
                 </div>
             </div>
         );
@@ -132,6 +138,20 @@ const GameRoom: React.FC = () => {
                         {state.players.length === 1 && '等待第二位玩家加入...'}
                     </div>
 
+                    {/* 開發環境顯示額外資訊 */}
+                    {config.isDevelopment && (
+                        <div className="alert alert-secondary text-start">
+                            <small>
+                                <strong>開發資訊：</strong><br />
+                                房間 ID: {roomId}<br />
+                                遊戲 ID: {state.gameId || '無'}<br />
+                                階段: {state.phase}<br />
+                                WebSocket: {isConnected ? '已連接' : '未連接'}<br />
+                                伺服器: {config.websocketUrl}
+                            </small>
+                        </div>
+                    )}
+
                     <button
                         className="btn btn-outline-secondary btn-sm"
                         onClick={() => window.location.href = '/'}
@@ -154,6 +174,14 @@ const GameRoom: React.FC = () => {
                             <button className="btn btn-outline-info btn-sm mt-1" onClick={copyRoomCode}>
                                 📋 複製代碼
                             </button>
+                            {config.isDevelopment && (
+                                <div className="mt-1">
+                                    <small className="text-muted">
+                                        環境: {process.env.NODE_ENV}<br />
+                                        WebSocket: {isConnected ? '已連接' : '未連接'}
+                                    </small>
+                                </div>
+                            )}
                         </div>
                         <div className="col-md-4 text-center">
                             <h5 className="mb-0">第 {state.round} 回合</h5>
@@ -204,6 +232,20 @@ const GameRoom: React.FC = () => {
                             離開遊戲
                         </button>
                     </div>
+
+                    {/* 開發環境顯示連線資訊 */}
+                    {config.isDevelopment && (
+                        <div className="mt-4 p-3 bg-light rounded">
+                            <small className="text-muted">
+                                <strong>開發資訊：</strong><br />
+                                遊戲 ID: {state.gameId}<br />
+                                玩家數量: {state.players.length}<br />
+                                當前回合: {state.currentPlayer}<br />
+                                WebSocket URL: {config.websocketUrl}<br />
+                                連線狀態: {isConnected ? '✅ 已連接' : '❌ 未連接'}
+                            </small>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

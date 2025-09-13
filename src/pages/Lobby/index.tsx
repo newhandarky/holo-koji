@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
+import config from '../../config/environment';
 
 /**
  * Lobby 組件：簡化版本，建立房間後立即跳轉
@@ -17,7 +18,8 @@ const Lobby: React.FC = () => {
         const connectWS = async () => {
             setConnectionStatus('connecting');
             try {
-                await gameWebSocket.connect('ws://localhost:3001');
+                // 使用環境配置的 WebSocket URL
+                await gameWebSocket.connect(config.websocketUrl);
                 setConnectionStatus('connected');
                 console.log('✅ [Lobby] WebSocket 連線成功');
             } catch (error) {
@@ -119,6 +121,14 @@ const Lobby: React.FC = () => {
                     <small className={getStatusColor()}>
                         {getStatusText()}
                     </small>
+                    {config.isDevelopment && (
+                        <div className="mt-2">
+                            <small className="text-muted">
+                                環境: {process.env.NODE_ENV}<br />
+                                WebSocket: {config.websocketUrl}
+                            </small>
+                        </div>
+                    )}
                 </div>
 
                 <div className="mb-3">
@@ -180,6 +190,16 @@ const Lobby: React.FC = () => {
                         控制四位以上藝妓或累積11點魅力值即可獲勝！
                     </small>
                 </div>
+
+                {config.isDevelopment && (
+                    <div className="mt-3 p-2 bg-light rounded">
+                        <small className="text-muted">
+                            <strong>開發資訊：</strong><br />
+                            連線狀態: {connectionStatus}<br />
+                            已註冊事件: {gameWebSocket.messageHandlers?.size || 0}
+                        </small>
+                    </div>
+                )}
             </div>
         </div>
     );

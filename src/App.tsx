@@ -1,27 +1,23 @@
-// src/App.tsx
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { GameProvider } from './contexts/GameContext';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
+import './App.css';
 
-/**
- * App 組件：整合路由與全局狀態
- */
-const App: React.FC = () => {
+function App() {
   return (
-    // 使用 GameProvider 提供全局遊戲狀態
     <GameProvider>
-      <Router>
-        <Routes>
-          {/* 大廳頁面路由 */}
-          <Route path="/" element={<Lobby />} />
-          {/* 遊戲房間路由，:roomId 為動態參數 */}
-          <Route path="/game/:roomId" element={<GameRoom />} />
-        </Routes>
-      </Router>
+      <BrowserRouter>
+        <div className="App">
+          <Routes>
+            <Route path="/" element={<Lobby />} />
+            <Route path="/game/:roomId" element={<GameRoom />} />
+          </Routes>
+        </div>
+      </BrowserRouter>
     </GameProvider>
   );
-};
+}
 
 export default App;

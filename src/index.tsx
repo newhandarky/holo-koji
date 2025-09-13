@@ -5,17 +5,14 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 // 引入專案自定義全局樣式
 import './index.css';
 import App from './App';
-import { HashRouter } from 'react-router-dom'; // 新增這行
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-// React 18 的根渲染
+// React 18 的根渲染 - 不需要任何 Router，App.tsx 中已包含
 root.render(
   <React.StrictMode>
-    <HashRouter> {/* 包裝 App 組件 */}
-      <App />
-    </HashRouter>
+    <App />
   </React.StrictMode>
 );

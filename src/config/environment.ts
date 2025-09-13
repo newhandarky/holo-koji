@@ -1,4 +1,4 @@
-// 修正您的 src/config/environment.ts
+// src/config/environment.ts - 修正版本，生產環境也顯示日誌
 interface EnvironmentConfig {
     websocketUrl: string;
     apiUrl: string;
@@ -9,24 +9,24 @@ interface EnvironmentConfig {
 const config: EnvironmentConfig = {
     websocketUrl: process.env.REACT_APP_WEBSOCKET_URL || (
         process.env.NODE_ENV === 'production'
-            ? 'wss://holo-koji-server.onrender.com'  // 請替換為實際 Render URL
+            ? 'wss://holo-koji-server.onrender.com'
             : 'ws://localhost:3001'
     ),
     apiUrl: process.env.REACT_APP_API_URL || (
         process.env.NODE_ENV === 'production'
-            ? 'https://holo-koji-server.onrender.com'  // 請替換為實際 Render URL
+            ? 'https://holo-koji-server.onrender.com'
             : 'http://localhost:3001'
     ),
     isDevelopment: process.env.NODE_ENV === 'development',
     isProduction: process.env.NODE_ENV === 'production',
 };
 
-// 開發環境下顯示配置資訊
-if (config.isDevelopment) {
-    console.log('🔧 [Environment] 配置資訊:');
-    console.log('  WebSocket URL:', config.websocketUrl);
-    console.log('  API URL:', config.apiUrl);
-    console.log('  環境:', process.env.NODE_ENV);
-}
+// 生產環境也顯示配置資訊，方便除錯
+console.log('🔧 [Environment] 配置資訊:');
+console.log('  WebSocket URL:', config.websocketUrl);
+console.log('  API URL:', config.apiUrl);
+console.log('  環境:', process.env.NODE_ENV);
+console.log('  是否為生產環境:', config.isProduction);
+console.log('  是否為開發環境:', config.isDevelopment);
 
 export default config;

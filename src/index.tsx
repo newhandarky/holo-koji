@@ -1,19 +1,21 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// 引入 Bootstrap 樣式
+import 'bootstrap/dist/css/bootstrap.min.css';
+// 引入專案自定義全局樣式
 import './index.css';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
+import { HashRouter } from 'react-router-dom'; // 新增這行
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
+// React 18 的根渲染
 root.render(
   <React.StrictMode>
-    <App />
+    <HashRouter> {/* 包裝 App 組件 */}
+      <App />
+    </HashRouter>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

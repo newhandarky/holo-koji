@@ -1,4 +1,4 @@
-// server/index.js - 完整的 Render.com 伺服器版本
+// server/index.js - 修正 CORS 設定
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -7,12 +7,14 @@ import cors from 'cors';
 const app = express();
 const server = createServer(app);
 
-// CORS 設定 - 支援多個前端域名
+// CORS 設定 - 修正 GitHub Pages 完整路徑
 app.use(cors({
     origin: [
-        'http://localhost:3000',                          // 本地開發
-        'https://holo-koji-frontend.onrender.com',       // Render.com 前端
-        'https://newhandarky.github.io'                  // GitHub Pages (備用)
+        'http://localhost:3000',                              // 本地開發
+        'https://holo-koji-frontend.onrender.com',           // Render.com 前端
+        'https://newhandarky.github.io',                     // GitHub Pages 根域名
+        'https://newhandarky.github.io/holo-koji',           // GitHub Pages 完整路徑（重要！）
+        'https://newhandarky.github.io/holo-koji/'           // GitHub Pages 完整路徑含斜槓
     ],
     credentials: true,
     methods: ['GET', 'POST', 'OPTIONS'],
@@ -26,7 +28,14 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        corsOrigins: [
+            'http://localhost:3000',
+            'https://holo-koji-frontend.onrender.com',
+            'https://newhandarky.github.io',
+            'https://newhandarky.github.io/holo-koji',
+            'https://newhandarky.github.io/holo-koji/'
+        ]
     });
 });
 
@@ -85,8 +94,10 @@ class GameRoom {
     }
 }
 
-wss.on('connection', (ws) => {
-    console.log('🔌 客戶端已連接');
+wss.on('connection', (ws, req) => {
+    // 記錄連接來源
+    const origin = req.headers.origin;
+    console.log('🔌 客戶端已連接，來源:', origin);
 
     let currentPlayerId = null;
     let currentRoomId = null;
@@ -94,7 +105,7 @@ wss.on('connection', (ws) => {
     ws.on('message', (data) => {
         try {
             const message = JSON.parse(data.toString());
-            console.log('📨 收到訊息:', message);
+            console.log('📨 收到訊息:', message, '來源:', origin);
 
             switch (message.type) {
                 case 'JOIN_ROOM':
@@ -121,7 +132,7 @@ wss.on('connection', (ws) => {
         if (currentRoomId && currentPlayerId) {
             handleLeaveRoom(ws);
         }
-        console.log('🔌 客戶端已斷線');
+        console.log('🔌 客戶端已斷線，來源:', origin);
     });
 
     function handleCreateRoom(ws, payload) {
@@ -134,7 +145,7 @@ wss.on('connection', (ws) => {
 
         room.addPlayer(currentPlayerId, ws);
 
-        console.log(`🏠 房間 ${roomId} 已建立，創建者：${currentPlayerId}`);
+        console.log(`🏠 房間 ${roomId} 已建立，創建者：${currentPlayerId}，來源：${origin}`);
 
         // 發送房間建立成功回應
         ws.send(JSON.stringify({
@@ -178,7 +189,7 @@ wss.on('connection', (ws) => {
 
         room.addPlayer(playerId, ws);
 
-        console.log(`👤 玩家 ${playerId} 加入房間 ${roomId}`);
+        console.log(`👤 玩家 ${playerId} 加入房間 ${roomId}，來源：${origin}`);
 
         // 通知加入者
         ws.send(JSON.stringify({
@@ -350,6 +361,8 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`📊 CORS 允許的域名:`, [
         'http://localhost:3000',
         'https://holo-koji-frontend.onrender.com',
-        'https://newhandarky.github.io'
+        'https://newhandarky.github.io',
+        'https://newhandarky.github.io/holo-koji',
+        'https://newhandarky.github.io/holo-koji/'
     ]);
 });

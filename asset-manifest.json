@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/newhandarky/holo-koji/static/css/main.0a732eb8.css",
+    "main.js": "/newhandarky/holo-koji/static/js/main.c653cd91.js",
+    "index.html": "/newhandarky/holo-koji/index.html",
+    "main.0a732eb8.css.map": "/newhandarky/holo-koji/static/css/main.0a732eb8.css.map",
+    "main.c653cd91.js.map": "/newhandarky/holo-koji/static/js/main.c653cd91.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.0a732eb8.css",
+    "static/js/main.c653cd91.js"
+  ]
+}

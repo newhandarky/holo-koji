@@ -1,9 +1,11 @@
+export type PlayerId = 'player1' | 'player2';
+
 // 藝妓狀態
 export interface Geisha {
     id: number;                     // 識別 ID
     name: string;                   // 藝妓名稱
     charmPoints: number;            // 魅力值
-    controlledBy: 'player1' | 'player2' | null; // 控制方
+    controlledBy: PlayerId | null; // 控制方
 }
 
 // 物品卡片
@@ -13,9 +15,11 @@ export interface ItemCard {
     type: string;                   // 卡片類型（文字描述）
 }
 
+export type ActionType = 'secret' | 'trade-off' | 'gift' | 'competition';
+
 // 玩家可使用的行動標誌
 export interface ActionToken {
-    type: 'secret' | 'trade-off' | 'gift' | 'competition'; // 行動種類
+    type: ActionType; // 行動種類
     used: boolean;                 // 是否已使用
 }
 

@@ -1,12 +1,9 @@
-// src/pages/Lobby/index.tsx - 簡化版本（建立後立即跳轉）
+// src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 
-/**
- * Lobby 組件：簡化版本，建立房間後立即跳轉
- */
 const Lobby: React.FC = () => {
     const [playerName, setPlayerName] = useState('');
     const [roomId, setRoomId] = useState('');
@@ -18,7 +15,6 @@ const Lobby: React.FC = () => {
         const connectWS = async () => {
             setConnectionStatus('connecting');
             try {
-                // 使用環境配置的 WebSocket URL
                 await gameWebSocket.connect(config.websocketUrl);
                 setConnectionStatus('connected');
                 console.log('✅ [Lobby] WebSocket 連線成功');
@@ -34,12 +30,13 @@ const Lobby: React.FC = () => {
             setConnectionStatus('connected');
         }
 
-        // 簡化的事件處理器
         const handleRoomCreated = (payload: any) => {
-            console.log('🏠 [Lobby] 房間建立成功，立即跳轉:', payload);
+            console.log('🏠 [Lobby] 房間建立成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
-            // 立即清理並跳轉
+            // 保存當前玩家ID到localStorage
+            localStorage.setItem('currentPlayerId', playerName);
+
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
@@ -48,10 +45,12 @@ const Lobby: React.FC = () => {
         };
 
         const handlePlayerJoined = (payload: any) => {
-            console.log('👤 [Lobby] 玩家加入成功，立即跳轉:', payload);
+            console.log('👤 [Lobby] 玩家加入成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
-            // 立即清理並跳轉
+            // 保存當前玩家ID到localStorage
+            localStorage.setItem('currentPlayerId', playerName);
+
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
@@ -65,22 +64,18 @@ const Lobby: React.FC = () => {
             alert(`錯誤: ${payload.message}`);
         };
 
-        // 註冊 Lobby 專用事件監聽器
         console.log('📋 [Lobby] 註冊事件監聽器');
         gameWebSocket.on('ROOM_CREATED', handleRoomCreated);
         gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined);
         gameWebSocket.on('ERROR', handleError);
 
-        console.log('📋 [Lobby] 已註冊的事件:', Array.from(gameWebSocket.messageHandlers.keys()));
-
-        // 清理函數
         return () => {
             console.log('🧹 [Lobby] 組件卸載，清理事件監聽器');
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
         };
-    }, [navigate]);
+    }, [navigate, playerName]);
 
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
@@ -112,6 +107,11 @@ const Lobby: React.FC = () => {
         }
     };
 
+    // 檢查當前網域，決定是否使用 Hash
+    const useHash = () => {
+        return window.location.host.includes('github.io');
+    };
+
     return (
         <div className="lobby-background d-flex align-items-center justify-content-center">
             <div className="card p-4" style={{ minWidth: 350, maxWidth: 400 }}>
@@ -125,7 +125,8 @@ const Lobby: React.FC = () => {
                         <div className="mt-2">
                             <small className="text-muted">
                                 環境: {process.env.NODE_ENV}<br />
-                                WebSocket: {config.websocketUrl}
+                                WebSocket: {config.websocketUrl}<br />
+                                Router: {useHash() ? 'HashRouter' : 'BrowserRouter'}
                             </small>
                         </div>
                     )}

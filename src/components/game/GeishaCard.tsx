@@ -12,8 +12,8 @@ interface Props {
 
 const GeishaCard: React.FC<Props> = ({ geisha }) => {
     // 根據控制方加上樣式
-    const className = `geisha-card ${geisha.controlledBy === 'player1' ? 'controlled-player1' :
-        geisha.controlledBy === 'player2' ? 'controlled-player2' : ''
+    const className = `geisha-card ${geisha.controlledBy === 'player1' ? 'player1' :
+        geisha.controlledBy === 'player2' ? 'player2' : ""
         }`;
 
     return (

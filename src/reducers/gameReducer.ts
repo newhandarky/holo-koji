@@ -1,74 +1,8 @@
 // src/contexts/gameReducer.ts - 添加順序決定狀態管理
-export interface GameState {
-    gameId: string;
-    players: Player[];
-    geishas: Geisha[];
-    currentPlayer: number;
-    phase: 'waiting' | 'deciding_order' | 'playing' | 'ended';
-    round: number;
-    winner?: string;
-    // 新增順序決定相關狀態
-    orderDecision: {
-        isActive: boolean;
-        phase: 'deciding' | 'result' | 'waiting_confirmation';
-        players: string[];
-        result?: {
-            firstPlayer: string;
-            secondPlayer: string;
-            order: string[];
-        };
-        confirmations: string[];
-        waitingFor: string[];
-    };
-}
+import { createRandomizedGeishas } from '../utils/gameData';
+import { GameState, Geisha, GameAction } from '../types/game.types';
 
-export interface Player {
-    id: string;
-    name: string;
-    hand: Card[];
-    playedCards: Card[];
-    secretCards: Card[];
-    discardedCards: Card[];
-    actionTokens: ActionToken[];
-}
-
-export interface Card {
-    id: string;
-    geishaId: number;
-    type: string;
-}
-
-export interface Geisha {
-    id: number;
-    name: string;
-    charmPoints: number;
-    controlledBy: string | null;
-}
-
-export interface ActionToken {
-    type: string;
-    used: boolean;
-}
-
-export type GameAction =
-    | { type: 'INIT_GAME'; payload: { gameId: string; players: Player[] } }
-    | { type: 'PLAY_ACTION'; payload: any }
-    | { type: 'END_TURN' }
-    | { type: 'END_GAME'; payload: { winner: string } }
-    // 新增順序決定相關動作
-    | { type: 'START_ORDER_DECISION'; payload: { players: string[] } }
-    | { type: 'ORDER_DECISION_RESULT'; payload: { firstPlayer: string; secondPlayer: string; order: string[] } }
-    | { type: 'UPDATE_ORDER_CONFIRMATIONS'; payload: { confirmations: string[]; waitingFor: string[] } };
-
-const initialGeishas: Geisha[] = [
-    { id: 1, name: '洋子', charmPoints: 2, controlledBy: null },
-    { id: 2, name: '彩葉', charmPoints: 2, controlledBy: null },
-    { id: 3, name: '琉璃', charmPoints: 2, controlledBy: null },
-    { id: 4, name: '杏樹', charmPoints: 3, controlledBy: null },
-    { id: 5, name: '知世', charmPoints: 3, controlledBy: null },
-    { id: 6, name: '美櫻', charmPoints: 4, controlledBy: null },
-    { id: 7, name: '小雪', charmPoints: 5, controlledBy: null },
-];
+const initialGeishas: Geisha[] = createRandomizedGeishas();
 
 export const initialState: GameState = {
     gameId: '',
@@ -80,12 +14,14 @@ export const initialState: GameState = {
     winner: undefined,
     // 初始化順序決定狀態
     orderDecision: {
-        isActive: false,
+        isOpen: false,
         phase: 'deciding',
         players: [],
         result: undefined,
         confirmations: [],
-        waitingFor: []
+        waitingFor: [],
+        currentPlayer: '',
+        onConfirm: () => { }
     }
 };
 
@@ -124,12 +60,14 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 ...state,
                 phase: 'deciding_order',
                 orderDecision: {
-                    isActive: true,
+                    isOpen: true,
                     phase: 'deciding',
                     players: action.payload.players,
                     result: undefined,
                     confirmations: [],
-                    waitingFor: []
+                    waitingFor: [],
+                    currentPlayer: action.payload.players[0],
+                    onConfirm: () => { }
                 }
             };
 
@@ -165,7 +103,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                     ...updatedOrderDecision,
                     orderDecision: {
                         ...updatedOrderDecision.orderDecision,
-                        isActive: false
+                        isOpen: false
                     }
                 };
             }
@@ -193,6 +131,21 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                 phase: 'ended',
                 winner: action.payload.winner
             };
+
+        // !
+        // case 'RESET_GAME':
+        //     return {
+        //         ...state,
+        //         geishas: initialGeishas, // 重置時重新隨機
+        //         phase: 'waiting',
+        //         currentPlayer: 0,
+        //     };
+
+        // case 'START_NEW_ROUND':
+        //     return {
+        //         ...state,
+        //         geishas: createRandomizedGeishas(), // 新回合重新隨機
+        //     };
 
         default:
             console.warn('⚠️ [Reducer] 未知動作類型:', action);

@@ -4,7 +4,7 @@ import { useGame } from '../../contexts/GameContext';
 import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
-import { ItemCard } from '../../types/game.types';
+import { ItemCard, ActionType } from '../../types/game.types';
 
 /**
  * GameBoard 組件：主遊戲介面
@@ -15,7 +15,7 @@ const GameBoard: React.FC = () => {
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
 
     // 處理行動按鈕點擊
-    const handleAction = (actionType: 'secret' | 'trade-off' | 'gift' | 'competition') => {
+    const handleAction = (actionType: ActionType) => {
         // 避免未選卡或狀態不對
         if (!selectedCards.length || state.phase !== 'playing') return;
 

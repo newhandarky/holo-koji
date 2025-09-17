@@ -420,8 +420,8 @@ function generateInitialHand() {
 
 function createInitialGeishas() {
     return [
-        { id: 1, name: '洋子', charmPoints: 2, controlledBy: null },
-        { id: 2, name: '彩葉', charmPoints: 2, controlledBy: null },
+        { id: 1, name: '洋子AA', charmPoints: 2, controlledBy: null },
+        { id: 2, name: '彩葉XXXX', charmPoints: 2, controlledBy: null },
         { id: 3, name: '琉璃', charmPoints: 2, controlledBy: null },
         { id: 4, name: '杏樹', charmPoints: 3, controlledBy: null },
         { id: 5, name: '知世', charmPoints: 3, controlledBy: null },

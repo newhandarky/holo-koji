@@ -17,6 +17,9 @@ export interface ItemCard {
 
 export type ActionType = 'secret' | 'trade-off' | 'gift' | 'competition';
 
+export type GamePhase = 'waiting' | 'deciding_order' | 'playing' | 'scoring' | 'ended';
+
+
 // 玩家可使用的行動標誌
 export interface ActionToken {
     type: ActionType; // 行動種類
@@ -34,15 +37,32 @@ export interface Player {
     actionTokens: ActionToken[];    // 行動標誌陣列
 }
 
+export interface OrderDecision {
+    isOpen: boolean;
+    phase: 'deciding' | 'result' | 'waiting_confirmation';
+    players: string[];
+    result?: {
+        firstPlayer: string;
+        secondPlayer: string;
+        order: string[];
+    };
+    confirmations: string[];
+    waitingFor: string[];
+    currentPlayer: string;
+    onConfirm: () => void;
+}
+
 // 遊戲整體狀態
 export interface GameState {
-    gameId: string;                 // 遊戲 ID
-    players: Player[];              // 參與玩家
-    geishas: Geisha[];              // 藝妓狀態
-    currentPlayer: number;          // 當前玩家索引 (0/1)
-    phase: 'waiting' | 'playing' | 'scoring' | 'ended'; // 遊戲階段
-    round: number;                  // 回合數
-    winner: string | null;          // 勝利者 ID
+    gameId: string;
+    players: Player[];
+    geishas: Geisha[];
+    currentPlayer: number;
+    phase: GamePhase;
+    round: number;
+    winner?: string;
+    // 新增順序決定相關狀態
+    orderDecision: OrderDecision;
 }
 
 // 定義可 dispatch 的動作
@@ -50,9 +70,13 @@ export type GameAction =
     | { type: 'INIT_GAME'; payload: { gameId: string; players: Player[] } }
     | { type: 'DRAW_CARD'; payload: { playerId: string; card: ItemCard } }
     | { type: 'PLAY_ACTION'; payload: { playerId: string; action: ActionToken; cards: ItemCard[] } }
+    | { type: 'SCORE_ROUND'; payload: { scores: { playerId: string; points: number }[] } }
     | { type: 'END_TURN' }
-    | { type: 'SCORE_ROUND' }
-    | { type: 'END_GAME'; payload: { winner: string } };
+    | { type: 'END_GAME'; payload: { winner: string } }
+    // 新增順序決定相關動作
+    | { type: 'START_ORDER_DECISION'; payload: { players: string[] } }
+    | { type: 'ORDER_DECISION_RESULT'; payload: { firstPlayer: string; secondPlayer: string; order: string[] } }
+    | { type: 'UPDATE_ORDER_CONFIRMATIONS'; payload: { confirmations: string[]; waitingFor: string[] } };
 
 // 房間資訊（若需要額外管理大廳狀態）
 export interface RoomInfo {

@@ -1,22 +1,8 @@
 // src/components/game/OrderDecisionModal.tsx
 import React, { useState, useEffect } from 'react';
+import { OrderDecision } from '../../types/game.types';
 
-interface OrderDecisionProps {
-    isOpen: boolean;
-    phase: 'deciding' | 'result' | 'waiting_confirmation';
-    players: string[];
-    result?: {
-        firstPlayer: string;
-        secondPlayer: string;
-        order: string[];
-    };
-    confirmations: string[];
-    waitingFor: string[];
-    currentPlayer: string;
-    onConfirm: () => void;
-}
-
-const OrderDecisionModal: React.FC<OrderDecisionProps> = ({
+const OrderDecisionModal: React.FC<OrderDecision> = ({
     isOpen,
     phase,
     players,

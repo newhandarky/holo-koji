@@ -222,7 +222,7 @@ const GameRoom: React.FC = () => {
 
             {/* 順序決定彈窗 */}
             <OrderDecisionModal
-                isOpen={state.orderDecision.isActive}
+                isOpen={state.orderDecision.isOpen}
                 phase={state.orderDecision.phase}
                 players={state.orderDecision.players}
                 result={state.orderDecision.result}

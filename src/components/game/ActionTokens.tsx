@@ -1,6 +1,6 @@
 // src/components/game/ActionTokens.tsx
 import React from 'react';
-import { ActionToken } from '../../types/game.types';
+import { ActionToken } from "game-shared-types"
 
 /**
  * ActionTokens 組件：顯示並觸發行動標誌

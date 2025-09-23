@@ -1,6 +1,6 @@
 // src/components/game/OrderDecisionModal.tsx
 import React, { useState, useEffect } from 'react';
-import { OrderDecision } from '../../types/game.types';
+import { OrderDecision } from "game-shared-types"
 
 const OrderDecisionModal: React.FC<OrderDecision> = ({
     isOpen,

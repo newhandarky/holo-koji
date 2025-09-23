@@ -4,7 +4,7 @@ import { useGame } from '../../contexts/GameContext';
 import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
-import { ItemCard, ActionType } from '../../types/game.types';
+import { ItemCard, ActionType, Geisha } from "game-shared-types"
 
 /**
  * GameBoard 組件：主遊戲介面
@@ -47,7 +47,7 @@ const GameBoard: React.FC = () => {
         <div>
             {/* 藝妓區域 */}
             <div className="d-flex flex-wrap justify-content-center">
-                {state.geishas.map(geisha => (
+                {state.geishas.map((geisha: Geisha) => (
                     <GeishaCard key={geisha.id} geisha={geisha} />
                 ))}
             </div>

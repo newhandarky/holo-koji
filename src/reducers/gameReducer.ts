@@ -1,6 +1,6 @@
 // src/contexts/gameReducer.ts - 添加順序決定狀態管理
 import { createRandomizedGeishas } from '../utils/gameData';
-import { GameState, Geisha, GameAction } from '../types/game.types';
+import { GameState, Geisha, GameAction } from "game-shared-types"
 
 const initialGeishas: Geisha[] = createRandomizedGeishas();
 

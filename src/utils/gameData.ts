@@ -1,4 +1,4 @@
-import { Geisha } from "../types/game.types";
+import { Geisha } from "game-shared-types"
 
 
 const geishaNames = ['白上フブキ', '百鬼あやめ', '大神ミオ', 'さくらみこ', '風真いろは', '儒烏風亭らでん', '一伊那尓栖'];

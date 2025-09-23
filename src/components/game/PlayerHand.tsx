@@ -1,6 +1,6 @@
 // src/components/game/PlayerHand.tsx
 import React, { useState } from 'react';
-import { ItemCard } from '../../types/game.types';
+import { ItemCard } from "game-shared-types"
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌

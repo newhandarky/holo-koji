@@ -1,7 +1,7 @@
 
 // src/components/game/GeishaCard.tsx
 import React from 'react';
-import { Geisha } from '../../types/game.types';
+import { Geisha } from "game-shared-types"
 
 /**
  * GeishaCard 組件：顯示單張藝妓卡片

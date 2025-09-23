@@ -1,222 +1,135 @@
-// src/hooks/useWebSocket.ts - 添加順序決定功能
-import { useEffect } from 'react';
+// frontend/src/hooks/useWebSocket.ts
+import { useEffect, useRef, useCallback } from 'react';
 import { useGame } from '../contexts/GameContext';
-import { gameWebSocket } from '../services/websocket';
-import config from '../config/environment';
+import io, { Socket } from 'socket.io-client';
+import { GameAction, Player } from "game-shared-types"
 
-export const useWebSocket = () => {
-    const { state, dispatch } = useGame();
-    const serverUrl = config.websocketUrl;
+// !
+interface WebSocketMessage {
+    type: string;
+    payload: any;
+}
 
+export const useWebSocket = (gameId: string, playerData: Player) => {
+    const { dispatch } = useGame();
+    const socketRef = useRef<Socket | null>(null);
+    const reconnectAttempts = useRef(0);
+    const maxReconnectAttempts = 5;
+
+    // 連接到後端
     useEffect(() => {
-        console.log('🔧 [useWebSocket] 使用 WebSocket URL:', serverUrl);
-        console.log('🔧 [useWebSocket] 環境:', process.env.NODE_ENV);
+        if (!gameId || !playerData) return;
 
-        const ensureConnection = async () => {
-            if (!gameWebSocket.isConnected()) {
-                try {
-                    await gameWebSocket.connect(serverUrl);
-                    console.log('✅ [useWebSocket] WebSocket 連接成功');
-                } catch (error) {
-                    console.error('❌ [useWebSocket] WebSocket 連接失敗:', error);
+        console.log(`🟢 [useWebSocket] 開始連接到遊戲: ${gameId}`);
+
+        // 建立 Socket.IO 連接
+        socketRef.current = io('http://localhost:3001', {
+            transports: ['websocket'],
+            forceNew: true
+        });
+
+        const socket = socketRef.current;
+
+        // 連接成功
+        socket.on('connect', () => {
+            console.log('🟢 [useWebSocket] Socket.IO 連線建立成功');
+            reconnectAttempts.current = 0;
+
+            // 自動加入遊戲
+            socket.emit('JOIN_GAME', {
+                gameId,
+                playerData
+            });
+        });
+
+        // 監聽遊戲狀態更新 (對應您原本的訊息處理器)
+        socket.on('GAME_STATE_UPDATE', (message: WebSocketMessage) => {
+            console.log('📨 [useWebSocket] 收到遊戲狀態更新:', message);
+
+            switch (message.type) {
+                case 'GAME_STARTED':
+                    console.log('🚨 [useWebSocket] 遊戲開始');
+                    dispatch({
+                        type: 'SYNC_SERVER_STATE',
+                        payload: message.payload
+                    });
+                    break;
+
+                case 'STATE_CHANGED':
+                    console.log('🔄 [useWebSocket] 遊戲狀態變更');
+                    dispatch({
+                        type: 'SYNC_SERVER_STATE',
+                        payload: message.payload
+                    });
+                    break;
+
+                case 'ORDER_CONFIRMED':
+                    console.log('✅ [useWebSocket] 順序確認完成');
+                    dispatch({
+                        type: 'SYNC_SERVER_STATE',
+                        payload: message.payload
+                    });
+                    break;
+
+                default:
+                    console.warn('⚠️ [useWebSocket] 未知訊息類型:', message.type);
+            }
+        });
+
+        // 連接錯誤處理
+        socket.on('connect_error', (error) => {
+            console.error('❌ [useWebSocket] 連接錯誤:', error);
+        });
+
+        // 斷線處理
+        socket.on('disconnect', (reason) => {
+            console.log('🔴 [useWebSocket] 連線斷開:', reason);
+
+            if (reason === 'io server disconnect') {
+                // 伺服器主動斷開，嘗試重連
+                if (reconnectAttempts.current < maxReconnectAttempts) {
+                    reconnectAttempts.current++;
+                    console.log(`🔄 [useWebSocket] 嘗試重新連接 (${reconnectAttempts.current}/${maxReconnectAttempts})`);
                 }
             }
-        };
-
-        ensureConnection();
-
-        const registerEvents = () => {
-            console.log('📋 [useWebSocket] 開始註冊遊戲事件');
-
-            const eventTypes = [
-                'GAME_STARTED', 'GAME_STATE_UPDATED', 'GAME_ACTION',
-                'TURN_ENDED', 'GAME_ENDED', 'PLAYER_LEFT', 'ERROR',
-                'ROOM_CREATED', 'PLAYER_JOINED',
-                // 新增順序決定相關事件
-                'ORDER_DECISION_START', 'ORDER_DECISION_RESULT', 'ORDER_CONFIRMATION_UPDATE'
-            ];
-
-            eventTypes.forEach(eventType => {
-                gameWebSocket.off(eventType);
-            });
-
-            // 處理遊戲狀態更新
-            gameWebSocket.on('GAME_STATE_UPDATED', (payload) => {
-                console.log('🔄 [CRITICAL] 收到 GAME_STATE_UPDATED 事件！');
-                if (payload.players && Array.isArray(payload.players)) {
-                    dispatch({
-                        type: 'INIT_GAME',
-                        payload: {
-                            gameId: payload.gameId,
-                            players: payload.players
-                        }
-                    });
-                }
-            });
-
-            // 處理遊戲開始
-            gameWebSocket.on('GAME_STARTED', (payload) => {
-                console.log('🎮 [CRITICAL] 收到 GAME_STARTED 事件！');
-                if (payload.players && payload.players.length > 0) {
-                    dispatch({
-                        type: 'INIT_GAME',
-                        payload: {
-                            gameId: payload.gameId,
-                            players: payload.players
-                        }
-                    });
-                }
-            });
-
-            // 新增：處理順序決定開始
-            gameWebSocket.on('ORDER_DECISION_START', (payload) => {
-                console.log('🎲 [useWebSocket] 收到 ORDER_DECISION_START:', payload);
-                dispatch({
-                    type: 'START_ORDER_DECISION',
-                    payload: {
-                        players: payload.players
-                    }
-                });
-            });
-
-            // 新增：處理順序決定結果
-            gameWebSocket.on('ORDER_DECISION_RESULT', (payload) => {
-                console.log('🎯 [useWebSocket] 收到 ORDER_DECISION_RESULT:', payload);
-                dispatch({
-                    type: 'ORDER_DECISION_RESULT',
-                    payload: {
-                        firstPlayer: payload.firstPlayer,
-                        secondPlayer: payload.secondPlayer,
-                        order: payload.order
-                    }
-                });
-            });
-
-            // 新增：處理確認狀態更新
-            gameWebSocket.on('ORDER_CONFIRMATION_UPDATE', (payload) => {
-                console.log('✅ [useWebSocket] 收到 ORDER_CONFIRMATION_UPDATE:', payload);
-                dispatch({
-                    type: 'UPDATE_ORDER_CONFIRMATIONS',
-                    payload: {
-                        confirmations: payload.confirmations,
-                        waitingFor: payload.waitingFor
-                    }
-                });
-            });
-
-            gameWebSocket.on('GAME_ACTION', (payload) => {
-                console.log('🎯 [useWebSocket] 收到 GAME_ACTION:', payload);
-                if (payload.playerId && payload.action && payload.cards) {
-                    dispatch({
-                        type: 'PLAY_ACTION',
-                        payload
-                    });
-                }
-            });
-
-            gameWebSocket.on('TURN_ENDED', (payload) => {
-                console.log('⏭️ [useWebSocket] 收到 TURN_ENDED:', payload);
-                dispatch({ type: 'END_TURN' });
-            });
-
-            gameWebSocket.on('GAME_ENDED', (payload) => {
-                console.log('🏆 [useWebSocket] 收到 GAME_ENDED:', payload);
-                dispatch({
-                    type: 'END_GAME',
-                    payload: { winner: payload.winner }
-                });
-            });
-
-            gameWebSocket.on('PLAYER_LEFT', (payload) => {
-                console.log('👋 [useWebSocket] 收到 PLAYER_LEFT:', payload);
-                alert(`玩家 ${payload.playerId} 已離開遊戲`);
-            });
-
-            gameWebSocket.on('ERROR', (payload) => {
-                console.error('❌ [useWebSocket] 收到 ERROR:', payload);
-                alert(`遊戲錯誤: ${payload.message || '未知錯誤'}`);
-            });
-
-            console.log('📋 [useWebSocket] 已註冊的事件監聽器:', Array.from(gameWebSocket.messageHandlers.keys()));
-        };
-
-        registerEvents();
+        });
 
         return () => {
-            console.log('🧹 [useWebSocket] 清理事件監聽器');
-            const eventTypes = [
-                'GAME_STARTED', 'GAME_STATE_UPDATED', 'GAME_ACTION',
-                'TURN_ENDED', 'GAME_ENDED', 'PLAYER_LEFT', 'ERROR',
-                'ORDER_DECISION_START', 'ORDER_DECISION_RESULT', 'ORDER_CONFIRMATION_UPDATE'
-            ];
-
-            eventTypes.forEach(eventType => {
-                gameWebSocket.off(eventType);
-            });
+            console.log('🔌 [useWebSocket] 清理連接');
+            socket.disconnect();
         };
-    }, [dispatch, serverUrl]);
+    }, [gameId, playerData?.id, dispatch]);
 
-    const sendAction = (type: string, payload: any) => {
-        try {
-            console.log('📤 [useWebSocket] 發送動作:', { type, payload });
-
-            if (!gameWebSocket.isConnected()) {
-                console.warn('⚠️ [useWebSocket] WebSocket 未連接，無法發送動作');
-                alert('連線已斷開，請重新整理頁面');
-                return;
-            }
-
-            gameWebSocket.send(type, payload);
-            console.log('✅ [useWebSocket] 動作發送成功');
-        } catch (error) {
-            console.error('❌ [useWebSocket] 發送失敗:', error);
-            alert('發送失敗，請檢查網路連線');
+    // 發送遊戲動作
+    const sendGameAction = useCallback((action: GameAction) => {
+        if (socketRef.current?.connected) {
+            console.log('📤 [useWebSocket] 發送遊戲動作:', action);
+            socketRef.current.emit('GAME_ACTION', {
+                gameId,
+                action
+            });
+        } else {
+            console.error('❌ [useWebSocket] 無法發送動作，連接未建立');
         }
-    };
+    }, [gameId]);
 
-    const sendGameAction = (action: any, cards: any[]) => {
-        if (!state.players.length || state.phase !== 'playing') {
-            console.warn('⚠️ [useWebSocket] 遊戲尚未開始或玩家不足');
-            return;
+    // 確認順序決定
+    const confirmOrder = useCallback(() => {
+        if (socketRef.current?.connected) {
+            console.log('✅ [useWebSocket] 確認順序');
+            socketRef.current.emit('CONFIRM_ORDER', {
+                gameId,
+                playerId: playerData.id
+            });
         }
+    }, [gameId, playerData?.id]);
 
-        const currentPlayer = state.players[state.currentPlayer];
-        if (!currentPlayer) {
-            console.warn('⚠️ [useWebSocket] 找不到當前玩家');
-            return;
-        }
-
-        sendAction('GAME_ACTION', {
-            playerId: currentPlayer.id,
-            action,
-            cards
-        });
-    };
-
-    const endTurn = () => {
-        sendAction('END_TURN', {});
-    };
-
-    const leaveGame = () => {
-        sendAction('LEAVE_ROOM', {});
-    };
-
-    // 新增：確認順序
-    const confirmOrder = () => {
-        console.log('✅ [useWebSocket] 發送確認順序');
-        sendAction('CONFIRM_ORDER', {});
-    };
+    // 連接狀態
+    const isConnected = socketRef.current?.connected || false;
 
     return {
-        sendAction,
         sendGameAction,
-        endTurn,
-        leaveGame,
-        confirmOrder, // 新增
-        isConnected: gameWebSocket.isConnected(),
-        connectionState: gameWebSocket.getConnectionState(),
-        serverUrl,
-        isDevelopment: config.isDevelopment,
-        isProduction: config.isProduction
+        confirmOrder,
+        isConnected
     };
 };

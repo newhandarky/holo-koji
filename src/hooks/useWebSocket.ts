@@ -100,12 +100,16 @@ const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | nul
 
     const candidate = payload as Partial<OrderDecisionResultPayload>;
     if (candidate.firstPlayer && candidate.secondPlayer && Array.isArray(candidate.order)) {
-        return {
+        const result: OrderDecisionResultPayload = {
             firstPlayer: candidate.firstPlayer,
             secondPlayer: candidate.secondPlayer,
             order: candidate.order,
             gameState: candidate.gameState
         };
+        if (!candidate.gameState) {
+            delete result.gameState;
+        }
+        return result;
     }
 
     return null;
@@ -236,6 +240,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('ORDER_CONFIRMATION_UPDATE', handleOrderConfirmationUpdate);
         registerEventHandler('ORDER_CONFIRMATIONS_UPDATED', handleOrderConfirmationUpdate);
         registerEventHandler('ERROR', handleErrorMessage);
+        registerEventHandler('GAME_ENDED', syncGameState);
 
         gameWebSocket.on(CONNECTION_OPEN, handleOpen);
         gameWebSocket.on(CONNECTION_CLOSE, handleClose);
@@ -258,18 +263,18 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     }, [gameId, playerData?.id, gameDispatch]);
 
     const sendGameAction = useCallback((action: GameAction) => {
-        if (!gameId) {
+        if (!gameId || !playerData?.id) {
             console.warn('⚠️ [useWebSocket] 缺少 gameId，無法發送遊戲動作');
             return;
         }
 
         try {
-            gameWebSocket.send('GAME_ACTION', { gameId, action });
+            gameWebSocket.send('GAME_ACTION', { gameId, playerId: playerData.id, action });
         } catch (error) {
             const message = error instanceof Error ? error.message : '遊戲動作送出失敗';
             clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
         }
-    }, [gameId]);
+    }, [gameId, playerData?.id]);
 
     const confirmOrder = useCallback(() => {
         if (!gameId || !playerData?.id) {

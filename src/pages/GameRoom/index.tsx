@@ -5,6 +5,7 @@ import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
+import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
 
@@ -23,13 +24,17 @@ const createPlayerProfile = (id: string): Player => ({
     secretCards: [],
     discardedCards: [],
     actionTokens: createInitialActionTokens(),
+    score: {
+        charm: 0,
+        tokens: 0
+    }
 });
 
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
     const [playerProfile, setPlayerProfile] = useState<Player | null>(null);
-    const { isConnected, confirmOrder } = useWebSocket(roomId ?? null, playerProfile);
+    const { isConnected, confirmOrder, sendGameAction } = useWebSocket(roomId ?? null, playerProfile);
     const [showRoomCode, setShowRoomCode] = useState(false);
     const [currentPlayerId, setCurrentPlayerId] = useState('');
 
@@ -110,6 +115,13 @@ const GameRoom: React.FC = () => {
     }
 
     const isWaiting = state.phase === 'waiting' || state.players.length < 2;
+
+    const pendingInteraction = state.pendingInteraction;
+    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
+    const canAct =
+        state.phase === 'playing'
+        && state.players[state.currentPlayer]?.id === currentPlayerId
+        && !pendingInteraction;
 
     if (isWaiting) {
         return (
@@ -221,6 +233,8 @@ const GameRoom: React.FC = () => {
                                             </span>
                                             <small className="text-muted">
                                                 手牌: {player.hand.length}
+                                                <br />
+                                                魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
                                             </small>
                                         </div>
                                     </div>
@@ -230,7 +244,12 @@ const GameRoom: React.FC = () => {
                     </div>
 
                     {/* 遊戲主要區域 */}
-                    <GameBoard />
+                    <GameBoard
+                        state={state}
+                        playerId={currentPlayerId}
+                        onSendAction={sendGameAction}
+                        canAct={canAct}
+                    />
 
                     {/* 離開遊戲按鈕 */}
                     <div className="text-center mt-4">
@@ -259,6 +278,14 @@ const GameRoom: React.FC = () => {
                 currentPlayer={currentPlayerId}
                 onConfirm={handleConfirmOrder}
             />
+
+            {needsResponse && pendingInteraction && (
+                <PendingInteractionModal
+                    interaction={pendingInteraction}
+                    playerId={currentPlayerId}
+                    onResolve={sendGameAction}
+                />
+            )}
         </div>
     );
 };

@@ -19,6 +19,10 @@ export class GameWebSocket {
                 this.ws.onopen = () => {
                     console.log('🟢 [WebSocket] 連線建立成功');
                     this.reconnectAttempts = 0;
+                    const openHandler = this.messageHandlers.get('__OPEN__'); // 通知使用端連線事件
+                    if (openHandler) {
+                        openHandler(undefined);
+                    }
                     resolve();
                 };
 
@@ -74,6 +78,11 @@ export class GameWebSocket {
 
                 this.ws.onclose = (event) => {
                     console.log('🔴 [WebSocket] 連線關閉:', event.code, event.reason);
+
+                    const closeHandler = this.messageHandlers.get('__CLOSE__'); // 通知使用端關閉事件
+                    if (closeHandler) {
+                        closeHandler({ code: event.code, reason: event.reason });
+                    }
 
                     if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.attemptReconnect(url);

@@ -1,37 +1,10 @@
 // src/models/GameManager.ts
-import { GameState, GameAction, Player, ActionToken } from "game-shared-types";
+import { GameState, GameAction, Player } from "game-shared-types";
 import { gameReducer, initialState } from '../reducers/gameReducer';
 import { createRandomizedGeishas } from '../utils/gameUtils';
 
 class GameManager {
     private games: Map<string, GameState> = new Map();
-
-    private createDefaultActionTokens(): ActionToken[] {
-        return [
-            { type: 'secret', used: false },
-            { type: 'trade-off', used: false },
-            { type: 'gift', used: false },
-            { type: 'competition', used: false },
-        ];
-    }
-
-    private ensurePlayerState(player: Player): Player {
-        return {
-            id: player.id,
-            name: player.name || player.id,
-            hand: player.hand ?? [],
-            playedCards: player.playedCards ?? [],
-            secretCards: player.secretCards ?? [],
-            discardedCards: player.discardedCards ?? [],
-            actionTokens: (player.actionTokens && player.actionTokens.length > 0)
-                ? player.actionTokens
-                : this.createDefaultActionTokens(),
-            score: player.score ?? {
-                charm: 0,
-                tokens: 0
-            }
-        };
-    }
 
     // 建立新遊戲房間
     createGame(gameId: string): GameState {
@@ -59,7 +32,7 @@ class GameManager {
 
         const updatedGame = {
             ...game,
-            players: [...game.players, this.ensurePlayerState(player)]
+            players: [...game.players, player]
         };
 
         this.games.set(gameId, updatedGame);

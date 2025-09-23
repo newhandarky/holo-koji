@@ -6,11 +6,30 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import config from '../../config/environment';
+import { Player, ActionToken } from "game-shared-types"
+
+const createInitialActionTokens = (): ActionToken[] => [
+    { type: 'secret', used: false },
+    { type: 'trade-off', used: false },
+    { type: 'gift', used: false },
+    { type: 'competition', used: false },
+];
+
+const createPlayerProfile = (id: string): Player => ({
+    id,
+    name: id,
+    hand: [],
+    playedCards: [],
+    secretCards: [],
+    discardedCards: [],
+    actionTokens: createInitialActionTokens(),
+});
 
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
-    const { isConnected, confirmOrder } = useWebSocket();
+    const [playerProfile, setPlayerProfile] = useState<Player | null>(null);
+    const { isConnected, confirmOrder } = useWebSocket(roomId ?? null, playerProfile);
     const [showRoomCode, setShowRoomCode] = useState(false);
     const [currentPlayerId, setCurrentPlayerId] = useState('');
 
@@ -19,8 +38,17 @@ const GameRoom: React.FC = () => {
         const savedPlayerId = localStorage.getItem('currentPlayerId');
         if (savedPlayerId) {
             setCurrentPlayerId(savedPlayerId);
+            setPlayerProfile(prev => prev ?? createPlayerProfile(savedPlayerId));
         }
     }, []);
+
+    useEffect(() => {
+        if (!currentPlayerId) return;
+        const existingPlayer = state.players.find(player => player.id === currentPlayerId);
+        if (existingPlayer) {
+            setPlayerProfile(existingPlayer);
+        }
+    }, [state.players, currentPlayerId]);
 
     useEffect(() => {
         console.log('🎮 [GameRoom] 狀態更新:');

@@ -108,7 +108,7 @@ const Lobby: React.FC = () => {
     };
 
     // 檢查當前網域，決定是否使用 Hash
-    const useHash = () => {
+    const shouldUseHash = () => {
         return window.location.host.includes('github.io');
     };
 
@@ -126,7 +126,7 @@ const Lobby: React.FC = () => {
                             <small className="text-muted">
                                 環境: {process.env.NODE_ENV}<br />
                                 WebSocket: {config.websocketUrl}<br />
-                                Router: {useHash() ? 'HashRouter' : 'BrowserRouter'}
+                                Router: {shouldUseHash() ? 'HashRouter' : 'BrowserRouter'}
                             </small>
                         </div>
                     )}

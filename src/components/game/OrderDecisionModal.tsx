@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { OrderDecision } from "game-shared-types"
 
-const OrderDecisionModal: React.FC<OrderDecision> = ({
+interface OrderDecisionModalProps extends OrderDecision {
+    onConfirm: () => void;
+}
+
+const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
     isOpen,
     phase,
     players,

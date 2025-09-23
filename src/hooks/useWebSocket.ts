@@ -251,7 +251,7 @@ const initialClientState: ClientState = {
     error: null
 };
 
-export const useWebSocket = (gameId: string, playerData: Player) => {
+export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
     // 使用內部的 clientReducer 管理 WebSocket 相關狀態
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState);
 
@@ -263,7 +263,9 @@ export const useWebSocket = (gameId: string, playerData: Player) => {
     const maxReconnectAttempts = 5;
 
     useEffect(() => {
-        if (!gameId || !playerData) return;
+        if (!gameId || !playerData) {
+            return;
+        }
 
         console.log(`🟢 [useWebSocket] 開始連接到遊戲: ${gameId}`);
 
@@ -295,7 +297,7 @@ export const useWebSocket = (gameId: string, playerData: Player) => {
         });
 
         // 統一的 WebSocket 訊息處理函數
-        const handleWebSocketMessage = (eventType: WebSocketEventType, message: WebSocketMessage) => {
+        const handleWebSocketMessage = (eventType: WebSocketEventType | string, message: WebSocketMessage) => {
             console.log(`📨 [useWebSocket] 收到事件: ${eventType}`, message);
 
             switch (eventType) {
@@ -454,7 +456,7 @@ export const useWebSocket = (gameId: string, playerData: Player) => {
             console.log('🔌 [useWebSocket] 清理連接');
             socket.disconnect();
         };
-    }, [gameId, playerData?.id, gameDispatch]);
+    }, [gameId, playerData, gameDispatch]);
 
     // 發送遊戲動作
     const sendGameAction = useCallback((action: GameAction) => {
@@ -471,18 +473,18 @@ export const useWebSocket = (gameId: string, playerData: Player) => {
 
     // 確認順序決定（保留您原本的方法）
     const confirmOrder = useCallback(() => {
-        if (socketRef.current?.connected) {
+        if (socketRef.current?.connected && gameId && playerData) {
             console.log('✅ [useWebSocket] 確認順序');
             socketRef.current.emit('CONFIRM_ORDER', {
                 gameId,
                 playerId: playerData.id
             });
         }
-    }, [gameId, playerData?.id]);
+    }, [gameId, playerData]);
 
     // 開始順序決定（新增的方法）
     const startOrderDecision = useCallback((players: string[]) => {
-        if (socketRef.current?.connected) {
+        if (socketRef.current?.connected && gameId) {
             console.log('🎲 [useWebSocket] 開始順序決定');
             socketRef.current.emit('START_ORDER_DECISION', {
                 gameId,

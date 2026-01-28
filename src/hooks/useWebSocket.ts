@@ -1,11 +1,12 @@
 // frontend/src/hooks/useWebSocket.ts
-import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import {
     ClientAction,
     ClientState,
     GameAction,
     GameState,
+    ItemCard,
     OrderDecisionResultPayload,
     OrderDecisionStartPayload,
     Player,
@@ -17,6 +18,17 @@ import config from '../config/environment';
 // 連線事件的保留名稱，避免與伺服器事件衝突
 const CONNECTION_OPEN = '__OPEN__';
 const CONNECTION_CLOSE = '__CLOSE__';
+
+export interface DealAnimationStep {
+    order: number;
+    playerId: string;
+    card: ItemCard;
+}
+
+export interface CardDrawEvent {
+    playerId: string;
+    card: ItemCard;
+}
 
 // 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
 const clientReducer = (state: ClientState, action: ClientAction): ClientState => {
@@ -118,6 +130,8 @@ const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | nul
 export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
+    const [dealQueue, setDealQueue] = useState<DealAnimationStep[]>([]);
+    const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
 
     useEffect(() => {
         const playerId = playerData?.id;
@@ -197,6 +211,53 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
         };
 
+        const handleDealAnimation = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as { sequence?: unknown };
+            if (!Array.isArray(candidate.sequence)) {
+                return;
+            }
+
+            const normalized = candidate.sequence
+                .map((step, index) => {
+                    if (!step || typeof step !== 'object') {
+                        return null;
+                    }
+
+                    const raw = step as Partial<DealAnimationStep> & { card?: ItemCard };
+                    if (!raw.card || typeof raw.playerId !== 'string') {
+                        return null;
+                    }
+
+                    return {
+                        order: typeof raw.order === 'number' ? raw.order : index,
+                        playerId: raw.playerId,
+                        card: raw.card
+                    } as DealAnimationStep;
+                })
+                .filter((step): step is DealAnimationStep => Boolean(step));
+
+            setDealQueue(normalized.sort((a, b) => a.order - b.order));
+        };
+
+        const handleCardDrawn = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as Partial<CardDrawEvent> & { card?: ItemCard };
+            if (typeof candidate.playerId === 'string' && candidate.card && typeof candidate.card === 'object') {
+                const drawEvent: CardDrawEvent = {
+                    playerId: candidate.playerId,
+                    card: candidate.card
+                };
+                setDrawQueue(prev => [...prev, drawEvent]);
+            }
+        };
+
         const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
             handlerMap[eventType] = handler;
             gameWebSocket.on(eventType, handler);
@@ -241,6 +302,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('ORDER_CONFIRMATIONS_UPDATED', handleOrderConfirmationUpdate);
         registerEventHandler('ERROR', handleErrorMessage);
         registerEventHandler('GAME_ENDED', syncGameState);
+        registerEventHandler('DEAL_ANIMATION', handleDealAnimation);
+        registerEventHandler('CARD_DRAWN', handleCardDrawn);
 
         gameWebSocket.on(CONNECTION_OPEN, handleOpen);
         gameWebSocket.on(CONNECTION_CLOSE, handleClose);
@@ -259,6 +322,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         return () => {
             isActive = false;
             cleanupHandlers();
+            setDealQueue([]);
+            setDrawQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);
 
@@ -314,6 +379,14 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         clientDispatch({ type: 'CLEAR_ERROR' });
     }, []);
 
+    const consumeDealStep = useCallback(() => {
+        setDealQueue(prev => prev.slice(1));
+    }, []);
+
+    const consumeDrawEvent = useCallback(() => {
+        setDrawQueue(prev => prev.slice(1));
+    }, []);
+
     return {
         gameState: clientState.gameState,
         isConnected: clientState.isConnected,
@@ -322,6 +395,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         sendGameAction,
         confirmOrder,
         startOrderDecision,
-        clearError
+        clearError,
+        dealQueue,
+        consumeDealStep,
+        drawQueue,
+        consumeDrawEvent
     };
 };

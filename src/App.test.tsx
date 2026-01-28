@@ -2,8 +2,9 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+// 基本渲染測試：確認大廳標題存在
+test('應該渲染大廳標題', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  const heading = screen.getByRole('heading', { name: '花見小路' });
+  expect(heading).toBeInTheDocument();
 });

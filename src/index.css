@@ -8,6 +8,79 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.deal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1050;
+}
+
+.deal-card {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: dealPulse 0.45s ease-in-out;
+}
+
+@keyframes dealPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.draw-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(33, 150, 243, 0.9);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  animation: toastFade 1.2s ease-in-out;
+  z-index: 1040;
+}
+
+@keyframes toastFade {
+  0% {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -10px);
+    opacity: 0;
+  }
+}
+
 /* 代碼區塊字體 */
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',

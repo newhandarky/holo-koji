@@ -1,5 +1,5 @@
 // src/components/game/GameBoard.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
@@ -18,16 +18,19 @@ interface GameBoardProps {
     canAct: boolean;
 }
 
+// 遊戲主棋盤與行動控制區
 const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, canAct }) => {
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
 
-    // 利用 memo 減少重複排序或運算
-    const currentPlayer = useMemo(() => state.players[state.currentPlayer], [state.players, state.currentPlayer]);
-    const myState = useMemo(() => state.players.find((player) => player.id === playerId), [state.players, playerId]);
+    // 取得當前玩家與自己的狀態
+    const currentPlayer = state.players[state.currentPlayer];
+    const myState = state.players.find((player) => player.id === playerId);
     const isMyTurn = canAct && currentPlayer?.id === playerId;
 
+    // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
 
+    // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
         if (!isMyTurn || !myState) {
             return;
@@ -110,6 +113,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, ca
         }
     };
 
+    // 更新選牌狀態並同步給父層
     const handleCardSelect = (cards: ItemCard[]) => {
         setSelectedCards(cards);
     };

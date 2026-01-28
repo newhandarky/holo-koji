@@ -1,5 +1,5 @@
 // src/components/game/PlayerHand.tsx
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ItemCard } from "game-shared-types"
 
 /**
@@ -10,19 +10,23 @@ interface Props {
     onCardSelect: (cards: ItemCard[]) => void;
 }
 
+// 玩家手牌區顯示與選牌
 const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
+    const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
 
+    // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
     const toggleCard = (card: ItemCard) => {
-        let newSel;
-        if (selected.some(c => c.id === card.id)) {
-            newSel = selected.filter(c => c.id !== card.id);
-        } else {
-            newSel = [...selected, card];
-        }
-        setSelected(newSel);
-        onCardSelect(newSel);
+        setSelected((prevSelected) => {
+            const exists = prevSelected.some(c => c.id === card.id);
+            const nextSelected = exists
+                ? prevSelected.filter(c => c.id !== card.id)
+                : [...prevSelected, card];
+
+            onCardSelect(nextSelected);
+            return nextSelected;
+        });
     };
 
     return (
@@ -30,7 +34,7 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
             {cards.map(card => (
                 <div
                     key={card.id}
-                    className={`item-card ${selected.some(c => c.id === card.id) ? 'selected' : ''}`}
+                    className={`item-card ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
                     onClick={() => toggleCard(card)}
                 >
                     <p>藝妓 {card.geishaId}</p>

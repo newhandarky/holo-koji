@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useWebSocket, DealAnimationStep } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
 
+// 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
     { type: 'secret', used: false },
     { type: 'trade-off', used: false },
@@ -16,6 +17,7 @@ const createInitialActionTokens = (): ActionToken[] => [
     { type: 'competition', used: false },
 ];
 
+// 建立玩家本地資料（尚未同步伺服器時使用）
 const createPlayerProfile = (id: string): Player => ({
     id,
     name: id,
@@ -30,31 +32,29 @@ const createPlayerProfile = (id: string): Player => ({
     }
 });
 
+// 遊戲房間主畫面
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
-    const [playerProfile, setPlayerProfile] = useState<Player | null>(null);
-    const { isConnected, confirmOrder, sendGameAction } = useWebSocket(roomId ?? null, playerProfile);
+    const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
+    const playerProfile = currentPlayerId
+        ? (state.players.find(player => player.id === currentPlayerId) ?? createPlayerProfile(currentPlayerId))
+        : null;
+    const {
+        isConnected,
+        confirmOrder,
+        sendGameAction,
+        dealQueue,
+        consumeDealStep,
+        drawQueue,
+        consumeDrawEvent
+    } = useWebSocket(roomId ?? null, playerProfile);
     const [showRoomCode, setShowRoomCode] = useState(false);
-    const [currentPlayerId, setCurrentPlayerId] = useState('');
+    const [activeDealStep, setActiveDealStep] = useState<DealAnimationStep | null>(null);
+    const [isDealing, setIsDealing] = useState(false);
+    const [recentDraw, setRecentDraw] = useState<string | null>(null);
 
-    // 獲取當前玩家ID（簡化處理，實際應該從更安全的地方獲取）
-    useEffect(() => {
-        const savedPlayerId = localStorage.getItem('currentPlayerId');
-        if (savedPlayerId) {
-            setCurrentPlayerId(savedPlayerId);
-            setPlayerProfile(prev => prev ?? createPlayerProfile(savedPlayerId));
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!currentPlayerId) return;
-        const existingPlayer = state.players.find(player => player.id === currentPlayerId);
-        if (existingPlayer) {
-            setPlayerProfile(existingPlayer);
-        }
-    }, [state.players, currentPlayerId]);
-
+    // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
         console.log('🎮 [GameRoom] 狀態更新:');
         console.log('  - roomId:', roomId);
@@ -64,6 +64,59 @@ const GameRoom: React.FC = () => {
         console.log('  - 當前玩家ID:', currentPlayerId);
     }, [state, roomId, isConnected, currentPlayerId]);
 
+    // 發牌動畫節奏控制
+    useEffect(() => {
+        if (dealQueue.length === 0) {
+            setActiveDealStep(null);
+            setIsDealing(false);
+            return;
+        }
+
+        setIsDealing(true);
+        setActiveDealStep(dealQueue[0]);
+
+        const timer = window.setTimeout(() => {
+            consumeDealStep();
+        }, 450);
+
+        return () => window.clearTimeout(timer);
+    }, [dealQueue, consumeDealStep]);
+
+    // 抽牌提示顯示與消失
+    useEffect(() => {
+        if (drawQueue.length === 0) {
+            setRecentDraw(null);
+            return;
+        }
+
+        const { playerId, card } = drawQueue[0];
+        const label = playerId === currentPlayerId
+            ? `你抽到了一張藝妓 ${card.geishaId} 的物品卡`
+            : `${playerId} 抽到了新卡`;
+        setRecentDraw(label);
+
+        const timer = window.setTimeout(() => {
+            consumeDrawEvent();
+        }, 1200);
+
+        return () => window.clearTimeout(timer);
+    }, [drawQueue, currentPlayerId, consumeDrawEvent]);
+
+    // 依目前發牌資訊生成顯示文字
+    const dealingLabel = (() => {
+        if (!activeDealStep) {
+            return '';
+        }
+
+        const targetPlayer = state.players.find(player => player.id === activeDealStep.playerId);
+        const targetName = targetPlayer?.name ?? activeDealStep.playerId;
+        const isMine = activeDealStep.playerId === currentPlayerId;
+        const cardInfo = isMine ? `藝妓 ${activeDealStep.card.geishaId}` : '神秘卡牌';
+
+        return `發牌給 ${targetName}：${cardInfo}`;
+    })();
+
+    // 複製房間代碼到剪貼簿
     const copyRoomCode = async () => {
         if (!roomId) return;
 
@@ -81,6 +134,7 @@ const GameRoom: React.FC = () => {
         }
     };
 
+    // 玩家確認順序
     const handleConfirmOrder = () => {
         console.log('🎯 [GameRoom] 玩家確認順序:', currentPlayerId);
         confirmOrder();
@@ -266,6 +320,19 @@ const GameRoom: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {isDealing && activeDealStep && (
+                <div className="deal-overlay">
+                    <div className="deal-card shadow">
+                        <div className="spinner-border spinner-border-sm text-light me-2" role="status" />
+                        <span>{dealingLabel}</span>
+                    </div>
+                </div>
+            )}
+
+            {recentDraw && (
+                <div className="draw-toast shadow">{recentDraw}</div>
+            )}
 
             {/* 順序決定彈窗 */}
             <OrderDecisionModal

@@ -1,24 +1,37 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 
+// Lobby 入口主畫面
 const Lobby: React.FC = () => {
     const [playerName, setPlayerName] = useState('');
     const [roomId, setRoomId] = useState('');
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     const navigate = useNavigate();
+    const playerNameRef = useRef('');
 
+    // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
+        playerNameRef.current = playerName;
+    }, [playerName]);
+
+    // 建立連線與註冊事件（只在首次掛載時執行）
+    useEffect(() => {
+        let isActive = true;
+
+        // 連線 WebSocket（避免重複連線）
         const connectWS = async () => {
             setConnectionStatus('connecting');
             try {
                 await gameWebSocket.connect(config.websocketUrl);
+                if (!isActive) return;
                 setConnectionStatus('connected');
                 console.log('✅ [Lobby] WebSocket 連線成功');
             } catch (error) {
+                if (!isActive) return;
                 setConnectionStatus('disconnected');
                 console.error('❌ [Lobby] WebSocket 連線失敗:', error);
             }
@@ -30,12 +43,13 @@ const Lobby: React.FC = () => {
             setConnectionStatus('connected');
         }
 
+        // 房間建立成功後處理
         const handleRoomCreated = (payload: any) => {
             console.log('🏠 [Lobby] 房間建立成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerName);
+            localStorage.setItem('currentPlayerId', playerNameRef.current);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
@@ -44,12 +58,13 @@ const Lobby: React.FC = () => {
             navigate(`/game/${payload.roomId}`);
         };
 
+        // 加入房間成功後處理
         const handlePlayerJoined = (payload: any) => {
             console.log('👤 [Lobby] 玩家加入成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerName);
+            localStorage.setItem('currentPlayerId', playerNameRef.current);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
@@ -58,6 +73,7 @@ const Lobby: React.FC = () => {
             navigate(`/game/${payload.roomId}`);
         };
 
+        // 收到伺服器錯誤時提示使用者
         const handleError = (payload: any) => {
             console.error('❌ [Lobby] 伺服器錯誤:', payload);
             setIsConnecting(false);
@@ -70,13 +86,15 @@ const Lobby: React.FC = () => {
         gameWebSocket.on('ERROR', handleError);
 
         return () => {
+            isActive = false;
             console.log('🧹 [Lobby] 組件卸載，清理事件監聽器');
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
         };
-    }, [navigate, playerName]);
+    }, [navigate]);
 
+    // 建立房間請求
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
@@ -84,6 +102,7 @@ const Lobby: React.FC = () => {
         gameWebSocket.send('CREATE_ROOM', { playerId: playerName });
     };
 
+    // 加入房間請求
     const joinRoom = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
@@ -91,6 +110,7 @@ const Lobby: React.FC = () => {
         gameWebSocket.send('JOIN_ROOM', { roomId, playerId: playerName });
     };
 
+    // 依連線狀態回傳文字顏色
     const getStatusColor = () => {
         switch (connectionStatus) {
             case 'connected': return 'text-success';
@@ -99,6 +119,7 @@ const Lobby: React.FC = () => {
         }
     };
 
+    // 依連線狀態回傳顯示文字
     const getStatusText = () => {
         switch (connectionStatus) {
             case 'connected': return '🟢 已連接到伺服器';
@@ -107,7 +128,7 @@ const Lobby: React.FC = () => {
         }
     };
 
-    // 檢查當前網域，決定是否使用 Hash
+    // 檢查當前網域，決定是否使用 Hash Router
     const shouldUseHash = () => {
         return window.location.host.includes('github.io');
     };

@@ -1,46 +1,76 @@
-# Getting Started with Create React App
+# 花見小路線上對戰（Hanamikoji）
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+本專案為花見小路的線上對戰版本，前端使用 React（Create React App），後端使用 Node.js + WebSocket，讓兩位玩家可在房間中進行遊戲。
 
-## Available Scripts
+## 專案結構
 
-In the project directory, you can run:
+- `src/`：前端 React 應用
+- `server/`：後端 WebSocket 伺服器
+- `docs/`：規則與開發文件
 
-### `npm start`
+## 環境需求
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- Node.js（建議 16+）
+- npm
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## 安裝依賴
 
-### `npm test`
+```bash
+npm install
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+後端依賴（可獨立安裝）：
 
-### `npm run build`
+```bash
+cd server
+npm install
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 前端啟動（開發模式）
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm start
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+預設會啟動在 `http://localhost:3000`。
 
-### `npm run eject`
+## 後端啟動
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+cd server
+npm run dev
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+預設 WebSocket 伺服器在 `http://localhost:3001`。
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## 測試
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+```bash
+npm test
+```
 
-## Learn More
+若要在 CI 或一次性跑完：
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+CI=1 npm test -- --watchAll=false
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 建置
+
+```bash
+npm run build
+```
+
+輸出會在 `build/` 資料夾。
+
+## 部署（GitHub Pages）
+
+```bash
+npm run deploy
+```
+
+## 補充說明
+
+- 遊戲規則請參考 `docs/0127-花見小路規則.md`。
+- 開發與檢查清單請參考 `docs/0127-花見小路線上遊戲 - 開發與檢查清單.md`。
+

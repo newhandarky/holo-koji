@@ -1,5 +1,5 @@
 // frontend/src/hooks/useWebSocket.ts
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import {
     ClientAction,
@@ -33,6 +33,11 @@ export interface CardDrawEvent {
     playerId: string;
     // 抽到的卡片
     card: ItemCard;
+}
+
+interface RoundCompletePayload {
+    // 結算回合數
+    round?: number;
 }
 
 // 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
@@ -138,6 +143,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
     const [dealQueue, setDealQueue] = useState<DealAnimationStep[]>([]);
     const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
+    const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
+    const roundSummaryTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
         const playerId = playerData?.id;
@@ -264,6 +271,27 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             }
         };
 
+        const handleRoundComplete = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const round = (payload as RoundCompletePayload).round;
+            if (!round) {
+                return;
+            }
+
+            setRoundSummary({ round });
+
+            if (roundSummaryTimerRef.current) {
+                window.clearTimeout(roundSummaryTimerRef.current);
+            }
+
+            roundSummaryTimerRef.current = window.setTimeout(() => {
+                setRoundSummary(null);
+            }, 2500);
+        };
+
         const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
             handlerMap[eventType] = handler;
             gameWebSocket.on(eventType, handler);
@@ -275,6 +303,11 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             });
             gameWebSocket.off(CONNECTION_OPEN);
             gameWebSocket.off(CONNECTION_CLOSE);
+
+            if (roundSummaryTimerRef.current) {
+                window.clearTimeout(roundSummaryTimerRef.current);
+                roundSummaryTimerRef.current = null;
+            }
         };
 
         const handleOpen = () => {
@@ -300,6 +333,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('GAME_STATE_SYNC', syncGameState);
         registerEventHandler('STATE_CHANGED', syncGameState);
         registerEventHandler('GAME_STARTED', syncGameState);
+        registerEventHandler('ROUND_COMPLETE', handleRoundComplete);
         registerEventHandler('ORDER_DECISION_START', handleOrderDecisionStart);
         registerEventHandler('ORDER_DECISION_STARTED', handleOrderDecisionStart);
         registerEventHandler('ORDER_DECISION_RESULT', handleOrderDecisionResult);
@@ -405,6 +439,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         isConnected: clientState.isConnected,
         isLoading: clientState.isLoading,
         error: clientState.error,
+        roundSummary,
         sendGameAction,
         confirmOrder,
         startOrderDecision,

@@ -48,6 +48,7 @@ const GameRoom: React.FC = () => {
         : null;
     const {
         isConnected,
+        roundSummary,
         confirmOrder,
         sendGameAction,
         dealQueue,
@@ -187,6 +188,14 @@ const GameRoom: React.FC = () => {
                 <div className="card p-4 text-center">
                     <h2 className="text-success mb-3">🎉 遊戲結束！</h2>
                     <p className="fs-5 mb-4">獲勝者: <strong>{state.winner}</strong></p>
+                    <div className="mb-3 text-start">
+                        {state.players.map((player) => (
+                            <div key={player.id} className="d-flex justify-content-between">
+                                <span className="fw-semibold">{player.name}</span>
+                                <span>魅力 {player.score?.charm || 0} / 藝妓 {player.score?.tokens || 0}</span>
+                            </div>
+                        ))}
+                    </div>
                     <button className="btn btn-primary me-2" onClick={() => window.location.href = '/'}>
                         返回大廳
                     </button>
@@ -372,6 +381,24 @@ const GameRoom: React.FC = () => {
 
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
+            )}
+
+            {roundSummary && (
+                <div className="round-summary-overlay">
+                    <div className="round-summary-card shadow">
+                        <h4 className="mb-2">第 {roundSummary.round} 回合結算完成</h4>
+                        <p className="text-muted mb-3">好感指示物已更新，準備進入下一回合</p>
+                        <div className="d-flex flex-column gap-2">
+                            {state.players.map((player) => (
+                                <div key={player.id} className="round-summary-row">
+                                    <span className="fw-semibold">{player.name}</span>
+                                    <span>魅力 {player.score?.charm || 0}</span>
+                                    <span>藝妓 {player.score?.tokens || 0}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             )}
 
             <DrawCardModal

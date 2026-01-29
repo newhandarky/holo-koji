@@ -62,6 +62,33 @@ body {
   z-index: 1040;
 }
 
+/* 回合結算提示 */
+.round-summary-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1060;
+}
+
+.round-summary-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px 24px;
+  min-width: 320px;
+  max-width: 520px;
+}
+
+.round-summary-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
 @keyframes toastFade {
   0% {
     transform: translate(-50%, 20px);

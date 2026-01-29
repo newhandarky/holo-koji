@@ -10,6 +10,10 @@ const Lobby: React.FC = () => {
     const [playerName, setPlayerName] = useState('');
     // 房間代碼輸入
     const [roomId, setRoomId] = useState('');
+    // 對戰模式（online = 玩家對戰，npc = 對戰 AI）
+    const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
+    // AI 難度（僅 NPC 模式使用）
+    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -104,8 +108,12 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName });
-        gameWebSocket.send('CREATE_ROOM', { playerId: playerName });
+        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty });
+        gameWebSocket.send('CREATE_ROOM', {
+            playerId: playerName,
+            mode: matchMode,
+            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined
+        });
     };
 
     // 加入房間請求
@@ -160,6 +168,48 @@ const Lobby: React.FC = () => {
                 </div>
 
                 <div className="mb-3">
+                    <label className="form-label">對戰模式</label>
+                    <div className="d-flex gap-3 mb-3">
+                        <label className="form-check-label">
+                            <input
+                                type="radio"
+                                className="form-check-input me-2"
+                                name="matchMode"
+                                value="online"
+                                checked={matchMode === 'online'}
+                                onChange={() => setMatchMode('online')}
+                                disabled={isConnecting}
+                            />
+                            線上玩家
+                        </label>
+                        <label className="form-check-label">
+                            <input
+                                type="radio"
+                                className="form-check-input me-2"
+                                name="matchMode"
+                                value="npc"
+                                checked={matchMode === 'npc'}
+                                onChange={() => setMatchMode('npc')}
+                                disabled={isConnecting}
+                            />
+                            對戰 NPC
+                        </label>
+                    </div>
+                    {matchMode === 'npc' && (
+                        <div className="mb-3">
+                            <label className="form-label">AI 強度</label>
+                            <select
+                                className="form-select"
+                                value={aiDifficulty}
+                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard')}
+                                disabled={isConnecting}
+                            >
+                                <option value="easy">簡單</option>
+                                <option value="medium">中等</option>
+                                <option value="hard">偏強</option>
+                            </select>
+                        </div>
+                    )}
                     <label className="form-label">玩家名稱</label>
                     <input
                         type="text"
@@ -194,13 +244,13 @@ const Lobby: React.FC = () => {
                         placeholder="輸入房間代碼"
                         value={roomId}
                         onChange={e => setRoomId(e.target.value.toUpperCase())}
-                        disabled={isConnecting}
+                        disabled={isConnecting || matchMode === 'npc'}
                         maxLength={6}
                     />
                     <button
                         className="btn btn-success w-100"
                         onClick={joinRoom}
-                        disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected'}
+                        disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected' || matchMode === 'npc'}
                     >
                         {isConnecting ? (
                             <>
@@ -209,6 +259,11 @@ const Lobby: React.FC = () => {
                             </>
                         ) : '🚪 加入房間'}
                     </button>
+                    {matchMode === 'npc' && (
+                        <div className="text-muted small mt-2">
+                            NPC 模式不需要輸入房間代碼，直接建立房間即可開始對戰。
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-4 pt-3 border-top">

@@ -1,6 +1,6 @@
 // src/pages/GameRoom/index.tsx - 添加順序決定彈窗
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket, DealAnimationStep } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
@@ -37,6 +37,7 @@ const createPlayerProfile = (id: string): Player => ({
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
+    const navigate = useNavigate();
     const { state } = useGame();
     // 當前玩家 ID（從 localStorage 取得）
     const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
@@ -196,8 +197,11 @@ const GameRoom: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                    <button className="btn btn-primary me-2" onClick={() => window.location.href = '/'}>
+                    <button className="btn btn-primary me-2" onClick={() => navigate('/')}>
                         返回大廳
+                    </button>
+                    <button className="btn btn-outline-primary" onClick={() => navigate('/')}>
+                        再來一場
                     </button>
                 </div>
             </div>
@@ -282,7 +286,7 @@ const GameRoom: React.FC = () => {
 
                     <button
                         className="btn btn-outline-secondary btn-sm"
-                        onClick={() => window.location.href = '/'}
+                        onClick={() => navigate('/')}
                     >
                         返回大廳
                     </button>
@@ -360,7 +364,7 @@ const GameRoom: React.FC = () => {
                             className="btn btn-outline-danger btn-sm"
                             onClick={() => {
                                 if (window.confirm('確定要離開遊戲嗎？')) {
-                                    window.location.href = '/';
+                                    navigate('/');
                                 }
                             }}
                         >
@@ -423,6 +427,9 @@ const GameRoom: React.FC = () => {
                 <PendingInteractionModal
                     interaction={pendingInteraction}
                     playerId={currentPlayerId}
+                    players={state.players}
+                    geishas={state.geishas}
+                    hostId={hostId}
                     onResolve={sendGameAction}
                 />
             )}

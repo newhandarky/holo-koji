@@ -301,6 +301,102 @@ code {
   color: #0d6efd;
 }
 
+/* 互動視窗戰況摘要 */
+.interaction-summary {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+
+.interaction-summary__header {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.interaction-summary__scores {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.interaction-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.interaction-summary__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.interaction-summary__name {
+  font-weight: 600;
+}
+
+/* 互動視窗內容限制高度，避免被遮罩擋住 */
+.interaction-modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* 戰況視覺化 */
+.battle-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.battle-geisha-card {
+  position: relative;
+  height: 90px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.battle-geisha-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.battle-geisha-score {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.7rem;
+  z-index: 2;
+}
+
+.battle-geisha-chips {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+}
+
+.battle-geisha-chips--opponent {
+  top: 8px;
+  right: 8px;
+}
+
+.battle-geisha-chips--mine {
+  bottom: 8px;
+  left: 8px;
+}
+
 .item-card--mini {
   width: 96px;
   min-width: 96px;

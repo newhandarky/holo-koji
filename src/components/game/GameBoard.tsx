@@ -1,8 +1,9 @@
 // src/components/game/GameBoard.tsx
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
+import CompetitionGroupModal from './CompetitionGroupModal';
 import {
     ItemCard,
     ActionType,
@@ -14,21 +15,63 @@ import {
 interface GameBoardProps {
     state: GameState;
     playerId: string;
+    hostId: string;
     onSendAction: (action: GameAction) => void;
     canAct: boolean;
 }
 
 // 遊戲主棋盤與行動控制區
-const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, canAct }) => {
+const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, hostId, onSendAction, canAct }) => {
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
+    const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
+    const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
 
     // 取得當前玩家與自己的狀態
     const currentPlayer = state.players[state.currentPlayer];
     const myState = state.players.find((player) => player.id === playerId);
     const isMyTurn = canAct && currentPlayer?.id === playerId;
+    const opponentState = state.players.find((player) => player.id !== playerId) ?? null;
 
     // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
+
+    // 當手牌更新或輪次切換時清除選牌狀態（避免選到舊卡）
+    useEffect(() => {
+        resetSelection();
+    }, [myState?.hand.length, isMyTurn]);
+
+    // 建立藝妓對應卡數量的索引表（快速查詢）
+    const myCountMap = useMemo(() => {
+        const map = new Map<number, number>();
+        myState?.playedCards.forEach((card) => {
+            map.set(card.geishaId, (map.get(card.geishaId) ?? 0) + 1);
+        });
+        return map;
+    }, [myState?.playedCards]);
+
+    const opponentCountMap = useMemo(() => {
+        const map = new Map<number, number>();
+        opponentState?.playedCards.forEach((card) => {
+            map.set(card.geishaId, (map.get(card.geishaId) ?? 0) + 1);
+        });
+        return map;
+    }, [opponentState?.playedCards]);
+
+    // 依魅力值排序，上排 3/3/4/5，下排 2/2/2
+    const { topRow, bottomRow } = useMemo(() => {
+        const twoPoints = state.geishas.filter((geisha) => geisha.charmPoints === 2);
+        const highPoints = state.geishas
+            .filter((geisha) => geisha.charmPoints !== 2)
+            .sort((a, b) => a.charmPoints - b.charmPoints);
+
+        return {
+            topRow: highPoints,
+            bottomRow: twoPoints
+        };
+    }, [state.geishas]);
+
+    const myCamp = playerId && hostId && playerId === hostId ? 'host' : 'guest';
+    const opponentCamp = myCamp === 'host' ? 'guest' : 'host';
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
@@ -80,32 +123,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, ca
                     alert('請選擇 4 張卡片進行競爭');
                     return;
                 }
-                const sequencePrompt = window.prompt('請輸入第一組 2 張卡片的順序 (以逗號分隔，範例: 1,3)', '1,2');
-                if (!sequencePrompt) {
-                    return;
-                }
-                const firstGroupIndexes = sequencePrompt
-                    .split(',')
-                    .map((value) => Number(value.trim()) - 1)
-                    .filter((value) => !Number.isNaN(value) && value >= 0 && value < selectedIds.length);
-                if (firstGroupIndexes.length !== 2) {
-                    alert('第一組必須為 2 張卡片');
-                    return;
-                }
-                const firstGroup = firstGroupIndexes.map((index) => selectedIds[index]);
-                const secondGroup = selectedIds.filter((_id, index) => !firstGroupIndexes.includes(index));
-                if (secondGroup.length !== 2) {
-                    alert('第二組必須為 2 張卡片');
-                    return;
-                }
-                onSendAction({
-                    type: 'INITIATE_COMPETITION',
-                    payload: {
-                        playerId,
-                        groups: [firstGroup, secondGroup]
-                    }
-                });
-                resetSelection();
+                setCompetitionCards(selectedCards);
+                setIsCompetitionModalOpen(true);
                 break;
             }
             default:
@@ -113,10 +132,30 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, ca
         }
     };
 
-    // 更新選牌狀態並同步給父層
-    const handleCardSelect = (cards: ItemCard[]) => {
-        setSelectedCards(cards);
+    // 競爭分組選擇完成後送出行動
+    const handleCompetitionConfirm = (groups: string[][]) => {
+        onSendAction({
+            type: 'INITIATE_COMPETITION',
+            payload: {
+                playerId,
+                groups
+            }
+        });
+        setIsCompetitionModalOpen(false);
+        setCompetitionCards([]);
+        resetSelection();
     };
+
+    // 關閉競爭分組視窗
+    const handleCompetitionClose = () => {
+        setIsCompetitionModalOpen(false);
+        setCompetitionCards([]);
+    };
+
+    // 更新選牌狀態並同步給父層
+    const handleCardSelect = useCallback((cards: ItemCard[]) => {
+        setSelectedCards(cards);
+    }, []);
 
     if (!myState) {
         return null;
@@ -124,9 +163,32 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, ca
 
     return (
         <div>
-            <div className="d-flex flex-wrap justify-content-center">
-                {state.geishas.map((geisha: Geisha) => (
-                    <GeishaCard key={geisha.id} geisha={geisha} />
+            <div className="geisha-row">
+                {topRow.map((geisha: Geisha) => (
+                    <GeishaCard
+                        key={geisha.id}
+                        geisha={geisha}
+                        myCount={myCountMap.get(geisha.id) ?? 0}
+                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
+                        currentPlayerId={playerId}
+                        hostId={hostId}
+                        myCamp={myCamp}
+                        opponentCamp={opponentCamp}
+                    />
+                ))}
+            </div>
+            <div className="geisha-row geisha-row--bottom">
+                {bottomRow.map((geisha: Geisha) => (
+                    <GeishaCard
+                        key={geisha.id}
+                        geisha={geisha}
+                        myCount={myCountMap.get(geisha.id) ?? 0}
+                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
+                        currentPlayerId={playerId}
+                        hostId={hostId}
+                        myCamp={myCamp}
+                        opponentCamp={opponentCamp}
+                    />
                 ))}
             </div>
 
@@ -143,6 +205,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, onSendAction, ca
             <PlayerHand
                 cards={myState.hand}
                 onCardSelect={handleCardSelect}
+            />
+
+            <CompetitionGroupModal
+                isOpen={isCompetitionModalOpen}
+                cards={competitionCards}
+                onSelect={handleCompetitionConfirm}
+                onClose={handleCompetitionClose}
             />
         </div>
     );

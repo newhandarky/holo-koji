@@ -1,5 +1,6 @@
 import React from 'react';
 import { ItemCard, PendingInteraction, GameAction } from 'game-shared-types';
+import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
     interaction: PendingInteraction;
@@ -8,9 +9,13 @@ interface PendingInteractionModalProps {
 }
 
 const renderCard = (card: ItemCard) => (
-    <div key={card.id} className="card p-2 m-1 text-center">
-        <div>藝妓 {card.geishaId}</div>
-        <small>{card.type}</small>
+    <div
+        key={card.id}
+        className="item-card item-card--image item-card--mini"
+        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
+    >
+        <div className="item-card__overlay" />
+        <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
     </div>
 );
 
@@ -35,7 +40,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
                                             payload: { playerId, chosenCardId: card.id }
                                         })}
                                     >
-                                        藝妓 {card.geishaId}
+                                        選擇此卡
                                     </button>
                                 ))}
                             </div>

@@ -11,6 +11,13 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
 }
 
+const actionLabelMap: Record<ActionToken['type'], string> = {
+    secret: '密約',
+    'trade-off': '取捨',
+    gift: '贈予',
+    competition: '競爭'
+};
+
 const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled }) => {
     return (
         <div className="d-flex flex-wrap mb-3">
@@ -21,7 +28,7 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled }) => {
                     disabled={token.used || disabled}
                     onClick={() => onAction(token.type)}
                 >
-                    {token.type}
+                    {actionLabelMap[token.type]}
                 </button>
             ))}
         </div>

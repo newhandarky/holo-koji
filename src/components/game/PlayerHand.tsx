@@ -1,6 +1,7 @@
 // src/components/game/PlayerHand.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ItemCard } from "game-shared-types"
+import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌
@@ -15,6 +16,13 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
     const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
+    const cardIdsKey = useMemo(() => cards.map(card => card.id).join('|'), [cards]);
+
+    // 當手牌變更時重置選牌狀態，避免選到舊牌
+    useEffect(() => {
+        setSelected([]);
+        onCardSelect([]);
+    }, [cardIdsKey, onCardSelect]);
 
     // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
     const toggleCard = (card: ItemCard) => {
@@ -30,15 +38,16 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
     };
 
     return (
-        <div className="d-flex flex-wrap">
+        <div className="player-hand-row">
             {cards.map(card => (
                 <div
                     key={card.id}
-                    className={`item-card ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
+                    className={`item-card item-card--image ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
                     onClick={() => toggleCard(card)}
+                    style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
                 >
-                    <p>藝妓 {card.geishaId}</p>
-                    <small>{card.type}</small>
+                    <div className="item-card__overlay" />
+                    <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
                 </div>
             ))}
         </div>

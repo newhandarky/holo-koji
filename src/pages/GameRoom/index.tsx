@@ -6,8 +6,10 @@ import { useWebSocket, DealAnimationStep } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
+import DrawCardModal from '../../components/game/DrawCardModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
+import { getGeishaNameById } from '../../utils/gameData';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -37,6 +39,7 @@ const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
     const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
+    const hostId = (state as { hostId?: string }).hostId ?? state.players[0]?.id ?? '';
     const playerProfile = currentPlayerId
         ? (state.players.find(player => player.id === currentPlayerId) ?? createPlayerProfile(currentPlayerId))
         : null;
@@ -53,6 +56,8 @@ const GameRoom: React.FC = () => {
     const [activeDealStep, setActiveDealStep] = useState<DealAnimationStep | null>(null);
     const [isDealing, setIsDealing] = useState(false);
     const [recentDraw, setRecentDraw] = useState<string | null>(null);
+    const [drawModalCard, setDrawModalCard] = useState<null | { playerId: string; card: DealAnimationStep['card'] }>(null);
+    const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
 
     // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
@@ -90,9 +95,13 @@ const GameRoom: React.FC = () => {
         }
 
         const { playerId, card } = drawQueue[0];
-        const label = playerId === currentPlayerId
-            ? `你抽到了一張藝妓 ${card.geishaId} 的物品卡`
-            : `${playerId} 抽到了新卡`;
+        if (playerId === currentPlayerId && card.type !== 'hidden') {
+            setDrawModalCard({ playerId, card });
+            setIsDrawModalOpen(true);
+            return;
+        }
+
+        const label = `${playerId} 抽到了新卡`;
         setRecentDraw(label);
 
         const timer = window.setTimeout(() => {
@@ -111,7 +120,9 @@ const GameRoom: React.FC = () => {
         const targetPlayer = state.players.find(player => player.id === activeDealStep.playerId);
         const targetName = targetPlayer?.name ?? activeDealStep.playerId;
         const isMine = activeDealStep.playerId === currentPlayerId;
-        const cardInfo = isMine ? `藝妓 ${activeDealStep.card.geishaId}` : '神秘卡牌';
+        const cardInfo = isMine
+            ? getGeishaNameById(activeDealStep.card.geishaId)
+            : '神秘卡牌';
 
         return `發牌給 ${targetName}：${cardInfo}`;
     })();
@@ -138,6 +149,13 @@ const GameRoom: React.FC = () => {
     const handleConfirmOrder = () => {
         console.log('🎯 [GameRoom] 玩家確認順序:', currentPlayerId);
         confirmOrder();
+    };
+
+    // 抽牌視窗確認（只對自己顯示）
+    const handleDrawModalConfirm = () => {
+        setIsDrawModalOpen(false);
+        setDrawModalCard(null);
+        consumeDrawEvent();
     };
 
     if (!isConnected) {
@@ -172,6 +190,7 @@ const GameRoom: React.FC = () => {
 
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
+    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
     const canAct =
         state.phase === 'playing'
         && state.players[state.currentPlayer]?.id === currentPlayerId
@@ -181,6 +200,10 @@ const GameRoom: React.FC = () => {
         return (
             <div className="game-background d-flex align-items-center justify-content-center">
                 <div className="card p-4 text-center" style={{ minWidth: 450 }}>
+                    <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
+                        <div>你是：<strong>{currentPlayerId || '未知玩家'}</strong></div>
+                        <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
+                    </div>
                     <div className="spinner-custom mb-3"></div>
                     <h4>等待對手加入</h4>
 
@@ -254,6 +277,10 @@ const GameRoom: React.FC = () => {
         <div className="game-background p-3">
             <div className="container-fluid">
                 <div className="card game-card p-3">
+                    <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
+                        <div>你是：<strong>{currentPlayerId || '未知玩家'}</strong></div>
+                        <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
+                    </div>
                     {/* 遊戲資訊欄 */}
                     <div className="row align-items-center mb-4">
                         <div className="col-md-4">
@@ -275,9 +302,11 @@ const GameRoom: React.FC = () => {
 
                     {/* 玩家資訊 */}
                     <div className="row mb-3">
-                        {state.players.map((player, index) => (
+                        {state.players.map((player, index) => {
+                            const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
+                            return (
                             <div key={player.id} className="col-md-6 mb-2">
-                                <div className={`card ${index === state.currentPlayer ? 'border-primary bg-light' : 'border-secondary'}`}>
+                                <div className={`card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
                                     <div className="card-body py-2">
                                         <div className="d-flex justify-content-between align-items-center">
                                             <span>
@@ -294,13 +323,15 @@ const GameRoom: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
 
                     {/* 遊戲主要區域 */}
                     <GameBoard
                         state={state}
                         playerId={currentPlayerId}
+                        hostId={hostId}
                         onSendAction={sendGameAction}
                         canAct={canAct}
                     />
@@ -333,6 +364,12 @@ const GameRoom: React.FC = () => {
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
             )}
+
+            <DrawCardModal
+                isOpen={isDrawModalOpen}
+                card={drawModalCard?.card ?? null}
+                onConfirm={handleDrawModalConfirm}
+            />
 
             {/* 順序決定彈窗 */}
             <OrderDecisionModal

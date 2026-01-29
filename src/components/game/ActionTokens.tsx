@@ -11,12 +11,12 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
 }
 
-// 行動名稱對照表
-const actionLabelMap: Record<ActionToken['type'], string> = {
-    secret: '密約',
-    'trade-off': '取捨',
-    gift: '贈予',
-    competition: '競爭'
+// 行動圖示對照表
+const actionIconMap: Record<ActionToken['type'], string> = {
+    secret: '/images/actions/Secret.png',
+    'trade-off': '/images/actions/Discard.png',
+    gift: '/images/actions/Gift.png',
+    competition: '/images/actions/Competition.png'
 };
 
 const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled }) => {
@@ -29,7 +29,11 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled }) => {
                     disabled={token.used || disabled}
                     onClick={() => onAction(token.type)}
                 >
-                    {actionLabelMap[token.type]}
+                    <img
+                        className="action-token__icon"
+                        src={actionIconMap[token.type]}
+                        alt={token.type}
+                    />
                 </button>
             ))}
         </div>

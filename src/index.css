@@ -242,12 +242,17 @@ code {
 /* 行動標誌樣式 */
 .action-token {
   border: 2px solid #28a745;    /* Bootstrap success */
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 12px;
+  padding: 10px;
   margin: 8px;
   cursor: pointer;
   background: #f8fff9;
   transition: all 0.3s;
+  width: 72px;
+  height: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .action-token:hover {
   background-color: #e8f5e8;
@@ -258,6 +263,13 @@ code {
   background-color: #f8f9fa;
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* 行動圖示 */
+.action-token__icon {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
 }
 
 /* 回合狀態提示列 */

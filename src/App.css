@@ -1,7 +1,9 @@
+/* App 根容器樣式（CRA 預設樣式） */
 .App {
   text-align: center;
 }
 
+/* Logo 動畫用 */
 .App-logo {
   height: 40vmin;
   pointer-events: none;
@@ -13,6 +15,7 @@
   }
 }
 
+/* App 標頭區塊 */
 .App-header {
   background-color: #282c34;
   min-height: 100vh;

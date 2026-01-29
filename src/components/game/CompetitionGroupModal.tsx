@@ -3,9 +3,13 @@ import { ItemCard } from 'game-shared-types';
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface CompetitionGroupModalProps {
+    // 是否開啟視窗
     isOpen: boolean;
+    // 參與競爭的 4 張卡
     cards: ItemCard[];
+    // 分組完成回呼
     onSelect: (groups: string[][]) => void;
+    // 關閉視窗回呼
     onClose: () => void;
 }
 
@@ -31,6 +35,7 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
         return null;
     }
 
+    // 固定 3 種分組（不考慮順序）
     const groups = [
         [[cards[0], cards[1]], [cards[2], cards[3]]],
         [[cards[0], cards[2]], [cards[1], cards[3]]],

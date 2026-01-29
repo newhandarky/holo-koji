@@ -38,8 +38,11 @@ const createPlayerProfile = (id: string): Player => ({
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { state } = useGame();
+    // 當前玩家 ID（從 localStorage 取得）
     const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
+    // 房主 ID（用於陣營顏色）
     const hostId = (state as { hostId?: string }).hostId ?? state.players[0]?.id ?? '';
+    // 玩家資料（以伺服器狀態為主）
     const playerProfile = currentPlayerId
         ? (state.players.find(player => player.id === currentPlayerId) ?? createPlayerProfile(currentPlayerId))
         : null;
@@ -52,11 +55,17 @@ const GameRoom: React.FC = () => {
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
+    // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
+    // 發牌動畫目前步驟
     const [activeDealStep, setActiveDealStep] = useState<DealAnimationStep | null>(null);
+    // 是否顯示發牌動畫
     const [isDealing, setIsDealing] = useState(false);
+    // 抽牌文字提示
     const [recentDraw, setRecentDraw] = useState<string | null>(null);
+    // 抽牌視窗顯示卡片
     const [drawModalCard, setDrawModalCard] = useState<null | { playerId: string; card: DealAnimationStep['card'] }>(null);
+    // 抽牌視窗開關
     const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
 
     // 當前狀態除錯紀錄（開發用）

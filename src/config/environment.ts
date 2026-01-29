@@ -1,4 +1,5 @@
 // src/config/environment.ts - 修正版本，生產環境也顯示日誌
+// 環境設定型別
 interface EnvironmentConfig {
     websocketUrl: string;
     apiUrl: string;
@@ -6,18 +7,23 @@ interface EnvironmentConfig {
     isProduction: boolean;
 }
 
+// 統一集中管理前端環境參數
 const config: EnvironmentConfig = {
+    // WebSocket 連線位址
     websocketUrl: process.env.REACT_APP_WEBSOCKET_URL || (
         process.env.NODE_ENV === 'production'
             ? 'wss://holo-koji-server.onrender.com'
             : 'ws://localhost:3001'
     ),
+    // API 連線位址（保留給 HTTP API）
     apiUrl: process.env.REACT_APP_API_URL || (
         process.env.NODE_ENV === 'production'
             ? 'https://holo-koji-server.onrender.com'
             : 'http://localhost:3001'
     ),
+    // 是否為開發環境
     isDevelopment: process.env.NODE_ENV === 'development',
+    // 是否為生產環境
     isProduction: process.env.NODE_ENV === 'production',
 };
 

@@ -15,7 +15,9 @@ interface Props {
 const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
+    // 已選卡片 ID 集合（快速判斷是否選取）
     const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
+    // 手牌 ID 組合鍵（用於偵測手牌變更）
     const cardIdsKey = useMemo(() => cards.map(card => card.id).join('|'), [cards]);
 
     // 當手牌變更時重置選牌狀態，避免選到舊牌

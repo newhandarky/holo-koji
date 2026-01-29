@@ -20,13 +20,18 @@ const CONNECTION_OPEN = '__OPEN__';
 const CONNECTION_CLOSE = '__CLOSE__';
 
 export interface DealAnimationStep {
+    // 發牌順序索引
     order: number;
+    // 目標玩家 ID
     playerId: string;
+    // 發出的卡片
     card: ItemCard;
 }
 
 export interface CardDrawEvent {
+    // 抽牌玩家 ID
     playerId: string;
+    // 抽到的卡片
     card: ItemCard;
 }
 
@@ -127,6 +132,7 @@ const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | nul
     return null;
 };
 
+// WebSocket 主 Hook：處理連線、事件、狀態同步
 export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
@@ -327,6 +333,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         };
     }, [gameId, playerData?.id, gameDispatch]);
 
+    // 發送遊戲行動到伺服器
     const sendGameAction = useCallback((action: GameAction) => {
         if (!gameId || !playerData?.id) {
             console.warn('⚠️ [useWebSocket] 缺少 gameId，無法發送遊戲動作');
@@ -341,6 +348,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
     }, [gameId, playerData?.id]);
 
+    // 確認順序（順序決定完成後使用）
     const confirmOrder = useCallback(() => {
         if (!gameId || !playerData?.id) {
             console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認順序');
@@ -358,6 +366,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
     }, [gameId, playerData?.id]);
 
+    // 主動觸發順序決定（目前預留使用）
     const startOrderDecision = useCallback((players: string[]) => {
         if (!gameId) {
             console.warn('⚠️ [useWebSocket] 缺少 gameId，無法啟動順序決定');
@@ -375,18 +384,22 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
     }, [gameId]);
 
+    // 清除錯誤訊息
     const clearError = useCallback(() => {
         clientDispatch({ type: 'CLEAR_ERROR' });
     }, []);
 
+    // 消耗一個發牌動畫事件
     const consumeDealStep = useCallback(() => {
         setDealQueue(prev => prev.slice(1));
     }, []);
 
+    // 消耗一個抽牌事件
     const consumeDrawEvent = useCallback(() => {
         setDrawQueue(prev => prev.slice(1));
     }, []);
 
+    // 回傳給 UI 的狀態與操作
     return {
         gameState: clientState.gameState,
         isConnected: clientState.isConnected,

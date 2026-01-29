@@ -13,10 +13,15 @@ import {
 } from 'game-shared-types';
 
 interface GameBoardProps {
+    // 全域遊戲狀態
     state: GameState;
+    // 自己的玩家 ID
     playerId: string;
+    // 房主 ID（用於陣營顏色）
     hostId: string;
+    // 發送行動到伺服器
     onSendAction: (action: GameAction) => void;
+    // 是否可操作（輪到自己且無互動阻擋）
     canAct: boolean;
 }
 
@@ -70,6 +75,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, hostId, onSendAc
         };
     }, [state.geishas]);
 
+    // 依房主判斷自身/對手陣營
     const myCamp = playerId && hostId && playerId === hostId ? 'host' : 'guest';
     const opponentCamp = myCamp === 'host' ? 'guest' : 'host';
 

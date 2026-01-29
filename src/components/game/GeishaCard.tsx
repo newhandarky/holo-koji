@@ -8,12 +8,19 @@ import { getGeishaImageById } from '../../utils/gameData';
  * GeishaCard 組件：顯示單張藝妓卡片
  */
 interface Props {
+    // 藝妓資料
     geisha: Geisha;
+    // 自己在該藝妓的卡牌數量
     myCount: number;
+    // 對手在該藝妓的卡牌數量
     opponentCount: number;
+    // 自己的玩家 ID
     currentPlayerId: string;
+    // 房主 ID（用於陣營顏色）
     hostId: string;
+    // 自己的陣營
     myCamp: 'host' | 'guest';
+    // 對手的陣營
     opponentCamp: 'host' | 'guest';
 }
 
@@ -31,6 +38,7 @@ const GeishaCard: React.FC<Props> = ({
     const className = `geisha-card ${isHostControlled ? 'geisha-card--host' :
         geisha.controlledBy ? 'geisha-card--guest' : ""
         }`;
+    // 藝妓背景圖片
     const imageUrl = getGeishaImageById(geisha.id);
 
     return (

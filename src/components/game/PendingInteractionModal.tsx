@@ -3,8 +3,11 @@ import { ItemCard, PendingInteraction, GameAction } from 'game-shared-types';
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
+    // 互動內容（贈予 / 競爭）
     interaction: PendingInteraction;
+    // 自己的玩家 ID
     playerId: string;
+    // 回應互動的回呼
     onResolve: (action: GameAction) => void;
 }
 
@@ -20,6 +23,7 @@ const renderCard = (card: ItemCard) => (
 );
 
 const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve }) => {
+    // 贈予：選 1 張
     if (interaction.type === 'GIFT_SELECTION') {
         return (
             <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
@@ -51,6 +55,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
         );
     }
 
+    // 競爭：選 1 組
     if (interaction.type === 'COMPETITION_SELECTION') {
         return (
             <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
@@ -84,6 +89,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
         );
     }
 
+    // 其他情況不顯示
     return null;
 };
 

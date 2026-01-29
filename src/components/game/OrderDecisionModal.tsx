@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { OrderDecision } from "game-shared-types"
 
 interface OrderDecisionModalProps extends OrderDecision {
+    // 玩家按下確認時的回呼
     onConfirm: () => void;
 }
 
@@ -30,6 +31,7 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
 
     if (!isOpen) return null;
 
+    // 決定中畫面
     const renderDecidingPhase = () => (
         <div className="text-center">
             <div className="mb-4">
@@ -52,6 +54,7 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
         </div>
     );
 
+    // 結果畫面
     const renderResultPhase = () => (
         <div className="text-center">
             <div className="mb-4">

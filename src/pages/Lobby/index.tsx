@@ -6,11 +6,17 @@ import config from '../../config/environment';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
+    // 玩家名稱輸入
     const [playerName, setPlayerName] = useState('');
+    // 房間代碼輸入
     const [roomId, setRoomId] = useState('');
+    // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
+    // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+    // 路由導向工具
     const navigate = useNavigate();
+    // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值

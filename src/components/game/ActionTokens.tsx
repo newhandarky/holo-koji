@@ -11,6 +11,7 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
 }
 
+// 行動名稱對照表
 const actionLabelMap: Record<ActionToken['type'], string> = {
     secret: '密約',
     'trade-off': '取捨',

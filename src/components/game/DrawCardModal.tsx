@@ -3,8 +3,11 @@ import { ItemCard } from 'game-shared-types';
 import { getGeishaNameById, getGeishaCharmById } from '../../utils/gameData';
 
 interface DrawCardModalProps {
+    // 是否開啟視窗
     isOpen: boolean;
+    // 抽到的卡片
     card: ItemCard | null;
+    // 確認回呼
     onConfirm: () => void;
 }
 

@@ -1,5 +1,6 @@
 import { Geisha } from "game-shared-types"
 
+// 藝妓資料：名稱與圖片網址
 export const geishaData = [
     {
         name: '一伊那尓栖',

@@ -221,10 +221,10 @@ code {
 
 .player-hand-row {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  overflow-x: visible;
+  padding-bottom: 0;
 }
 
 .item-card--image {
@@ -238,6 +238,20 @@ code {
   background-repeat: no-repeat;
   border-radius: 10px;
   overflow: hidden;
+}
+
+/* 手牌專用尺寸（避免過大需要捲動） */
+.item-card--hand {
+  width: 80px;
+  min-width: 80px;
+  height: 80px;
+}
+
+.item-card--hand .item-card__badge {
+  left: 6px;
+  bottom: 6px;
+  font-size: 0.7rem;
+  padding: 3px 6px;
 }
 
 .item-card__overlay {
@@ -259,6 +273,34 @@ code {
   z-index: 2;
 }
 
+/* 贈予選牌格 */
+.gift-selection-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gift-selection-card {
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gift-selection-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.gift-selection-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #0d6efd;
+}
+
 .item-card--mini {
   width: 96px;
   min-width: 96px;
@@ -271,11 +313,11 @@ code {
   border: 2px solid #28a745;    /* Bootstrap success */
   border-radius: 12px;
   padding: 10px;
-  margin: 8px;
+  margin: 0;
   cursor: pointer;
   background: #f8fff9;
   transition: all 0.3s;
-  width: 72px;
+  width: 100%;
   height: 72px;
   display: inline-flex;
   align-items: center;
@@ -297,6 +339,17 @@ code {
   width: 44px;
   height: 44px;
   object-fit: contain;
+}
+
+/* 行動圖示列（固定 4 欄） */
+.action-token-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.action-token-row .action-token {
+  flex: 0 0 25%;
+  max-width: 22%;
 }
 
 /* 回合狀態提示列 */

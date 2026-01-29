@@ -44,7 +44,7 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
             {cards.map(card => (
                 <div
                     key={card.id}
-                    className={`item-card item-card--image ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
+                    className={`item-card item-card--image item-card--hand ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
                     onClick={() => toggleCard(card)}
                     style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
                 >

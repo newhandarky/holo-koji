@@ -13,7 +13,7 @@ const Lobby: React.FC = () => {
     // 對戰模式（online = 玩家對戰，npc = 對戰 AI）
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
-    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -201,12 +201,14 @@ const Lobby: React.FC = () => {
                             <select
                                 className="form-select"
                                 value={aiDifficulty}
-                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard')}
+                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
                                 disabled={isConnecting}
                             >
                                 <option value="easy">簡單</option>
                                 <option value="medium">中等</option>
                                 <option value="hard">偏強</option>
+                                <option value="expert">超強</option>
+                                <option value="hell">地獄</option>
                             </select>
                         </div>
                     )}

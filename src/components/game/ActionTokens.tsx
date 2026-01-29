@@ -11,17 +11,19 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
 }
 
+// 靜態資源基底路徑（支援 GitHub Pages）
+const publicBaseUrl = process.env.PUBLIC_URL ?? '';
 // 行動圖示對照表
 const actionIconMap: Record<ActionToken['type'], string> = {
-    secret: '/images/actions/Secret.png',
-    'trade-off': '/images/actions/Discard.png',
-    gift: '/images/actions/Gift.png',
-    competition: '/images/actions/Competition.png'
+    secret: `${publicBaseUrl}/images/actions/Secret.png`,
+    'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
+    gift: `${publicBaseUrl}/images/actions/Gift.png`,
+    competition: `${publicBaseUrl}/images/actions/Competition.png`
 };
 
 const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled }) => {
     return (
-        <div className="d-flex flex-wrap mb-3">
+        <div className="action-token-row mb-3">
             {tokens.map((token, idx) => (
                 <button
                     key={idx}

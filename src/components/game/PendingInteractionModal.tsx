@@ -34,17 +34,18 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
                         </div>
                         <div className="modal-body">
                             <p>對手提供了下列卡片，請挑選 1 張：</p>
-                            <div className="d-flex flex-wrap">
+                            <div className="gift-selection-grid">
                                 {interaction.offeredCards.map((card) => (
                                     <button
                                         key={card.id}
-                                        className="btn btn-outline-primary m-1"
+                                        className="gift-selection-card"
                                         onClick={() => onResolve({
                                             type: 'RESOLVE_GIFT',
                                             payload: { playerId, chosenCardId: card.id }
                                         })}
                                     >
-                                        選擇此卡
+                                        {renderCard(card)}
+                                        <span className="gift-selection-label">選擇此卡</span>
                                     </button>
                                 ))}
                             </div>

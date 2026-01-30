@@ -8,46 +8,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.deal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  pointer-events: none;
-  z-index: 1050;
-}
-
-.deal-card {
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: dealPulse 0.45s ease-in-out;
-}
-
-@keyframes dealPulse {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .draw-toast {
   position: fixed;
   bottom: 24px;
@@ -156,7 +116,6 @@ code {
   border: 2px solid #dee2e6;    /* Bootstrap border-gray-200 */
   border-radius: 8px;
   padding: 15px;
-  margin: 10px;
   text-align: center;
   background: white;
   transition: all 0.3s ease;
@@ -203,7 +162,6 @@ code {
   border: 1px solid #ced4da;   /* Bootstrap border */
   border-radius: 6px;
   padding: 10px;
-  margin: 5px;
   cursor: pointer;
   background: white;
   transition: all 0.2s;
@@ -223,9 +181,9 @@ code {
 .player-hand-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
   overflow-x: visible;
-  padding-bottom: 0;
+  padding-bottom: 12px;
+  justify-content: center;
 }
 
 .item-card--image {
@@ -246,6 +204,7 @@ code {
   width: 80px;
   min-width: 80px;
   height: 80px;
+  margin:  2px;
 }
 
 .item-card--hand .item-card__badge {
@@ -300,11 +259,6 @@ code {
 .gift-selection-grid--nowrap {
   flex-wrap: nowrap;
   gap: 12px;
-}
-
-.gift-selection-grid--nowrap .gift-selection-card {
-  flex: 0 0 30%;
-  max-width: 30%;
 }
 
 .gift-selection-card {
@@ -387,6 +341,7 @@ code {
 .interaction-opponent-actions {
   display: flex;
   gap: 8px;
+  margin: 0 auto 12px;
 }
 
 .interaction-action-item {
@@ -404,6 +359,20 @@ code {
 .interaction-action-icon.is-used {
   filter: grayscale(1);
   opacity: 0.45;
+}
+
+/* 場上對手行動提示列 */
+.opponent-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-height: 100px;
+}
+
+.opponent-actions-bar__label {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* 互動視窗顯示玩家手牌 */
@@ -429,6 +398,11 @@ code {
   background: transparent;
 }
 
+.decide-turn-order {
+  padding: 0;
+  margin: 0;
+}
+
 .bottom-sheet__panel {
   pointer-events: auto;
   position: relative;
@@ -447,9 +421,10 @@ code {
 .bottom-sheet__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin-bottom: 8px;
+  margin-right: 16px ;
 }
 
 .bottom-sheet__title {
@@ -462,7 +437,6 @@ code {
   background: #f0f4ff;
   color: #1d4ed8;
   font-weight: 600;
-  padding: 6px 12px;
   border-radius: 999px;
 }
 
@@ -471,9 +445,12 @@ code {
   overflow-y: auto;
 }
 
+.bottom-sheet__body--full {
+  max-height: calc(100vh - 96px);
+}
+
 .bottom-sheet__expand {
   width: 100%;
-  margin-top: 8px;
   padding: 10px 12px;
   border: none;
   border-radius: 12px;
@@ -602,9 +579,9 @@ code {
 }
 
 .item-card--mini {
-  width: 96px;
-  min-width: 96px;
-  height: 96px;
+  width: 80px;
+  min-width: 80px;
+  height: 80px;
   border-radius: 12px;
 }
 
@@ -623,16 +600,29 @@ code {
   align-items: center;
   justify-content: center;
   position: relative;
+  opacity: 1;
+  filter: none;
 }
 .action-token:hover {
   background-color: #e8f5e8;
   transform: scale(1.02);
+  opacity: 1;
+  filter: none;
+}
+.action-token:focus,
+.action-token:active {
+  opacity: 1;
+  filter: none;
 }
 .action-token.used {
   border-color: #6c757d;       /* Bootstrap secondary */
   background-color: #f8f9fa;
-  opacity: 0.6;
   cursor: not-allowed;
+}
+
+.action-token.used .action-token__icon {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 /* 行動圖示 */
@@ -681,7 +671,7 @@ code {
 }
 .action-token-row .action-token {
   flex: 0 0 25%;
-  max-width: 22%;
+  max-width: 23%;
 }
 
 /* 回合狀態提示列 */

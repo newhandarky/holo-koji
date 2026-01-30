@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, PendingInteraction, GameAction, Player, ActionToken } from 'game-shared-types';
+import { ItemCard, PendingInteraction, GameAction, Player } from 'game-shared-types';
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
@@ -26,41 +26,14 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
     </div>
 );
 
-// 靜態資源基底路徑（支援 GitHub Pages）
-const publicBaseUrl = process.env.PUBLIC_URL ?? '';
-// 行動圖示對照表
-const actionIconMap: Record<ActionToken['type'], string> = {
-    secret: `${publicBaseUrl}/images/actions/Secret.png`,
-    'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
-    gift: `${publicBaseUrl}/images/actions/Gift.png`,
-    competition: `${publicBaseUrl}/images/actions/Competition.png`
-};
-
 const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve, players, getCharmByGeishaId }) => {
-    const currentPlayer = players.find(player => player.id === playerId);
-    const opponentPlayer = players.find(player => player.id !== playerId);
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
         setIsCollapsed(false);
     }, [interaction.type]);
 
-    const renderOpponentActions = () => {
-        const tokens = opponentPlayer?.actionTokens ?? [];
-        return (
-            <div className="interaction-opponent-actions">
-                {tokens.map((token, index) => (
-                    <div key={`${token.type}-${index}`} className="interaction-action-item">
-                        <img
-                            className={`interaction-action-icon ${token.used ? 'is-used' : ''}`}
-                            src={actionIconMap[token.type]}
-                            alt={token.type}
-                        />
-                    </div>
-                ))}
-            </div>
-        );
-    };
+ 
     const title = interaction.type === 'GIFT_SELECTION'
         ? '對手執行了贈予，請選擇一張物品卡牌'
         : '對手執行了競爭，請選擇一組卡牌';
@@ -112,23 +85,18 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
         <div className="bottom-sheet">
             <div className="bottom-sheet__backdrop" />
             <div className={`bottom-sheet__panel ${isCollapsed ? 'is-collapsed' : ''}`}>
-                <div className="bottom-sheet__header">
-                    <h5 className="bottom-sheet__title">{title}</h5>
-                    <button
-                        className="bottom-sheet__toggle"
-                        onClick={() => setIsCollapsed(!isCollapsed)}
-                    >
-                        {isCollapsed ? '展開' : '收合'}
-                    </button>
-                </div>
+                {
+                    !isCollapsed && <div className="bottom-sheet__header">
+                        <button
+                            className="bottom-sheet__toggle"
+                            onClick={() => setIsCollapsed(!isCollapsed)}
+                        >
+                            {isCollapsed ? '展開' : '收合'}
+                        </button>
+                    </div>
+                }
                 {!isCollapsed && (
                     <div className="bottom-sheet__body">
-                        <div className="interaction-header mb-3">
-                            <div className="interaction-header__line">
-                                對手剩餘手牌：{opponentPlayer?.hand?.length ?? 0}
-                            </div>
-                            {renderOpponentActions()}
-                        </div>
                         {body}
                     </div>
                 )}

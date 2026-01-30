@@ -68,19 +68,22 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                 <h4 className="text-success">🎯 順序決定完成！</h4>
 
                 {/* 顯示結果 */}
-                <div className="row justify-content-center mt-4">
-                    <div className="col-md-8">
-                        <div className="card bg-primary text-white mb-3">
-                            <div className="card-body">
-                                <h5 className="card-title">🥇 先手玩家</h5>
-                                <div className="fs-4">{result?.firstPlayer}</div>
+                <div className="justify-content-center mt-4 ">
+                    <div className="row decide-turn-order">
+                        <div className="col-md-6">
+                            <div className="card bg-primary text-white mb-3 ">
+                                <div className="card-body">
+                                    <h5 className="card-title">🥇 先手玩家</h5>
+                                    <div className="fs-4">{result?.firstPlayer}</div>
+                                </div>
                             </div>
                         </div>
-
-                        <div className="card bg-secondary text-white">
-                            <div className="card-body">
-                                <h5 className="card-title">🥈 後手玩家</h5>
-                                <div className="fs-4">{result?.secondPlayer}</div>
+                        <div className="col-md-6">
+                            <div className="card bg-secondary text-white mb-3">
+                                <div className="card-body">
+                                    <h5 className="card-title">🥈 後手玩家</h5>
+                                    <div className="fs-4">{result?.secondPlayer}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -137,15 +140,20 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
         <div className="bottom-sheet">
             <div className="bottom-sheet__backdrop" />
             <div className={`bottom-sheet__panel ${isCollapsed ? 'is-collapsed' : ''}`}>
-                <div className="bottom-sheet__header">
-                    <h5 className="bottom-sheet__title">決定遊戲順序</h5>
-                    <button
-                        className="bottom-sheet__toggle"
-                        onClick={() => setIsCollapsed(!isCollapsed)}
-                    >
-                        {isCollapsed ? '展開' : '收合'}
-                    </button>
-                </div>
+                {
+                    !isCollapsed && (
+                        <div className="bottom-sheet__header">
+                            <button
+                                className="bottom-sheet__toggle"
+                                onClick={() => setIsCollapsed(!isCollapsed)}
+                            >
+                                {isCollapsed ? '展開' : '收合'}
+                            </button>
+                        </div>
+
+                    )
+                }
+
                 {!isCollapsed && (
                     <div className="bottom-sheet__body">
                         {phase === 'deciding' && renderDecidingPhase()}

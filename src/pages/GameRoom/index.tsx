@@ -2,13 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
-import { useWebSocket, DealAnimationStep } from '../../hooks/useWebSocket';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
-import { getGeishaNameById } from '../../utils/gameData';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -54,33 +53,23 @@ const GameRoom: React.FC = () => {
         sendGameAction,
         requestRematch,
         confirmReady,
-        dealQueue,
-        consumeDealStep,
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
     // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
-    // 發牌動畫目前步驟
-    const [activeDealStep, setActiveDealStep] = useState<DealAnimationStep | null>(null);
-    // 是否顯示發牌動畫
-    const [isDealing, setIsDealing] = useState(false);
     // 抽牌文字提示
     const [recentDraw, setRecentDraw] = useState<string | null>(null);
-    // 抽牌視窗顯示卡片
-    const [drawModalCard, setDrawModalCard] = useState<null | { playerId: string; card: DealAnimationStep['card'] }>(null);
     // 抽牌視窗開關
     const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
     // 抽牌動畫目標卡片
     const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
     // 抽牌動畫是否顯示
     const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
-    // 發牌動畫目標卡片
-    const [dealHighlightCardId, setDealHighlightCardId] = useState<string | null>(null);
-    // 發牌動畫是否顯示
-    const [isDealHighlightActive, setIsDealHighlightActive] = useState(false);
     // 再來一場送出狀態
     const [isRematchRequested, setIsRematchRequested] = useState(false);
+    // 結算底部視窗是否收合
+    const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
 
     // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
@@ -99,23 +88,12 @@ const GameRoom: React.FC = () => {
         }
     }, [state.phase, isRematchRequested]);
 
-    // 發牌動畫節奏控制
+    // 新對局時還原結算視窗狀態
     useEffect(() => {
-        if (dealQueue.length === 0) {
-            setActiveDealStep(null);
-            setIsDealing(false);
-            return;
+        if (state.phase !== 'ended') {
+            setIsEndSheetCollapsed(false);
         }
-
-        setIsDealing(true);
-        setActiveDealStep(dealQueue[0]);
-
-        const timer = window.setTimeout(() => {
-            consumeDealStep();
-        }, 450);
-
-        return () => window.clearTimeout(timer);
-    }, [dealQueue, consumeDealStep]);
+    }, [state.phase]);
 
     // 抽牌提示顯示與消失
     useEffect(() => {
@@ -126,7 +104,6 @@ const GameRoom: React.FC = () => {
 
         const { playerId, card } = drawQueue[0];
         if (playerId === currentPlayerId && card.type !== 'hidden') {
-            setDrawModalCard({ playerId, card });
             setIsDrawModalOpen(true);
             setDrawHighlightCardId(card.id);
             setIsDrawHighlightActive(false);
@@ -141,7 +118,6 @@ const GameRoom: React.FC = () => {
 
             const closeTimer = window.setTimeout(() => {
                 setIsDrawModalOpen(false);
-                setDrawModalCard(null);
                 setIsDrawHighlightActive(false);
                 setDrawHighlightCardId(null);
                 consumeDrawEvent();
@@ -164,49 +140,7 @@ const GameRoom: React.FC = () => {
         return () => window.clearTimeout(timer);
     }, [drawQueue, currentPlayerId, consumeDrawEvent]);
 
-    // 發牌動畫完成後，延遲 0.5 秒再滑入手牌
-    useEffect(() => {
-        if (!activeDealStep) {
-            return;
-        }
 
-        if (activeDealStep.playerId !== currentPlayerId) {
-            return;
-        }
-
-        const dealCardId = activeDealStep.card.id;
-        setDealHighlightCardId(dealCardId);
-        setIsDealHighlightActive(false);
-
-        const revealTimer = window.setTimeout(() => {
-            setIsDealHighlightActive(true);
-        }, 950);
-
-        const resetTimer = window.setTimeout(() => {
-            setIsDealHighlightActive(false);
-        }, 1450);
-
-        return () => {
-            window.clearTimeout(revealTimer);
-            window.clearTimeout(resetTimer);
-        };
-    }, [activeDealStep, currentPlayerId]);
-
-    // 依目前發牌資訊生成顯示文字
-    const dealingLabel = (() => {
-        if (!activeDealStep) {
-            return '';
-        }
-
-        const targetPlayer = state.players.find(player => player.id === activeDealStep.playerId);
-        const targetName = targetPlayer?.name ?? activeDealStep.playerId;
-        const isMine = activeDealStep.playerId === currentPlayerId;
-        const cardInfo = isMine
-            ? getGeishaNameById(activeDealStep.card.geishaId)
-            : '神秘卡牌';
-
-        return `發牌給 ${targetName}：${cardInfo}`;
-    })();
 
     // 複製房間代碼到剪貼簿
     const copyRoomCode = async () => {
@@ -246,37 +180,7 @@ const GameRoom: React.FC = () => {
         );
     }
 
-    if (state.phase === 'ended') {
-        return (
-            <div className="game-background d-flex align-items-center justify-content-center">
-                <div className="card p-4 text-center">
-                    <h2 className="text-success mb-3">🎉 遊戲結束！</h2>
-                    <p className="fs-5 mb-4">獲勝者: <strong>{state.winner}</strong></p>
-                    <div className="mb-3 text-start">
-                        {state.players.map((player) => (
-                            <div key={player.id} className="d-flex justify-content-between">
-                                <span className="fw-semibold">{player.name}</span>
-                                <span>魅力 {player.score?.charm || 0} / 藝妓 {player.score?.tokens || 0}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <button className="btn btn-primary me-2" onClick={() => navigate('/')}>
-                        返回大廳
-                    </button>
-                    <button
-                        className="btn btn-outline-primary"
-                        onClick={() => {
-                            requestRematch();
-                            setIsRematchRequested(true);
-                        }}
-                        disabled={isRematchRequested}
-                    >
-                        {isRematchRequested ? '等待對手...' : '再來一場'}
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    const isGameEnded = state.phase === 'ended';
 
     const isWaiting = state.phase === 'waiting' || state.players.length < 2;
 
@@ -286,7 +190,8 @@ const GameRoom: React.FC = () => {
     const isInteractionLocked = Boolean(pendingInteraction)
         || isDrawModalOpen
         || state.orderDecision.isOpen
-        || Boolean(readyStatus);
+        || Boolean(readyStatus)
+        || isGameEnded;
     const canAct =
         state.phase === 'playing'
         && state.players[state.currentPlayer]?.id === currentPlayerId
@@ -403,25 +308,25 @@ const GameRoom: React.FC = () => {
                         {state.players.map((player, index) => {
                             const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
                             return (
-                            <div key={player.id} className="col-md-6 mb-2">
-                                <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
-                                    <div className="card-body py-2">
-                                        <div className="d-flex justify-content-between align-items-center">
-                                            <span>
-                                                <strong>{player.name}</strong>
-                                                {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
-                                                {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
-                                            </span>
-                                            <small className="text-muted">
-                                                手牌: {player.hand.length}
-                                                <br />
-                                                魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
-                                            </small>
+                                <div key={player.id} className="col-md-6 mb-2">
+                                    <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
+                                        <div className="card-body py-2">
+                                            <div className="d-flex justify-content-between align-items-center">
+                                                <span>
+                                                    <strong>{player.name}</strong>
+                                                    {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
+                                                    {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
+                                                </span>
+                                                <small className="text-muted">
+                                                    手牌: {player.hand.length}
+                                                    <br />
+                                                    魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
+                                                </small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
+                            );
                         })}
                     </div>
 
@@ -432,12 +337,12 @@ const GameRoom: React.FC = () => {
                         hostId={hostId}
                         onSendAction={sendGameAction}
                         canAct={canAct}
-                        highlightCardId={isDrawHighlightActive ? drawHighlightCardId : dealHighlightCardId}
-                        highlightActive={isDrawHighlightActive || isDealHighlightActive}
+                        highlightCardId={drawHighlightCardId}
+                        highlightActive={isDrawHighlightActive}
                     />
 
                     {/* 離開遊戲按鈕 */}
-                    <div className="text-center mt-4">
+                    <div className="text-center mt-4 mb-2">
                         <button
                             className="btn btn-outline-danger btn-sm"
                             onClick={() => {
@@ -451,15 +356,6 @@ const GameRoom: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            {isDealing && activeDealStep && (
-                <div className="deal-overlay">
-                    <div className="deal-card shadow">
-                        <div className="spinner-border spinner-border-sm text-light me-2" role="status" />
-                        <span>{dealingLabel}</span>
-                    </div>
-                </div>
-            )}
 
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
@@ -483,7 +379,7 @@ const GameRoom: React.FC = () => {
                 </div>
             )}
 
-            {isDrawModalOpen && drawModalCard && (
+            {isDrawModalOpen && (
                 <div className="top-sheet">
                     <div className="top-sheet__panel">
                         <div className="top-sheet__title">你抽到一張新牌</div>
@@ -526,6 +422,63 @@ const GameRoom: React.FC = () => {
                                 我準備好了
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {isGameEnded && (
+                <div className="bottom-sheet">
+                    <div className="bottom-sheet__backdrop" />
+                    <div className={`bottom-sheet__panel ${isEndSheetCollapsed ? 'is-collapsed' : ''}`}>
+                        {!isEndSheetCollapsed && (
+                            <>
+                                <div className="bottom-sheet__header">
+                                    <button
+                                        className="bottom-sheet__toggle"
+                                        onClick={() => setIsEndSheetCollapsed(true)}
+                                    >
+                                        查看戰況
+                                    </button>
+                                </div>
+                                <div className="bottom-sheet__body bottom-sheet__body--full">
+                                    <div className="text-center mb-3">
+                                        <h2 className="text-success mb-2">🎉 遊戲結束！</h2>
+                                        <p className="fs-5 mb-0">獲勝者: <strong>{state.winner}</strong></p>
+                                    </div>
+                                    <div className="mb-4">
+                                        {state.players.map((player) => (
+                                            <div key={player.id} className="d-flex justify-content-between mb-1">
+                                                <span className="fw-semibold">{player.name}</span>
+                                                <span>魅力 {player.score?.charm || 0} / 藝妓 {player.score?.tokens || 0}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="d-flex justify-content-center gap-2">
+                                        <button className="btn btn-primary" onClick={() => navigate('/')}>
+                                            返回大廳
+                                        </button>
+                                        <button
+                                            className="btn btn-outline-primary"
+                                            onClick={() => {
+                                                requestRematch();
+                                                setIsRematchRequested(true);
+                                            }}
+                                            disabled={isRematchRequested}
+                                        >
+                                            {isRematchRequested ? '等待對手...' : '再來一場'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                        {isEndSheetCollapsed && (
+                            <button
+                                className="bottom-sheet__expand"
+                                onClick={() => setIsEndSheetCollapsed(false)}
+                            >
+                                展開結算
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

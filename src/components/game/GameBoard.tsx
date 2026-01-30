@@ -6,6 +6,7 @@ import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
 import {
     ItemCard,
+    ActionToken,
     ActionType,
     Geisha,
     GameAction,
@@ -48,6 +49,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const myState = state.players.find((player) => player.id === playerId);
     const isMyTurn = canAct && currentPlayer?.id === playerId;
     const opponentState = state.players.find((player) => player.id !== playerId) ?? null;
+
+    // 靜態資源基底路徑（支援 GitHub Pages）
+    const publicBaseUrl = process.env.PUBLIC_URL ?? '';
+    // 行動圖示對照表
+    const actionIconMap: Record<ActionToken['type'], string> = {
+        secret: `${publicBaseUrl}/images/actions/Secret.png`,
+        'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
+        gift: `${publicBaseUrl}/images/actions/Gift.png`,
+        competition: `${publicBaseUrl}/images/actions/Competition.png`
+    };
 
     // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
@@ -187,9 +198,29 @@ const GameBoard: React.FC<GameBoardProps> = ({
         return null;
     }
 
+    const renderOpponentActions = () => {
+        const tokens = opponentState?.actionTokens ?? [];
+        return (
+            <div className="opponent-actions-bar">
+                <div className="interaction-opponent-actions">
+                    {tokens.map((token, index) => (
+                        <div key={`${token.type}-${index}`} className="interaction-action-item">
+                            <img
+                                className={`interaction-action-icon ${token.used ? 'is-used' : ''}`}
+                                src={actionIconMap[token.type]}
+                                alt={token.type}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div>
-            <div className="geisha-row">
+            {renderOpponentActions()}
+            <div className="geisha-row mt-2">
                 {topRow.map((geisha: Geisha) => (
                     <GeishaCard
                         key={geisha.id}
@@ -203,7 +234,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     />
                 ))}
             </div>
-            <div className="geisha-row geisha-row--bottom">
+            <div className="geisha-row geisha-row--bottom mb-4">
                 {bottomRow.map((geisha: Geisha) => (
                     <GeishaCard
                         key={geisha.id}

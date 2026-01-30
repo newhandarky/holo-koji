@@ -46,38 +46,36 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     ];
 
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
-            <div className="modal-dialog">
-                <div className="modal-content">
-                    <div className="modal-header bg-warning">
-                        <h5 className="modal-title">競爭分組選擇</h5>
-                        <button className="btn-close" onClick={onClose} aria-label="關閉" />
-                    </div>
-                    <div className="modal-body">
-                        <p>請選擇要提供給對手的分組方式（對手會從兩組中選 1 組）：</p>
-                        {groups.map((group, index) => (
-                            <div key={index} className="border rounded p-2 mb-3">
-                                <div className="row">
-                                    <div className="col-6">
-                                        <div className="d-flex flex-wrap justify-content-center">
-                                            {group[0].map((card) => renderCard(card, getCharmByGeishaId))}
-                                        </div>
-                                    </div>
-                                    <div className="col-6">
-                                        <div className="d-flex flex-wrap justify-content-center">
-                                            {group[1].map((card) => renderCard(card, getCharmByGeishaId))}
-                                        </div>
+        <div className="bottom-sheet">
+            <div className="bottom-sheet__backdrop" />
+            <div className="bottom-sheet__panel">
+                <div className="bottom-sheet__header">
+                    <button className="btn-close" onClick={onClose} aria-label="關閉" />
+                </div>
+                <div className="bottom-sheet__body">
+                    <p>請選擇要提供給對手的分組方式（對手會從兩組中選 1 組）：</p>
+                    {groups.map((group, index) => (
+                        <div key={index} className="border rounded p-2 mb-3">
+                            <div className="row">
+                                <div className="col-6">
+                                    <div className="d-flex flex-wrap justify-content-center">
+                                        {group[0].map((card) => renderCard(card, getCharmByGeishaId))}
                                     </div>
                                 </div>
-                                <button
-                                    className="btn btn-outline-danger btn-sm mt-2 w-100"
-                                    onClick={() => onSelect(group.map(list => list.map(card => card.id)))}
-                                >
-                                    使用此分組
-                                </button>
+                                <div className="col-6">
+                                    <div className="d-flex flex-wrap justify-content-center">
+                                        {group[1].map((card) => renderCard(card, getCharmByGeishaId))}
+                                    </div>
+                                </div>
                             </div>
-                        ))}
-                    </div>
+                            <button
+                                className="btn btn-outline-danger btn-sm mt-2 w-100"
+                                onClick={() => onSelect(group.map(list => list.map(card => card.id)))}
+                            >
+                                使用此分組
+                            </button>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

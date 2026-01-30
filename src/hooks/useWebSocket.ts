@@ -19,15 +19,6 @@ import config from '../config/environment';
 const CONNECTION_OPEN = '__OPEN__';
 const CONNECTION_CLOSE = '__CLOSE__';
 
-export interface DealAnimationStep {
-    // 發牌順序索引
-    order: number;
-    // 目標玩家 ID
-    playerId: string;
-    // 發出的卡片
-    card: ItemCard;
-}
-
 export interface CardDrawEvent {
     // 抽牌玩家 ID
     playerId: string;
@@ -146,7 +137,6 @@ const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | nul
 export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
-    const [dealQueue, setDealQueue] = useState<DealAnimationStep[]>([]);
     const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
     const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
     const roundSummaryTimerRef = useRef<number | null>(null);
@@ -228,38 +218,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
                     ? String((payload as { message: unknown }).message)
                     : '未知錯誤';
             safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
-        };
-
-        const handleDealAnimation = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
-                return;
-            }
-
-            const candidate = payload as { sequence?: unknown };
-            if (!Array.isArray(candidate.sequence)) {
-                return;
-            }
-
-            const normalized = candidate.sequence
-                .map((step, index) => {
-                    if (!step || typeof step !== 'object') {
-                        return null;
-                    }
-
-                    const raw = step as Partial<DealAnimationStep> & { card?: ItemCard };
-                    if (!raw.card || typeof raw.playerId !== 'string') {
-                        return null;
-                    }
-
-                    return {
-                        order: typeof raw.order === 'number' ? raw.order : index,
-                        playerId: raw.playerId,
-                        card: raw.card
-                    } as DealAnimationStep;
-                })
-                .filter((step): step is DealAnimationStep => Boolean(step));
-
-            setDealQueue(normalized.sort((a, b) => a.order - b.order));
         };
 
         const handleCardDrawn = (payload: unknown) => {
@@ -370,7 +328,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('ORDER_CONFIRMATIONS_UPDATED', handleOrderConfirmationUpdate);
         registerEventHandler('ERROR', handleErrorMessage);
         registerEventHandler('GAME_ENDED', syncGameState);
-        registerEventHandler('DEAL_ANIMATION', handleDealAnimation);
         registerEventHandler('CARD_DRAWN', handleCardDrawn);
 
         gameWebSocket.on(CONNECTION_OPEN, handleOpen);
@@ -390,7 +347,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         return () => {
             isActive = false;
             cleanupHandlers();
-            setDealQueue([]);
             setDrawQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);
@@ -481,11 +437,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         clientDispatch({ type: 'CLEAR_ERROR' });
     }, []);
 
-    // 消耗一個發牌動畫事件
-    const consumeDealStep = useCallback(() => {
-        setDealQueue(prev => prev.slice(1));
-    }, []);
-
     // 消耗一個抽牌事件
     const consumeDrawEvent = useCallback(() => {
         setDrawQueue(prev => prev.slice(1));
@@ -505,8 +456,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         confirmOrder,
         startOrderDecision,
         clearError,
-        dealQueue,
-        consumeDealStep,
         drawQueue,
         consumeDrawEvent
     };

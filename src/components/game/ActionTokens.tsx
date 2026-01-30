@@ -69,7 +69,7 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                 return (
                     <button
                         key={idx}
-                        className={`action-token btn me-2 mb-2 ${token.used ? 'used' : ''}`}
+                        className={`action-token btn ${token.used ? 'used' : ''}`}
                         disabled={Boolean(disabled) || (token.used && !canInspect)}
                         onClick={() => handleTokenClick(token)}
                         onBlur={() => setOpenToken(null)}

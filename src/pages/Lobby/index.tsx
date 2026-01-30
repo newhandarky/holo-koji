@@ -204,11 +204,11 @@ const Lobby: React.FC = () => {
                                 onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
                                 disabled={isConnecting}
                             >
-                                <option value="easy">簡單</option>
-                                <option value="medium">中等</option>
-                                <option value="hard">偏強</option>
-                                <option value="expert">超強</option>
-                                <option value="hell">地獄</option>
+                                <option value="easy">しぐれうい</option>
+                                <option value="medium">大空スバル</option>
+                                <option value="hard">兎田ぺこら</option>
+                                <option value="expert">猫又おかゆ</option>
+                                <option value="hell">ときのそら</option>
                             </select>
                         </div>
                     )}

@@ -67,20 +67,26 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                 const isOpen = openToken === token.type && canInspect;
 
                 return (
-                    <button
+                    <div
                         key={idx}
-                        className={`action-token btn ${token.used ? 'used' : ''}`}
-                        disabled={Boolean(disabled) || (token.used && !canInspect)}
-                        onClick={() => handleTokenClick(token)}
-                        onBlur={() => setOpenToken(null)}
+                        className="action-token-wrapper"
+                        onMouseLeave={() => setOpenToken(null)}
                     >
-                        <img
-                            className="action-token__icon"
-                            src={actionIconMap[token.type]}
-                            alt={token.type}
-                        />
+                        <button
+                            className={`action-token btn ${token.used ? 'used' : ''}`}
+                            disabled={Boolean(disabled) || (token.used && !canInspect)}
+                            onClick={() => handleTokenClick(token)}
+                            onBlur={() => setOpenToken(null)}
+                            type="button"
+                        >
+                            <img
+                                className="action-token__icon"
+                                src={actionIconMap[token.type]}
+                                alt={token.type}
+                            />
+                        </button>
                         {isOpen && renderUsedCards(cards)}
-                    </button>
+                    </div>
                 );
             })}
         </div>

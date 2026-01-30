@@ -90,6 +90,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
     // 依房主判斷自身/對手陣營
     const myCamp = playerId && hostId && playerId === hostId ? 'host' : 'guest';
     const opponentCamp = myCamp === 'host' ? 'guest' : 'host';
+    const charmMap = useMemo(() => {
+        const map = new Map<number, number>();
+        state.geishas.forEach((geisha) => {
+            map.set(geisha.id, geisha.charmPoints);
+        });
+        return map;
+    }, [state.geishas]);
+    const getCharmByGeishaId = useCallback((geishaId: number) => charmMap.get(geishaId) ?? 0, [charmMap]);
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
@@ -218,6 +226,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     secret: myState.secretCards,
                     'trade-off': myState.discardedCards
                 }}
+                getCharmByGeishaId={getCharmByGeishaId}
             />
 
             {!canAct && (
@@ -229,6 +238,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onCardSelect={handleCardSelect}
                 highlightCardId={highlightCardId}
                 highlightActive={highlightActive}
+                getCharmByGeishaId={getCharmByGeishaId}
             />
 
             <CompetitionGroupModal
@@ -236,6 +246,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 cards={competitionCards}
                 onSelect={handleCompetitionConfirm}
                 onClose={handleCompetitionClose}
+                getCharmByGeishaId={getCharmByGeishaId}
             />
         </div>
     );

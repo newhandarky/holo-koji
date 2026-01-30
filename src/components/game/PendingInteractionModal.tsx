@@ -11,16 +11,18 @@ interface PendingInteractionModalProps {
     onResolve: (action: GameAction) => void;
     // 當前玩家資料
     players: Player[];
+    // 取得魅力值（以伺服器資料為主）
+    getCharmByGeishaId?: (geishaId: number) => number;
 }
 
-const renderCard = (card: ItemCard) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
         style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
     >
         <div className="item-card__overlay" />
-        <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
+        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
     </div>
 );
 
@@ -34,7 +36,7 @@ const actionIconMap: Record<ActionToken['type'], string> = {
     competition: `${publicBaseUrl}/images/actions/Competition.png`
 };
 
-const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve, players }) => {
+const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve, players, getCharmByGeishaId }) => {
     const currentPlayer = players.find(player => player.id === playerId);
     const opponentPlayer = players.find(player => player.id !== playerId);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -77,7 +79,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
                                 payload: { playerId, chosenCardId: card.id }
                             })}
                         >
-                            {renderCard(card)}
+                            {renderCard(card, getCharmByGeishaId)}
                             <span className="gift-selection-label">選擇此卡</span>
                         </button>
                     ))}
@@ -90,7 +92,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
                 {interaction.groups.map((group, index) => (
                     <div key={index} className="border rounded p-2 mb-2">
                         <div className="d-flex flex-wrap">
-                            {group.map(renderCard)}
+                            {group.map((card) => renderCard(card, getCharmByGeishaId))}
                         </div>
                         <button
                             className="btn btn-outline-danger btn-sm"

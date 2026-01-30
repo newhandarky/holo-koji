@@ -11,16 +11,18 @@ interface CompetitionGroupModalProps {
     onSelect: (groups: string[][]) => void;
     // 關閉視窗回呼
     onClose: () => void;
+    // 取得魅力值（以伺服器資料為主）
+    getCharmByGeishaId?: (geishaId: number) => number;
 }
 
-const renderCard = (card: ItemCard) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
         style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
     >
         <div className="item-card__overlay" />
-        <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
+        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
     </div>
 );
 
@@ -29,7 +31,8 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     isOpen,
     cards,
     onSelect,
-    onClose
+    onClose,
+    getCharmByGeishaId
 }) => {
     if (!isOpen || cards.length !== 4) {
         return null;
@@ -57,12 +60,12 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
                                 <div className="row">
                                     <div className="col-6">
                                         <div className="d-flex flex-wrap justify-content-center">
-                                            {group[0].map(renderCard)}
+                                            {group[0].map((card) => renderCard(card, getCharmByGeishaId))}
                                         </div>
                                     </div>
                                     <div className="col-6">
                                         <div className="d-flex flex-wrap justify-content-center">
-                                            {group[1].map(renderCard)}
+                                            {group[1].map((card) => renderCard(card, getCharmByGeishaId))}
                                         </div>
                                     </div>
                                 </div>

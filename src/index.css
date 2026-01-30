@@ -426,7 +426,7 @@ code {
 .bottom-sheet__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: transparent;
 }
 
 .bottom-sheet__panel {
@@ -547,34 +547,8 @@ code {
 .game-card--locked .geisha-card,
 .game-card--locked .player-card {
   pointer-events: none;
-  animation: shakeHint 0.6s ease-in-out infinite;
 }
 
-.game-card--locked .action-token::after,
-.game-card--locked .item-card::after,
-.game-card--locked .geisha-card::after,
-.game-card--locked .player-card::after {
-  content: "請先完成當前動作";
-  position: absolute;
-  top: -22px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  font-size: 0.65rem;
-  padding: 2px 6px;
-  border-radius: 999px;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-@keyframes shakeHint {
-  0% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  50% { transform: translateX(2px); }
-  75% { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
-}
 
 /* 戰況視覺化 */
 .battle-summary-grid {
@@ -693,6 +667,10 @@ code {
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
+}
+
+.action-token__popover .item-card__overlay {
+  display: none;
 }
 
 /* 行動圖示列（固定 4 欄） */

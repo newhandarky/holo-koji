@@ -11,6 +11,7 @@ interface Props {
     onAction: (type: ActionToken['type']) => void;    // 點擊行動回呼
     disabled?: boolean;                               // 是否暫時停用
     usedCards?: Partial<Record<ActionToken['type'], ItemCard[]>>; // 已使用行動的卡牌資訊
+    getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
 }
 
 // 靜態資源基底路徑（支援 GitHub Pages）
@@ -23,7 +24,7 @@ const actionIconMap: Record<ActionToken['type'], string> = {
     competition: `${publicBaseUrl}/images/actions/Competition.png`
 };
 
-const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards }) => {
+const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, getCharmByGeishaId }) => {
     const [openToken, setOpenToken] = useState<ActionToken['type'] | null>(null);
 
     const handleTokenClick = (token: ActionToken) => {
@@ -51,7 +52,7 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards }
                         style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
                     >
                         <div className="item-card__overlay" />
-                        <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
+                        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                     </div>
                 ))}
             </div>

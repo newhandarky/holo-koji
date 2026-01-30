@@ -11,10 +11,11 @@ interface Props {
     onCardSelect: (cards: ItemCard[]) => void;
     highlightCardId?: string | null;                 // 新抽到的卡片 ID
     highlightActive?: boolean;                       // 是否啟用抽牌動畫
+    getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
 }
 
 // 玩家手牌區顯示與選牌
-const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive }) => {
+const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive, getCharmByGeishaId }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
     // 已選卡片 ID 集合（快速判斷是否選取）
@@ -55,7 +56,7 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, hig
                     style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
                 >
                     <div className="item-card__overlay" />
-                    <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
+                    <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                 </div>
             ))}
         </div>

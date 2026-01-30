@@ -40,6 +40,11 @@ interface RoundCompletePayload {
     round?: number;
 }
 
+interface ReadyStatusPayload {
+    confirmations: string[];
+    waitingFor: string[];
+}
+
 // 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
 const clientReducer = (state: ClientState, action: ClientAction): ClientState => {
     switch (action.type) {
@@ -145,6 +150,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
     const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
     const roundSummaryTimerRef = useRef<number | null>(null);
+    const [readyStatus, setReadyStatus] = useState<ReadyStatusPayload | null>(null);
 
     useEffect(() => {
         const playerId = playerData?.id;
@@ -292,6 +298,26 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             }, 2500);
         };
 
+        const handleReadyCheck = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+            const candidate = payload as ReadyStatusPayload;
+            setReadyStatus(candidate);
+        };
+
+        const handleReadyStatus = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+            const candidate = payload as ReadyStatusPayload;
+            if (candidate.waitingFor.length === 0) {
+                setReadyStatus(null);
+            } else {
+                setReadyStatus(candidate);
+            }
+        };
+
         const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
             handlerMap[eventType] = handler;
             gameWebSocket.on(eventType, handler);
@@ -333,6 +359,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('GAME_STATE_SYNC', syncGameState);
         registerEventHandler('STATE_CHANGED', syncGameState);
         registerEventHandler('GAME_STARTED', syncGameState);
+        registerEventHandler('READY_CHECK', handleReadyCheck);
+        registerEventHandler('READY_STATUS', handleReadyStatus);
         registerEventHandler('ROUND_COMPLETE', handleRoundComplete);
         registerEventHandler('ORDER_DECISION_START', handleOrderDecisionStart);
         registerEventHandler('ORDER_DECISION_STARTED', handleOrderDecisionStart);
@@ -378,6 +406,36 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             gameWebSocket.send('GAME_ACTION', { gameId, playerId: playerData.id, action });
         } catch (error) {
             const message = error instanceof Error ? error.message : '遊戲動作送出失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        }
+    }, [gameId, playerData?.id]);
+
+    // 送出再來一場請求（同房間重開）
+    const requestRematch = useCallback(() => {
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法發送再來一場');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('REMATCH_REQUEST', { gameId, playerId: playerData.id });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '再來一場送出失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        }
+    }, [gameId, playerData?.id]);
+
+    // 玩家準備確認
+    const confirmReady = useCallback(() => {
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認準備');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('READY_CONFIRM', { gameId, playerId: playerData.id });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '準備確認送出失敗';
             clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
         }
     }, [gameId, playerData?.id]);
@@ -440,7 +498,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         isLoading: clientState.isLoading,
         error: clientState.error,
         roundSummary,
+        readyStatus,
         sendGameAction,
+        requestRematch,
+        confirmReady,
         confirmOrder,
         startOrderDecision,
         clearError,

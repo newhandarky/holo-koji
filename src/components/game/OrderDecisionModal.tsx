@@ -18,6 +18,7 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
     onConfirm
 }) => {
     const [dots, setDots] = useState('');
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     // 決定中的動畫效果
     useEffect(() => {
@@ -28,6 +29,12 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
             return () => clearInterval(interval);
         }
     }, [phase]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setIsCollapsed(false);
+        }
+    }, [isOpen, phase]);
 
     if (!isOpen) return null;
 
@@ -127,17 +134,29 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
     );
 
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
-                    <div className="modal-header bg-primary text-white">
-                        <h5 className="modal-title">🎲 決定遊戲順序</h5>
-                    </div>
-                    <div className="modal-body p-4">
+        <div className="bottom-sheet">
+            <div className="bottom-sheet__backdrop" />
+            <div className={`bottom-sheet__panel ${isCollapsed ? 'is-collapsed' : ''}`}>
+                <div className="bottom-sheet__header">
+                    <h5 className="bottom-sheet__title">決定遊戲順序</h5>
+                    <button
+                        className="bottom-sheet__toggle"
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                    >
+                        {isCollapsed ? '展開' : '收合'}
+                    </button>
+                </div>
+                {!isCollapsed && (
+                    <div className="bottom-sheet__body">
                         {phase === 'deciding' && renderDecidingPhase()}
                         {(phase === 'result' || phase === 'waiting_confirmation') && renderResultPhase()}
                     </div>
-                </div>
+                )}
+                {isCollapsed && (
+                    <button className="bottom-sheet__expand" onClick={() => setIsCollapsed(false)}>
+                        展開操作
+                    </button>
+                )}
             </div>
         </div>
     );

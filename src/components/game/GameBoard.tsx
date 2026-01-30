@@ -23,10 +23,22 @@ interface GameBoardProps {
     onSendAction: (action: GameAction) => void;
     // 是否可操作（輪到自己且無互動阻擋）
     canAct: boolean;
+    // 抽牌動畫卡片 ID
+    highlightCardId?: string | null;
+    // 是否啟用抽牌動畫
+    highlightActive?: boolean;
 }
 
 // 遊戲主棋盤與行動控制區
-const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, hostId, onSendAction, canAct }) => {
+const GameBoard: React.FC<GameBoardProps> = ({
+    state,
+    playerId,
+    hostId,
+    onSendAction,
+    canAct,
+    highlightCardId,
+    highlightActive
+}) => {
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
@@ -202,6 +214,10 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, hostId, onSendAc
                 tokens={myState.actionTokens}
                 onAction={handleAction}
                 disabled={!isMyTurn}
+                usedCards={{
+                    secret: myState.secretCards,
+                    'trade-off': myState.discardedCards
+                }}
             />
 
             {!canAct && (
@@ -211,6 +227,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ state, playerId, hostId, onSendAc
             <PlayerHand
                 cards={myState.hand}
                 onCardSelect={handleCardSelect}
+                highlightCardId={highlightCardId}
+                highlightActive={highlightActive}
             />
 
             <CompetitionGroupModal

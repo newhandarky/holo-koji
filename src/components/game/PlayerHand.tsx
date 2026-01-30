@@ -9,10 +9,12 @@ import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData
 interface Props {
     cards: ItemCard[];
     onCardSelect: (cards: ItemCard[]) => void;
+    highlightCardId?: string | null;                 // 新抽到的卡片 ID
+    highlightActive?: boolean;                       // 是否啟用抽牌動畫
 }
 
 // 玩家手牌區顯示與選牌
-const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
+const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
     // 已選卡片 ID 集合（快速判斷是否選取）
@@ -44,7 +46,11 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect }) => {
             {cards.map(card => (
                 <div
                     key={card.id}
-                    className={`item-card item-card--image item-card--hand ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
+                    className={`item-card item-card--image item-card--hand ${
+                        selectedIdSet.has(card.id) ? 'selected' : ''
+                    } ${
+                        highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
+                    }`}
                     onClick={() => toggleCard(card)}
                     style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
                 >

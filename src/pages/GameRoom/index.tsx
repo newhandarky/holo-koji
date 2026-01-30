@@ -6,7 +6,6 @@ import { useWebSocket, DealAnimationStep } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
-import DrawCardModal from '../../components/game/DrawCardModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
 import { getGeishaNameById } from '../../utils/gameData';
@@ -50,8 +49,11 @@ const GameRoom: React.FC = () => {
     const {
         isConnected,
         roundSummary,
+        readyStatus,
         confirmOrder,
         sendGameAction,
+        requestRematch,
+        confirmReady,
         dealQueue,
         consumeDealStep,
         drawQueue,
@@ -69,6 +71,16 @@ const GameRoom: React.FC = () => {
     const [drawModalCard, setDrawModalCard] = useState<null | { playerId: string; card: DealAnimationStep['card'] }>(null);
     // 抽牌視窗開關
     const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
+    // 抽牌動畫目標卡片
+    const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
+    // 抽牌動畫是否顯示
+    const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
+    // 發牌動畫目標卡片
+    const [dealHighlightCardId, setDealHighlightCardId] = useState<string | null>(null);
+    // 發牌動畫是否顯示
+    const [isDealHighlightActive, setIsDealHighlightActive] = useState(false);
+    // 再來一場送出狀態
+    const [isRematchRequested, setIsRematchRequested] = useState(false);
 
     // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
@@ -79,6 +91,13 @@ const GameRoom: React.FC = () => {
         console.log('  - 順序決定狀態:', state.orderDecision);
         console.log('  - 當前玩家ID:', currentPlayerId);
     }, [state, roomId, isConnected, currentPlayerId]);
+
+    // 進入新局時重置再來一場狀態
+    useEffect(() => {
+        if (state.phase !== 'ended' && isRematchRequested) {
+            setIsRematchRequested(false);
+        }
+    }, [state.phase, isRematchRequested]);
 
     // 發牌動畫節奏控制
     useEffect(() => {
@@ -109,7 +128,30 @@ const GameRoom: React.FC = () => {
         if (playerId === currentPlayerId && card.type !== 'hidden') {
             setDrawModalCard({ playerId, card });
             setIsDrawModalOpen(true);
-            return;
+            setDrawHighlightCardId(card.id);
+            setIsDrawHighlightActive(false);
+
+            const revealTimer = window.setTimeout(() => {
+                setIsDrawHighlightActive(true);
+            }, 1000);
+
+            const highlightTimer = window.setTimeout(() => {
+                setIsDrawHighlightActive(false);
+            }, 1500);
+
+            const closeTimer = window.setTimeout(() => {
+                setIsDrawModalOpen(false);
+                setDrawModalCard(null);
+                setIsDrawHighlightActive(false);
+                setDrawHighlightCardId(null);
+                consumeDrawEvent();
+            }, 5000);
+
+            return () => {
+                window.clearTimeout(revealTimer);
+                window.clearTimeout(highlightTimer);
+                window.clearTimeout(closeTimer);
+            };
         }
 
         const label = `${playerId} 抽到了新卡`;
@@ -121,6 +163,34 @@ const GameRoom: React.FC = () => {
 
         return () => window.clearTimeout(timer);
     }, [drawQueue, currentPlayerId, consumeDrawEvent]);
+
+    // 發牌動畫完成後，延遲 0.5 秒再滑入手牌
+    useEffect(() => {
+        if (!activeDealStep) {
+            return;
+        }
+
+        if (activeDealStep.playerId !== currentPlayerId) {
+            return;
+        }
+
+        const dealCardId = activeDealStep.card.id;
+        setDealHighlightCardId(dealCardId);
+        setIsDealHighlightActive(false);
+
+        const revealTimer = window.setTimeout(() => {
+            setIsDealHighlightActive(true);
+        }, 950);
+
+        const resetTimer = window.setTimeout(() => {
+            setIsDealHighlightActive(false);
+        }, 1450);
+
+        return () => {
+            window.clearTimeout(revealTimer);
+            window.clearTimeout(resetTimer);
+        };
+    }, [activeDealStep, currentPlayerId]);
 
     // 依目前發牌資訊生成顯示文字
     const dealingLabel = (() => {
@@ -162,13 +232,6 @@ const GameRoom: React.FC = () => {
         confirmOrder();
     };
 
-    // 抽牌視窗確認（只對自己顯示）
-    const handleDrawModalConfirm = () => {
-        setIsDrawModalOpen(false);
-        setDrawModalCard(null);
-        consumeDrawEvent();
-    };
-
     if (!isConnected) {
         return (
             <div className="game-background d-flex align-items-center justify-content-center">
@@ -200,8 +263,15 @@ const GameRoom: React.FC = () => {
                     <button className="btn btn-primary me-2" onClick={() => navigate('/')}>
                         返回大廳
                     </button>
-                    <button className="btn btn-outline-primary" onClick={() => navigate('/')}>
-                        再來一場
+                    <button
+                        className="btn btn-outline-primary"
+                        onClick={() => {
+                            requestRematch();
+                            setIsRematchRequested(true);
+                        }}
+                        disabled={isRematchRequested}
+                    >
+                        {isRematchRequested ? '等待對手...' : '再來一場'}
                     </button>
                 </div>
             </div>
@@ -213,10 +283,16 @@ const GameRoom: React.FC = () => {
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
     const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
+    const isInteractionLocked = Boolean(pendingInteraction)
+        || isDrawModalOpen
+        || state.orderDecision.isOpen
+        || Boolean(readyStatus);
     const canAct =
         state.phase === 'playing'
         && state.players[state.currentPlayer]?.id === currentPlayerId
-        && !pendingInteraction;
+        && !pendingInteraction
+        && !isDrawModalOpen
+        && !state.orderDecision.isOpen;
 
     if (isWaiting) {
         return (
@@ -298,7 +374,7 @@ const GameRoom: React.FC = () => {
     return (
         <div className="game-background p-3">
             <div className="container-fluid">
-                <div className="card game-card p-3">
+                <div className={`card game-card p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
                     <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
                         <div>你是：<strong>{currentPlayerId || '未知玩家'}</strong></div>
                         <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
@@ -328,7 +404,7 @@ const GameRoom: React.FC = () => {
                             const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
                             return (
                             <div key={player.id} className="col-md-6 mb-2">
-                                <div className={`card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
+                                <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
                                     <div className="card-body py-2">
                                         <div className="d-flex justify-content-between align-items-center">
                                             <span>
@@ -356,6 +432,8 @@ const GameRoom: React.FC = () => {
                         hostId={hostId}
                         onSendAction={sendGameAction}
                         canAct={canAct}
+                        highlightCardId={isDrawHighlightActive ? drawHighlightCardId : dealHighlightCardId}
+                        highlightActive={isDrawHighlightActive || isDealHighlightActive}
                     />
 
                     {/* 離開遊戲按鈕 */}
@@ -405,11 +483,13 @@ const GameRoom: React.FC = () => {
                 </div>
             )}
 
-            <DrawCardModal
-                isOpen={isDrawModalOpen}
-                card={drawModalCard?.card ?? null}
-                onConfirm={handleDrawModalConfirm}
-            />
+            {isDrawModalOpen && drawModalCard && (
+                <div className="top-sheet">
+                    <div className="top-sheet__panel">
+                        <div className="top-sheet__title">你抽到一張新牌</div>
+                    </div>
+                </div>
+            )}
 
             {/* 順序決定彈窗 */}
             <OrderDecisionModal
@@ -423,13 +503,38 @@ const GameRoom: React.FC = () => {
                 onConfirm={handleConfirmOrder}
             />
 
+            {readyStatus && (
+                <div className="bottom-sheet">
+                    <div className="bottom-sheet__backdrop" />
+                    <div className="bottom-sheet__panel">
+                        <div className="bottom-sheet__header">
+                            <h5 className="bottom-sheet__title">準備開始</h5>
+                        </div>
+                        <div className="bottom-sheet__body">
+                            <p>請確認已準備好開始新對戰。</p>
+                            <div className="d-flex flex-column gap-2 mb-3">
+                                {state.players.map((player) => (
+                                    <div key={player.id} className="d-flex justify-content-between">
+                                        <span>{player.name}</span>
+                                        <span>
+                                            {readyStatus.confirmations.includes(player.id) ? '✅ 已準備' : '⏳ 等待中'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <button className="btn btn-primary w-100" onClick={confirmReady}>
+                                我準備好了
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {needsResponse && pendingInteraction && (
                 <PendingInteractionModal
                     interaction={pendingInteraction}
                     playerId={currentPlayerId}
                     players={state.players}
-                    geishas={state.geishas}
-                    hostId={hostId}
                     onResolve={sendGameAction}
                 />
             )}

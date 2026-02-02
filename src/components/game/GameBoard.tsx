@@ -40,6 +40,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     highlightCardId,
     highlightActive
 }) => {
+    const geishaSet = state.geishaSet ?? 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
@@ -231,6 +232,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
+                        geishaSet={geishaSet}
                     />
                 ))}
             </div>
@@ -245,6 +247,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
+                        geishaSet={geishaSet}
                     />
                 ))}
             </div>
@@ -258,6 +261,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     'trade-off': myState.discardedCards
                 }}
                 getCharmByGeishaId={getCharmByGeishaId}
+                geishaSet={geishaSet}
             />
 
             {!canAct && (
@@ -270,6 +274,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 highlightCardId={highlightCardId}
                 highlightActive={highlightActive}
                 getCharmByGeishaId={getCharmByGeishaId}
+                geishaSet={geishaSet}
             />
 
             <CompetitionGroupModal
@@ -278,6 +283,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onSelect={handleCompetitionConfirm}
                 onClose={handleCompetitionClose}
                 getCharmByGeishaId={getCharmByGeishaId}
+                geishaSet={geishaSet}
             />
         </div>
     );

@@ -10,6 +10,7 @@ export const initialState: GameState = {
     gameId: '',
     players: [],
     geishas: initialGeishas,
+    geishaSet: 'default',
     currentPlayer: 0,
     phase: 'waiting',
     round: 1,

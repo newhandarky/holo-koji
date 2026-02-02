@@ -1,5 +1,5 @@
 import React from 'react';
-import { ItemCard } from 'game-shared-types';
+import { ItemCard, GeishaSetKey } from 'game-shared-types';
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface CompetitionGroupModalProps {
@@ -13,13 +13,15 @@ interface CompetitionGroupModalProps {
     onClose: () => void;
     // 取得魅力值（以伺服器資料為主）
     getCharmByGeishaId?: (geishaId: number) => number;
+    // 藝妓組合
+    geishaSet?: GeishaSetKey;
 }
 
-const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSetKey) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
-        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
+        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
     >
         <div className="item-card__overlay" />
         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
@@ -32,7 +34,8 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     cards,
     onSelect,
     onClose,
-    getCharmByGeishaId
+    getCharmByGeishaId,
+    geishaSet
 }) => {
     if (!isOpen || cards.length !== 4) {
         return null;
@@ -59,12 +62,12 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
                             <div className="row">
                                 <div className="col-6">
                                     <div className="d-flex flex-wrap justify-content-center">
-                                        {group[0].map((card) => renderCard(card, getCharmByGeishaId))}
+                                            {group[0].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                                     </div>
                                 </div>
                                 <div className="col-6">
                                     <div className="d-flex flex-wrap justify-content-center">
-                                        {group[1].map((card) => renderCard(card, getCharmByGeishaId))}
+                                            {group[1].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                                     </div>
                                 </div>
                             </div>

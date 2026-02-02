@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard } from 'game-shared-types';
+import { ItemCard, GeishaSetKey } from 'game-shared-types';
 import { getGeishaNameById, getGeishaCharmById } from '../../utils/gameData';
 
 interface DrawCardModalProps {
@@ -9,10 +9,12 @@ interface DrawCardModalProps {
     card: ItemCard | null;
     // 確認回呼
     onConfirm: () => void;
+    // 藝妓組合
+    geishaSet?: GeishaSetKey;
 }
 
 // 抽牌提示視窗（回合開始時顯示給自己）
-const DrawCardModal: React.FC<DrawCardModalProps> = ({ isOpen, card, onConfirm }) => {
+const DrawCardModal: React.FC<DrawCardModalProps> = ({ isOpen, card, onConfirm, geishaSet }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
@@ -41,7 +43,7 @@ const DrawCardModal: React.FC<DrawCardModalProps> = ({ isOpen, card, onConfirm }
                         <div className="draw-card">
                             <div className="draw-card__inner">
                                 <div className="draw-card__front">
-                                    <div className="fs-5">{getGeishaNameById(card.geishaId)}</div>
+                                    <div className="fs-5">{getGeishaNameById(card.geishaId, geishaSet ?? 'default')}</div>
                                     <small className="text-muted">魅力值 {getGeishaCharmById(card.geishaId)}</small>
                                 </div>
                             </div>

@@ -1,7 +1,7 @@
 
 // src/components/game/GeishaCard.tsx
 import React from 'react';
-import { Geisha } from "game-shared-types"
+import { Geisha, GeishaSetKey } from "game-shared-types"
 import { getGeishaImageById } from '../../utils/gameData';
 
 /**
@@ -22,6 +22,8 @@ interface Props {
     myCamp: 'host' | 'guest';
     // 對手的陣營
     opponentCamp: 'host' | 'guest';
+    // 藝妓組合
+    geishaSet?: GeishaSetKey;
 }
 
 const GeishaCard: React.FC<Props> = ({
@@ -31,7 +33,8 @@ const GeishaCard: React.FC<Props> = ({
     currentPlayerId,
     hostId,
     myCamp,
-    opponentCamp
+    opponentCamp,
+    geishaSet
 }) => {
     // 根據控制方加上樣式（以玩家 ID 判斷陣營）
     const isHostControlled = Boolean(hostId) && geisha.controlledBy === hostId;
@@ -39,7 +42,7 @@ const GeishaCard: React.FC<Props> = ({
         geisha.controlledBy ? 'geisha-card--guest' : ""
         }`;
     // 藝妓背景圖片
-    const imageUrl = getGeishaImageById(geisha.id);
+    const imageUrl = getGeishaImageById(geisha.id, geishaSet ?? 'default');
 
     return (
         <div

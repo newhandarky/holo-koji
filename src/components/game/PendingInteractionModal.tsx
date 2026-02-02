@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, PendingInteraction, GameAction, Player } from 'game-shared-types';
+import { ItemCard, PendingInteraction, GameAction, Player, GeishaSetKey } from 'game-shared-types';
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
@@ -13,20 +13,22 @@ interface PendingInteractionModalProps {
     players: Player[];
     // 取得魅力值（以伺服器資料為主）
     getCharmByGeishaId?: (geishaId: number) => number;
+    // 藝妓組合
+    geishaSet?: GeishaSetKey;
 }
 
-const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSetKey) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
-        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
+        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
     >
         <div className="item-card__overlay" />
         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
     </div>
 );
 
-const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve, players, getCharmByGeishaId }) => {
+const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ interaction, playerId, onResolve, players, getCharmByGeishaId, geishaSet }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
@@ -43,19 +45,19 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
             <>
                 <p>對手提供了下列卡片，請挑選 1 張：</p>
                 <div className="gift-selection-grid gift-selection-grid--nowrap">
-                    {interaction.offeredCards.map((card) => (
-                        <button
-                            key={card.id}
-                            className="gift-selection-card"
-                            onClick={() => onResolve({
-                                type: 'RESOLVE_GIFT',
-                                payload: { playerId, chosenCardId: card.id }
-                            })}
-                        >
-                            {renderCard(card, getCharmByGeishaId)}
-                            <span className="gift-selection-label">選擇此卡</span>
-                        </button>
-                    ))}
+                            {interaction.offeredCards.map((card) => (
+                                <button
+                                    key={card.id}
+                                    className="gift-selection-card"
+                                    onClick={() => onResolve({
+                                        type: 'RESOLVE_GIFT',
+                                        payload: { playerId, chosenCardId: card.id }
+                                    })}
+                                >
+                                    {renderCard(card, getCharmByGeishaId, geishaSet)}
+                                    <span className="gift-selection-label">選擇此卡</span>
+                                </button>
+                            ))}
                 </div>
             </>
         )
@@ -65,7 +67,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
                 {interaction.groups.map((group, index) => (
                     <div key={index} className="border rounded p-2 mb-2">
                         <div className="d-flex flex-wrap">
-                            {group.map((card) => renderCard(card, getCharmByGeishaId))}
+                            {group.map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                         </div>
                         <button
                             className="btn btn-outline-danger btn-sm"

@@ -489,6 +489,7 @@ const GameRoom: React.FC = () => {
                     playerId={currentPlayerId}
                     players={state.players}
                     getCharmByGeishaId={(geishaId) => state.geishas.find((geisha) => geisha.id === geishaId)?.charmPoints ?? 0}
+                    geishaSet={state.geishaSet ?? 'default'}
                     onResolve={sendGameAction}
                 />
             )}

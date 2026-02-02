@@ -1,6 +1,6 @@
 // src/components/game/ActionTokens.tsx
 import React, { useState } from 'react';
-import { ActionToken, ItemCard } from "game-shared-types"
+import { ActionToken, ItemCard, GeishaSetKey } from "game-shared-types"
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 /**
@@ -12,6 +12,7 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
     usedCards?: Partial<Record<ActionToken['type'], ItemCard[]>>; // 已使用行動的卡牌資訊
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
+    geishaSet?: GeishaSetKey;                         // 藝妓組合
 }
 
 // 靜態資源基底路徑（支援 GitHub Pages）
@@ -24,7 +25,7 @@ const actionIconMap: Record<ActionToken['type'], string> = {
     competition: `${publicBaseUrl}/images/actions/Competition.png`
 };
 
-const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, getCharmByGeishaId }) => {
+const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, getCharmByGeishaId, geishaSet }) => {
     const [openToken, setOpenToken] = useState<ActionToken['type'] | null>(null);
 
     const handleTokenClick = (token: ActionToken) => {
@@ -49,7 +50,7 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                     <div
                         key={card.id}
                         className="item-card item-card--image item-card--mini"
-                        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
+                        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
                     >
                         <div className="item-card__overlay" />
                         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>

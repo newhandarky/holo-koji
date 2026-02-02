@@ -1,6 +1,6 @@
 // src/components/game/PlayerHand.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { ItemCard } from "game-shared-types"
+import { ItemCard, GeishaSetKey } from "game-shared-types"
 import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
 
 /**
@@ -12,10 +12,11 @@ interface Props {
     highlightCardId?: string | null;                 // 新抽到的卡片 ID
     highlightActive?: boolean;                       // 是否啟用抽牌動畫
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
+    geishaSet?: GeishaSetKey; // 藝妓組合
 }
 
 // 玩家手牌區顯示與選牌
-const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive, getCharmByGeishaId }) => {
+const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive, getCharmByGeishaId, geishaSet }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
     // 已選卡片 ID 集合（快速判斷是否選取）
@@ -53,7 +54,7 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, hig
                         highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
                     }`}
                     onClick={() => toggleCard(card)}
-                    style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId)})` }}
+                    style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
                 >
                     <div className="item-card__overlay" />
                     <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>

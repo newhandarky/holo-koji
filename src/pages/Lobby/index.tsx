@@ -14,6 +14,8 @@ const Lobby: React.FC = () => {
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
     const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
+    // 藝妓組合
+    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki'>('default');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -108,11 +110,12 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty });
+        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
             mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined
+            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
+            geishaSet
         });
     };
 
@@ -212,6 +215,18 @@ const Lobby: React.FC = () => {
                             </select>
                         </div>
                     )}
+                    <div className="mb-3">
+                        <label className="form-label">藝妓組合</label>
+                        <select
+                            className="form-select"
+                            value={geishaSet}
+                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki')}
+                            disabled={isConnecting}
+                        >
+                            <option value="default">預設</option>
+                            <option value="akatsuki">曉</option>
+                        </select>
+                    </div>
                     <label className="form-label">玩家名稱</label>
                     <input
                         type="text"

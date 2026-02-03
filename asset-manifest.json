@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/holo-koji/static/css/main.5dd71915.css",
-    "main.js": "/holo-koji/static/js/main.c76a2428.js",
+    "main.js": "/holo-koji/static/js/main.2b57b8f4.js",
     "index.html": "/holo-koji/index.html",
     "main.5dd71915.css.map": "/holo-koji/static/css/main.5dd71915.css.map",
-    "main.c76a2428.js.map": "/holo-koji/static/js/main.c76a2428.js.map"
+    "main.2b57b8f4.js.map": "/holo-koji/static/js/main.2b57b8f4.js.map"
   },
   "entrypoints": [
     "static/css/main.5dd71915.css",
-    "static/js/main.c76a2428.js"
+    "static/js/main.2b57b8f4.js"
   ]
 }

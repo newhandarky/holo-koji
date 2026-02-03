@@ -80,9 +80,48 @@ export const akatsuki = [
     }
 ];
 
+export const onesan = [
+    {
+        name: 'アキ・ローゼンタール',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/aki.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/rosetai.jpg`
+    },
+    {
+        name: '癒月ちょこ',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/choko.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/choco-fan.jpg`
+    },
+    {
+        name: 'ときのそら',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/sora.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/ankimo.jpg`
+    },
+    {
+        name: 'Mori Calliope',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/cali.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/death-sensei.jpg`
+    },
+    {
+        name: 'AZKi',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/azki.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/guess.jpg`
+    },
+    {
+        name: 'Elizabeth Rose Bloodflame',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/Elizabeth.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/sword.jpg`
+    },
+    {
+        name: 'Nerissa Ravencroft',
+        imageUrl: `${publicBaseUrl}/images/geisha/onesan/Nerissa.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/onesan-items/jial-bird.jpg`
+    }
+];
+
 const geishaSetMap: Record<GeishaSetKey, typeof geishaData> = {
     default: geishaData,
-    akatsuki
+    akatsuki,
+    onesan
 };
 
 const charmPointsDistribution = [2, 2, 2, 3, 3, 4, 5];

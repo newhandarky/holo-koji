@@ -1,46 +1,132 @@
-# Getting Started with Create React App
+# 花見小路線上對戰（Hanamikoji）
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+本專案為花見小路的線上對戰版本，前端使用 React（Create React App），後端使用 Node.js + WebSocket，讓兩位玩家可在房間中進行遊戲。
 
-## Available Scripts
+## 目前進度與已完成功能
 
-In the project directory, you can run:
+- **房間與連線**
+  - 建立 / 加入房間（2 人上限）
+  - WebSocket 連線與事件處理
+  - 房間滿員後自動進入順序決定流程
 
-### `npm start`
+- **順序與回合**
+  - 首輪隨機決定先後手
+  - 後續回合輪流先手
+  - 順序確認後追加「Ready 準備」流程
+  - 抽牌提示改為 Top Sheet（5 秒自動收合）
+  - 抽牌卡片延遲 1 秒後滑入手牌區
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- **四個行動**
+  - 密約 / 取捨 / 贈予 / 競爭（含互動流程）
+  - 贈予與競爭改為 Bottom Sheet（可收合）
+  - 競爭提供 3 種固定分組，免鍵盤輸入
+  - 密約/取捨可點擊已使用 ICON 查看當時選牌
+  - 競爭分組選擇改為 Bottom Sheet
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- **計分與結算**
+  - 回合結束翻開密約卡
+  - 依藝妓卡牌數量更新好感指示物
+  - 檢查魅力值（>=11）與好感指示物（>=4）勝利條件
+  - 無勝者則自動進入下一輪
+  - 遊戲結束支援「再來一場」（同房間重新開局）
+  - 遊戲結束改為 Bottom Sheet（全高，可收合查看戰況）
 
-### `npm test`
+- **狀態同步與防呆**
+  - 遊戲狀態同步（依玩家視角隱藏對手手牌/密約）
+  - 行動驗證（回合、行動可用、卡牌所有權、互動等待）
+  - 回合初始化檢查（手牌數、牌堆數、重複卡）
+  - 互動期間鎖定場上操作
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **介面與視覺**
+  - 上方顯示玩家名稱與是否為自己回合
+  - 房主紅框、加入者藍框（陣營色）
+  - 藝妓區塊背景圖 + 50% 透明遮罩
+  - 藝妓固定排列：上排 3/3/4/5，下排 2/2/2
+  - 藝妓卡牌歸屬：自己左下角、對手右上角（縮小顯示）
+  - 手牌改為圖片卡，換行排列並縮小尺寸
+  - 行動按鈕改為 ICON 並固定 4 欄排版
+  - 對手剩餘行動顯示於場上（藝妓區塊上方）
 
-### `npm run build`
+- **藝妓組合**
+  - 遊戲開始前可選擇藝妓組合
+  - 目前提供：預設、曉、大姊姊組
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+ - **AI 對戰**
+  - 模式：線上玩家 / NPC
+  - 難度：簡單 / 中等 / 偏強 / 超強 / 地獄
+  - 進階策略（讀盤面、翻盤價值、最差情境最大化）
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- **連線穩定性**
+  - 房間狀態支援 Redis 快照（避免重啟或休眠導致房間消失）
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 專案結構
 
-### `npm run eject`
+- `src/`：前端 React 應用
+- `server/`：後端 WebSocket 伺服器
+- `docs/`：規則與開發文件
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## 環境需求
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- Node.js（建議 16+）
+- npm
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## 安裝依賴
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+```bash
+npm install
+```
 
-## Learn More
+後端依賴（可獨立安裝）：
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+cd server
+npm install
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 前端啟動（開發模式）
+
+```bash
+npm start
+```
+
+預設會啟動在 `http://localhost:3000`。
+
+## 後端啟動
+
+```bash
+cd server
+npm run dev
+```
+
+預設 WebSocket 伺服器在 `http://localhost:3001`。
+
+## 測試
+
+```bash
+npm test
+```
+
+若要在 CI 或一次性跑完：
+
+```bash
+CI=1 npm test -- --watchAll=false
+```
+
+## 建置
+
+```bash
+npm run build
+```
+
+輸出會在 `build/` 資料夾。
+
+## 部署（GitHub Pages）
+
+```bash
+npm run deploy
+```
+
+## 補充說明
+
+- 遊戲規則請參考 `docs/0127-花見小路規則.md`。
+- 開發與檢查清單請參考 `docs/0127-花見小路線上遊戲 - 開發與檢查清單.md`。

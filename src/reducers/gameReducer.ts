@@ -2,12 +2,15 @@
 import { createRandomizedGeishas } from '../utils/gameData';
 import { GameState, Geisha, GameAction } from "game-shared-types"
 
+// 初始藝妓資料（隨機順序）
 const initialGeishas: Geisha[] = createRandomizedGeishas();
 
+// 初始遊戲狀態
 export const initialState: GameState = {
     gameId: '',
     players: [],
     geishas: initialGeishas,
+    geishaSet: 'default',
     currentPlayer: 0,
     phase: 'waiting',
     round: 1,
@@ -20,11 +23,16 @@ export const initialState: GameState = {
         result: undefined,
         confirmations: [],
         waitingFor: [],
-        currentPlayer: '',
-        onConfirm: () => { }
-    }
+        currentPlayer: ''
+    },
+    drawPile: [],
+    discardPile: [],
+    removedCard: undefined,
+    pendingInteraction: null,
+    lastAction: undefined
 };
 
+// 遊戲狀態 reducer（負責所有 action 狀態更新）
 export const gameReducer = (state: GameState, action: GameAction): GameState => {
     console.log('🔄 [Reducer] ===== 收到動作 =====');
     console.log('🔄 [Reducer] 動作類型:', action.type);
@@ -66,8 +74,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                     result: undefined,
                     confirmations: [],
                     waitingFor: [],
-                    currentPlayer: action.payload.players[0],
-                    onConfirm: () => { }
+                    currentPlayer: action.payload.players[0]
                 }
             };
 
@@ -109,6 +116,17 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             }
 
             return updatedOrderDecision;
+
+        case 'SYNC_SERVER_STATE':
+            console.log('🌐 [Reducer] ===== 處理 SYNC_SERVER_STATE =====');
+            return {
+                ...state,
+                ...action.payload,
+                orderDecision: {
+                    ...state.orderDecision,
+                    ...action.payload.orderDecision,
+                }
+            };
 
         case 'PLAY_ACTION':
             console.log('🎯 [Reducer] ===== 處理 PLAY_ACTION =====');

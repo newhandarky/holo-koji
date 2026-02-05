@@ -1,209 +1,42 @@
-// // frontend/src/hooks/useWebSocket.ts
-// import { useEffect, useRef, useCallback } from 'react';
-// import { useGame } from '../contexts/GameContext';
-// import io, { Socket } from 'socket.io-client';
-// import {
-//     GameAction, Player, WebSocketMessage,
-//     WebSocketEventType,
-//     GameStartedPayload,
-//     PlayerJoinedPayload,
-//     OrderDecisionResultPayload,
-//     ClientAction,
-//     ClientState,
-//     GameState
-// } from "game-shared-types"
-
-// // 前端狀態 reducer
-// const clientReducer = (state: ClientState, action: ClientAction): ClientState => {
-//     switch (action.type) {
-//         case 'SYNC_SERVER_STATE':
-//             return {
-//                 ...state,
-//                 gameState: action.payload,
-//                 isLoading: false,
-//                 error: null
-//             };
-
-//         case 'SET_CONNECTION_STATUS':
-//             return {
-//                 ...state,
-//                 isConnected: action.payload.isConnected
-//             };
-
-//         case 'SET_ERROR':
-//             return {
-//                 ...state,
-//                 error: action.payload.error,
-//                 isLoading: false
-//             };
-
-//         case 'CLEAR_ERROR':
-//             return {
-//                 ...state,
-//                 error: null
-//             };
-
-//         case 'SET_LOADING':
-//             return {
-//                 ...state,
-//                 isLoading: action.payload.isLoading
-//             };
-
-//         default:
-//             return state;
-//     }
-// };
-
-// const initialClientState: ClientState = {
-//     gameState: {} as GameState, // 初始空狀態
-//     isConnected: false,
-//     isLoading: true,
-//     error: null
-// };
-
-// export const useWebSocket = (gameId: string, playerData: Player) => {
-//     const { dispatch } = useGame();
-//     const socketRef = useRef<Socket | null>(null);
-//     const reconnectAttempts = useRef(0);
-//     const maxReconnectAttempts = 5;
-
-//     // 連接到後端
-//     useEffect(() => {
-//         if (!gameId || !playerData) return;
-
-//         console.log(`🟢 [useWebSocket] 開始連接到遊戲: ${gameId}`);
-
-//         // 建立 Socket.IO 連接
-//         socketRef.current = io('http://localhost:3001', {
-//             transports: ['websocket'],
-//             forceNew: true
-//         });
-
-//         const socket = socketRef.current;
-
-//         // 連接成功
-//         socket.on('connect', () => {
-//             console.log('🟢 [useWebSocket] Socket.IO 連線建立成功');
-//             reconnectAttempts.current = 0;
-
-//             // 自動加入遊戲
-//             socket.emit('JOIN_GAME', {
-//                 gameId,
-//                 playerData
-//             });
-//         });
-
-//         // 監聽遊戲狀態更新 (對應您原本的訊息處理器)
-//         socket.on('GAME_STATE_UPDATE', (message: WebSocketMessage) => {
-//             console.log('📨 [useWebSocket] 收到遊戲狀態更新:', message);
-
-//             switch (message.type) {
-//                 case 'GAME_STARTED':
-//                     console.log('🚨 [useWebSocket] 遊戲開始');
-//                     dispatch({
-//                         type: 'SYNC_SERVER_STATE',
-//                         payload: message.payload
-//                     });
-//                     break;
-
-//                 case 'STATE_CHANGED':
-//                     console.log('🔄 [useWebSocket] 遊戲狀態變更');
-//                     dispatch({
-//                         type: 'SYNC_SERVER_STATE',
-//                         payload: message.payload
-//                     });
-//                     break;
-
-//                 case 'ORDER_CONFIRMED':
-//                     console.log('✅ [useWebSocket] 順序確認完成');
-//                     dispatch({
-//                         type: 'SYNC_SERVER_STATE',
-//                         payload: message.payload
-//                     });
-//                     break;
-
-//                 default:
-//                     console.warn('⚠️ [useWebSocket] 未知訊息類型:', message.type);
-//             }
-//         });
-
-//         // 連接錯誤處理
-//         socket.on('connect_error', (error) => {
-//             console.error('❌ [useWebSocket] 連接錯誤:', error);
-//         });
-
-//         // 斷線處理
-//         socket.on('disconnect', (reason) => {
-//             console.log('🔴 [useWebSocket] 連線斷開:', reason);
-
-//             if (reason === 'io server disconnect') {
-//                 // 伺服器主動斷開，嘗試重連
-//                 if (reconnectAttempts.current < maxReconnectAttempts) {
-//                     reconnectAttempts.current++;
-//                     console.log(`🔄 [useWebSocket] 嘗試重新連接 (${reconnectAttempts.current}/${maxReconnectAttempts})`);
-//                 }
-//             }
-//         });
-
-//         return () => {
-//             console.log('🔌 [useWebSocket] 清理連接');
-//             socket.disconnect();
-//         };
-//     }, [gameId, playerData?.id, dispatch]);
-
-//     // 發送遊戲動作
-//     const sendGameAction = useCallback((action: GameAction) => {
-//         if (socketRef.current?.connected) {
-//             console.log('📤 [useWebSocket] 發送遊戲動作:', action);
-//             socketRef.current.emit('GAME_ACTION', {
-//                 gameId,
-//                 action
-//             });
-//         } else {
-//             console.error('❌ [useWebSocket] 無法發送動作，連接未建立');
-//         }
-//     }, [gameId]);
-
-//     // 確認順序決定
-//     const confirmOrder = useCallback(() => {
-//         if (socketRef.current?.connected) {
-//             console.log('✅ [useWebSocket] 確認順序');
-//             socketRef.current.emit('CONFIRM_ORDER', {
-//                 gameId,
-//                 playerId: playerData.id
-//             });
-//         }
-//     }, [gameId, playerData?.id]);
-
-//     // 連接狀態
-//     const isConnected = socketRef.current?.connected || false;
-
-//     return {
-//         sendGameAction,
-//         confirmOrder,
-//         isConnected
-//     };
-// };
-
-
 // frontend/src/hooks/useWebSocket.ts
-import { useEffect, useRef, useCallback, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
-import io, { Socket } from 'socket.io-client';
 import {
-    GameAction,
-    Player,
-    WebSocketMessage,
-    WebSocketEventType,
-    GameStartedPayload,
-    PlayerJoinedPayload,
-    OrderDecisionResultPayload,
     ClientAction,
     ClientState,
-    GameState
-} from "game-shared-types";
+    GameAction,
+    GameState,
+    ItemCard,
+    OrderDecisionResultPayload,
+    OrderDecisionStartPayload,
+    Player,
+    WebSocketEventType
+} from 'game-shared-types';
+import { gameWebSocket } from '../services/websocket';
+import config from '../config/environment';
 
-// 前端狀態 reducer
+// 連線事件的保留名稱，避免與伺服器事件衝突
+const CONNECTION_OPEN = '__OPEN__';
+const CONNECTION_CLOSE = '__CLOSE__';
+
+export interface CardDrawEvent {
+    // 抽牌玩家 ID
+    playerId: string;
+    // 抽到的卡片
+    card: ItemCard;
+}
+
+interface RoundCompletePayload {
+    // 結算回合數
+    round?: number;
+}
+
+interface ReadyStatusPayload {
+    confirmations: string[];
+    waitingFor: string[];
+}
+
+// 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
 const clientReducer = (state: ClientState, action: ClientAction): ClientState => {
     switch (action.type) {
         case 'SYNC_SERVER_STATE':
@@ -213,37 +46,33 @@ const clientReducer = (state: ClientState, action: ClientAction): ClientState =>
                 isLoading: false,
                 error: null
             };
-
         case 'SET_CONNECTION_STATUS':
             return {
                 ...state,
                 isConnected: action.payload.isConnected
             };
-
         case 'SET_ERROR':
             return {
                 ...state,
                 error: action.payload.error,
                 isLoading: false
             };
-
         case 'CLEAR_ERROR':
             return {
                 ...state,
                 error: null
             };
-
         case 'SET_LOADING':
             return {
                 ...state,
                 isLoading: action.payload.isLoading
             };
-
         default:
             return state;
     }
 };
 
+// 初始的客戶端狀態快照
 const initialClientState: ClientState = {
     gameState: {} as GameState,
     isConnected: false,
@@ -251,262 +80,383 @@ const initialClientState: ClientState = {
     error: null
 };
 
-export const useWebSocket = (gameId: string, playerData: Player) => {
-    // 使用內部的 clientReducer 管理 WebSocket 相關狀態
-    const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState);
+// 解析廣播 payload 中的 GameState，確保型別安全
+const resolveGameStatePayload = (payload: unknown): GameState | null => {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
 
-    // 使用 GameContext 的 dispatch 管理遊戲狀態
-    const { dispatch: gameDispatch } = useGame();
+    if ('gameState' in payload && (payload as { gameState: GameState }).gameState) {
+        return (payload as { gameState: GameState }).gameState;
+    }
 
-    const socketRef = useRef<Socket | null>(null);
-    const reconnectAttempts = useRef(0);
-    const maxReconnectAttempts = 5;
+    if ('gameId' in payload && 'players' in payload) {
+        return payload as GameState;
+    }
+
+    return null;
+};
+
+// 讀取順序決定事件中的玩家列表
+const orderDecisionPlayers = (payload: unknown): string[] => {
+    if (!payload || typeof payload !== 'object') {
+        return [];
+    }
+
+    if ('players' in payload && Array.isArray((payload as OrderDecisionStartPayload).players)) {
+        return (payload as OrderDecisionStartPayload).players;
+    }
+
+    return [];
+};
+
+// 讀取順序決定結果（允許缺少 gameState）
+const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | null => {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+
+    const candidate = payload as Partial<OrderDecisionResultPayload>;
+    if (candidate.firstPlayer && candidate.secondPlayer && Array.isArray(candidate.order)) {
+        const result: OrderDecisionResultPayload = {
+            firstPlayer: candidate.firstPlayer,
+            secondPlayer: candidate.secondPlayer,
+            order: candidate.order,
+            gameState: candidate.gameState
+        };
+        if (!candidate.gameState) {
+            delete result.gameState;
+        }
+        return result;
+    }
+
+    return null;
+};
+
+// WebSocket 主 Hook：處理連線、事件、狀態同步
+export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
+    const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
+    const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
+    const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
+    const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
+    const roundSummaryTimerRef = useRef<number | null>(null);
+    const [readyStatus, setReadyStatus] = useState<ReadyStatusPayload | null>(null);
 
     useEffect(() => {
-        if (!gameId || !playerData) return;
+        const playerId = playerData?.id;
+        if (!gameId || !playerId) {
+            return;
+        }
 
-        console.log(`🟢 [useWebSocket] 開始連接到遊戲: ${gameId}`);
+        let isActive = true; // 確保卸載後不再更新 state
+        const handlerMap: Record<string, (payload: unknown) => void> = {}; // 快速紀錄已註冊的事件
 
-        clientDispatch({ type: 'SET_LOADING', payload: { isLoading: true } });
-
-        // 建立 Socket.IO 連接
-        socketRef.current = io('http://localhost:3001', {
-            transports: ['websocket'],
-            forceNew: true
-        });
-
-        const socket = socketRef.current;
-
-        // 連接成功
-        socket.on('connect', () => {
-            console.log('🟢 [useWebSocket] Socket.IO 連線建立成功');
-            reconnectAttempts.current = 0;
-
-            clientDispatch({
-                type: 'SET_CONNECTION_STATUS',
-                payload: { isConnected: true }
-            });
-
-            // 自動加入遊戲
-            socket.emit('JOIN_GAME', {
-                gameId,
-                playerData
-            });
-        });
-
-        // 統一的 WebSocket 訊息處理函數
-        const handleWebSocketMessage = (eventType: WebSocketEventType, message: WebSocketMessage) => {
-            console.log(`📨 [useWebSocket] 收到事件: ${eventType}`, message);
-
-            switch (eventType) {
-                case 'GAME_STARTED':
-                    const gameStartedPayload = message.payload as GameStartedPayload;
-                    console.log('🚨 [useWebSocket] 遊戲開始:', gameStartedPayload.message);
-
-                    // 更新遊戲狀態
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: gameStartedPayload.gameState
-                    });
-
-                    // 更新客戶端狀態
-                    clientDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: gameStartedPayload.gameState
-                    });
-                    break;
-
-                case 'PLAYER_JOINED':
-                    const playerJoinedPayload = message.payload as PlayerJoinedPayload;
-                    console.log('👥 [useWebSocket] 玩家加入:', playerJoinedPayload.player.name);
-
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: playerJoinedPayload.gameState
-                    });
-
-                    clientDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: playerJoinedPayload.gameState
-                    });
-                    break;
-
-                case 'GAME_STATE_UPDATED':
-                case 'STATE_CHANGED': // 兼容您原本的事件名稱
-                    console.log('🔄 [useWebSocket] 遊戲狀態更新');
-
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: message.payload as GameState
-                    });
-
-                    clientDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: message.payload as GameState
-                    });
-                    break;
-
-                case 'ORDER_DECISION_START':
-                case 'ORDER_DECISION_STARTED': // 新的命名
-                    console.log('🎲 [useWebSocket] 開始順序決定');
-
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: message.payload.gameState || message.payload
-                    });
-                    break;
-
-                case 'ORDER_DECISION_RESULT':
-                case 'ORDER_DECISION_COMPLETED': // 新的命名
-                case 'ORDER_CONFIRMED': // 兼容您原本的事件名稱
-                    const orderResultPayload = message.payload as OrderDecisionResultPayload;
-                    console.log('✅ [useWebSocket] 順序決定結果:', orderResultPayload.order || '已確認');
-
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: orderResultPayload.gameState || message.payload
-                    });
-                    break;
-
-                case 'ORDER_CONFIRMATION_UPDATE':
-                case 'ORDER_CONFIRMATIONS_UPDATED': // 新的命名
-                    console.log('📝 [useWebSocket] 確認狀態更新');
-
-                    gameDispatch({
-                        type: 'SYNC_SERVER_STATE',
-                        payload: message.payload.gameState || message.payload
-                    });
-                    break;
-
-                case 'ERROR':
-                    console.error('❌ [useWebSocket] 伺服器錯誤:', message.payload);
-
-                    clientDispatch({
-                        type: 'SET_ERROR',
-                        payload: { error: message.payload.message || message.payload }
-                    });
-                    break;
-
-                default:
-                    console.warn('⚠️ [useWebSocket] 未知事件類型:', eventType);
+        const safeDispatch = (action: ClientAction) => {
+            if (isActive) {
+                clientDispatch(action);
             }
         };
 
-        // 監聽您原本的 GAME_STATE_UPDATE 事件
-        socket.on('GAME_STATE_UPDATE', (message: WebSocketMessage) => {
-            console.log('📨 [useWebSocket] 收到遊戲狀態更新:', message);
-            handleWebSocketMessage(message.type, message);
-        });
-
-        // 註冊所有新的 WebSocket 事件監聽器
-        const eventTypes: WebSocketEventType[] = [
-            'GAME_STARTED',
-            'GAME_STATE_UPDATED',
-            'PLAYER_JOINED',
-            'PLAYER_LEFT',
-            'ORDER_DECISION_START',
-            'ORDER_DECISION_STARTED',
-            'ORDER_DECISION_RESULT',
-            'ORDER_DECISION_COMPLETED',
-            'ORDER_CONFIRMATION_UPDATE',
-            'ORDER_CONFIRMATIONS_UPDATED',
-            'TURN_ENDED',
-            'GAME_ENDED',
-            'ERROR',
-            'ROOM_CREATED'
-        ];
-
-        eventTypes.forEach(eventType => {
-            socket.on(eventType, (message: WebSocketMessage) => {
-                handleWebSocketMessage(eventType, message);
-            });
-        });
-
-        // 連接錯誤處理
-        socket.on('connect_error', (error) => {
-            console.error('❌ [useWebSocket] 連接錯誤:', error);
-
-            clientDispatch({
-                type: 'SET_ERROR',
-                payload: { error: `連接錯誤: ${error.message}` }
-            });
-        });
-
-        // 斷線處理
-        socket.on('disconnect', (reason) => {
-            console.log('🔴 [useWebSocket] 連線斷開:', reason);
-
-            clientDispatch({
-                type: 'SET_CONNECTION_STATUS',
-                payload: { isConnected: false }
-            });
-
-            if (reason === 'io server disconnect') {
-                // 伺服器主動斷開，嘗試重連
-                if (reconnectAttempts.current < maxReconnectAttempts) {
-                    reconnectAttempts.current++;
-                    console.log(`🔄 [useWebSocket] 嘗試重新連接 (${reconnectAttempts.current}/${maxReconnectAttempts})`);
-                }
+        const syncGameState = (payload: unknown) => {
+            const gameState = resolveGameStatePayload(payload);
+            if (!gameState) {
+                return;
             }
-        });
+
+            gameDispatch({ type: 'SYNC_SERVER_STATE', payload: gameState });
+            safeDispatch({ type: 'SYNC_SERVER_STATE', payload: gameState });
+        };
+
+        const handleOrderDecisionStart = (payload: unknown) => {
+            const players = orderDecisionPlayers(payload);
+            if (players.length === 0) {
+                return;
+            }
+
+            gameDispatch({ type: 'START_ORDER_DECISION', payload: { players } });
+        };
+
+        const handleOrderDecisionResult = (payload: unknown) => {
+            const resultPayload = orderDecisionResult(payload);
+            if (!resultPayload) {
+                return;
+            }
+
+            gameDispatch({
+                type: 'ORDER_DECISION_RESULT',
+                payload: {
+                    firstPlayer: resultPayload.firstPlayer,
+                    secondPlayer: resultPayload.secondPlayer,
+                    order: resultPayload.order
+                }
+            });
+
+            if (resultPayload.gameState) {
+                syncGameState(resultPayload.gameState);
+            }
+        };
+
+        const handleOrderConfirmationUpdate = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as { confirmations?: unknown; waitingFor?: unknown };
+            const confirmations = Array.isArray(candidate.confirmations) ? (candidate.confirmations as string[]) : [];
+            const waitingFor = Array.isArray(candidate.waitingFor) ? (candidate.waitingFor as string[]) : [];
+
+            gameDispatch({
+                type: 'UPDATE_ORDER_CONFIRMATIONS',
+                payload: { confirmations, waitingFor }
+            });
+        };
+
+        const handleErrorMessage = (payload: unknown) => {
+            const message = typeof payload === 'string'
+                ? payload
+                : (payload && typeof payload === 'object' && 'message' in payload)
+                    ? String((payload as { message: unknown }).message)
+                    : '未知錯誤';
+            safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        };
+
+        const handleCardDrawn = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as Partial<CardDrawEvent> & { card?: ItemCard };
+            if (typeof candidate.playerId === 'string' && candidate.card && typeof candidate.card === 'object') {
+                const drawEvent: CardDrawEvent = {
+                    playerId: candidate.playerId,
+                    card: candidate.card
+                };
+                setDrawQueue(prev => [...prev, drawEvent]);
+            }
+        };
+
+        const handleRoundComplete = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const round = (payload as RoundCompletePayload).round;
+            if (!round) {
+                return;
+            }
+
+            setRoundSummary({ round });
+
+            if (roundSummaryTimerRef.current) {
+                window.clearTimeout(roundSummaryTimerRef.current);
+            }
+
+            roundSummaryTimerRef.current = window.setTimeout(() => {
+                setRoundSummary(null);
+            }, 2500);
+        };
+
+        const handleReadyCheck = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+            const candidate = payload as ReadyStatusPayload;
+            setReadyStatus(candidate);
+        };
+
+        const handleReadyStatus = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+            const candidate = payload as ReadyStatusPayload;
+            if (candidate.waitingFor.length === 0) {
+                setReadyStatus(null);
+            } else {
+                setReadyStatus(candidate);
+            }
+        };
+
+        const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
+            handlerMap[eventType] = handler;
+            gameWebSocket.on(eventType, handler);
+        };
+
+        const cleanupHandlers = () => {
+            Object.keys(handlerMap).forEach(eventType => {
+                gameWebSocket.off(eventType);
+            });
+            gameWebSocket.off(CONNECTION_OPEN);
+            gameWebSocket.off(CONNECTION_CLOSE);
+
+            if (roundSummaryTimerRef.current) {
+                window.clearTimeout(roundSummaryTimerRef.current);
+                roundSummaryTimerRef.current = null;
+            }
+        };
+
+        const handleOpen = () => {
+            safeDispatch({ type: 'SET_CONNECTION_STATUS', payload: { isConnected: true } });
+            safeDispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
+            safeDispatch({ type: 'CLEAR_ERROR' });
+
+            try {
+                gameWebSocket.send('JOIN_ROOM', { roomId: gameId, playerId });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : '無法加入房間';
+                safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
+            }
+        };
+
+        const handleClose = () => {
+            safeDispatch({ type: 'SET_CONNECTION_STATUS', payload: { isConnected: false } });
+            safeDispatch({ type: 'SET_LOADING', payload: { isLoading: true } });
+        };
+
+        registerEventHandler('GAME_STATE_UPDATE', syncGameState);
+        registerEventHandler('GAME_STATE_UPDATED', syncGameState);
+        registerEventHandler('GAME_STATE_SYNC', syncGameState);
+        registerEventHandler('STATE_CHANGED', syncGameState);
+        registerEventHandler('GAME_STARTED', syncGameState);
+        registerEventHandler('READY_CHECK', handleReadyCheck);
+        registerEventHandler('READY_STATUS', handleReadyStatus);
+        registerEventHandler('ROUND_COMPLETE', handleRoundComplete);
+        registerEventHandler('ORDER_DECISION_START', handleOrderDecisionStart);
+        registerEventHandler('ORDER_DECISION_STARTED', handleOrderDecisionStart);
+        registerEventHandler('ORDER_DECISION_RESULT', handleOrderDecisionResult);
+        registerEventHandler('ORDER_DECISION_COMPLETED', handleOrderDecisionResult);
+        registerEventHandler('ORDER_CONFIRMATION_UPDATE', handleOrderConfirmationUpdate);
+        registerEventHandler('ORDER_CONFIRMATIONS_UPDATED', handleOrderConfirmationUpdate);
+        registerEventHandler('ERROR', handleErrorMessage);
+        registerEventHandler('GAME_ENDED', syncGameState);
+        registerEventHandler('CARD_DRAWN', handleCardDrawn);
+
+        gameWebSocket.on(CONNECTION_OPEN, handleOpen);
+        gameWebSocket.on(CONNECTION_CLOSE, handleClose);
+
+        if (gameWebSocket.isConnected()) {
+            handleOpen();
+        } else {
+            safeDispatch({ type: 'SET_LOADING', payload: { isLoading: true } });
+            gameWebSocket.connect(config.websocketUrl).catch((error) => {
+                const message = error instanceof Error ? error.message : '連線失敗';
+                handleClose();
+                safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
+            });
+        }
 
         return () => {
-            console.log('🔌 [useWebSocket] 清理連接');
-            socket.disconnect();
+            isActive = false;
+            cleanupHandlers();
+            setDrawQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);
 
-    // 發送遊戲動作
+    // 發送遊戲行動到伺服器
     const sendGameAction = useCallback((action: GameAction) => {
-        if (socketRef.current?.connected) {
-            console.log('📤 [useWebSocket] 發送遊戲動作:', action);
-            socketRef.current.emit('GAME_ACTION', {
-                gameId,
-                action
-            });
-        } else {
-            console.error('❌ [useWebSocket] 無法發送動作，連接未建立');
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少 gameId，無法發送遊戲動作');
+            return;
         }
-    }, [gameId]);
 
-    // 確認順序決定（保留您原本的方法）
-    const confirmOrder = useCallback(() => {
-        if (socketRef.current?.connected) {
-            console.log('✅ [useWebSocket] 確認順序');
-            socketRef.current.emit('CONFIRM_ORDER', {
-                gameId,
-                playerId: playerData.id
-            });
+        try {
+            gameWebSocket.send('GAME_ACTION', { gameId, playerId: playerData.id, action });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '遊戲動作送出失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
         }
     }, [gameId, playerData?.id]);
 
-    // 開始順序決定（新增的方法）
+    // 送出再來一場請求（同房間重開）
+    const requestRematch = useCallback(() => {
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法發送再來一場');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('REMATCH_REQUEST', { gameId, playerId: playerData.id });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '再來一場送出失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        }
+    }, [gameId, playerData?.id]);
+
+    // 玩家準備確認
+    const confirmReady = useCallback(() => {
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認準備');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('READY_CONFIRM', { gameId, playerId: playerData.id });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '準備確認送出失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        }
+    }, [gameId, playerData?.id]);
+
+    // 確認順序（順序決定完成後使用）
+    const confirmOrder = useCallback(() => {
+        if (!gameId || !playerData?.id) {
+            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認順序');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('CONFIRM_ORDER', {
+                gameId,
+                playerId: playerData.id
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '確認順序失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
+        }
+    }, [gameId, playerData?.id]);
+
+    // 主動觸發順序決定（目前預留使用）
     const startOrderDecision = useCallback((players: string[]) => {
-        if (socketRef.current?.connected) {
-            console.log('🎲 [useWebSocket] 開始順序決定');
-            socketRef.current.emit('START_ORDER_DECISION', {
+        if (!gameId) {
+            console.warn('⚠️ [useWebSocket] 缺少 gameId，無法啟動順序決定');
+            return;
+        }
+
+        try {
+            gameWebSocket.send('START_ORDER_DECISION', {
                 gameId,
                 players
             });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '啟動順序決定失敗';
+            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
         }
     }, [gameId]);
 
-    // 清除錯誤
+    // 清除錯誤訊息
     const clearError = useCallback(() => {
         clientDispatch({ type: 'CLEAR_ERROR' });
     }, []);
 
+    // 消耗一個抽牌事件
+    const consumeDrawEvent = useCallback(() => {
+        setDrawQueue(prev => prev.slice(1));
+    }, []);
+
+    // 回傳給 UI 的狀態與操作
     return {
-        // 客戶端狀態
         gameState: clientState.gameState,
         isConnected: clientState.isConnected,
         isLoading: clientState.isLoading,
         error: clientState.error,
-
-        // 方法
+        roundSummary,
+        readyStatus,
         sendGameAction,
-        confirmOrder, // 保留您原本的方法
-        startOrderDecision, // 新增的方法
-        clearError
+        requestRematch,
+        confirmReady,
+        confirmOrder,
+        startOrderDecision,
+        clearError,
+        drawQueue,
+        consumeDrawEvent
     };
 };

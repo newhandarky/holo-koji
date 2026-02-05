@@ -1,27 +1,40 @@
 // src/services/websocket.ts - 強化版本
+// WebSocket 訊息格式
 interface WebSocketMessage {
     type: string;
     payload: any;
 }
 
 export class GameWebSocket {
+    // WebSocket 連線物件
     private ws: WebSocket | null = null;
+    // 訊息處理器表（事件名稱 → 處理函式）
     public messageHandlers: Map<string, (payload: any) => void> = new Map();
+    // 重新連線計數
     private reconnectAttempts = 0;
+    // 重新連線最大次數
     private maxReconnectAttempts = 5;
+    // 重新連線延遲基準（毫秒）
     private reconnectDelay = 1000;
 
+    // 建立 WebSocket 連線
     connect(url: string): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
                 this.ws = new WebSocket(url);
 
+                // 連線成功
                 this.ws.onopen = () => {
                     console.log('🟢 [WebSocket] 連線建立成功');
                     this.reconnectAttempts = 0;
+                    const openHandler = this.messageHandlers.get('__OPEN__'); // 通知使用端連線事件
+                    if (openHandler) {
+                        openHandler(undefined);
+                    }
                     resolve();
                 };
 
+                // 連線錯誤
                 this.ws.onerror = (error) => {
                     console.error('🔴 [WebSocket] 連線錯誤:', error);
                     reject(error);
@@ -75,6 +88,11 @@ export class GameWebSocket {
                 this.ws.onclose = (event) => {
                     console.log('🔴 [WebSocket] 連線關閉:', event.code, event.reason);
 
+                    const closeHandler = this.messageHandlers.get('__CLOSE__'); // 通知使用端關閉事件
+                    if (closeHandler) {
+                        closeHandler({ code: event.code, reason: event.reason });
+                    }
+
                     if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.attemptReconnect(url);
                     }
@@ -87,6 +105,7 @@ export class GameWebSocket {
         });
     }
 
+    // 嘗試重新連線
     private attemptReconnect(url: string) {
         this.reconnectAttempts++;
         console.log(`🔄 [WebSocket] 嘗試重新連線 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
@@ -100,6 +119,7 @@ export class GameWebSocket {
         }, this.reconnectDelay * this.reconnectAttempts);
     }
 
+    // 發送訊息到伺服器
     send(type: string, payload: any): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const message: WebSocketMessage = { type, payload };
@@ -111,17 +131,20 @@ export class GameWebSocket {
         }
     }
 
+    // 註冊事件處理器
     on(messageType: string, handler: (payload: any) => void): void {
         console.log(`📋 [WebSocket] 註冊處理器: ${messageType}`);
         this.messageHandlers.set(messageType, handler);
         console.log(`📋 [WebSocket] 目前已註冊:`, Array.from(this.messageHandlers.keys()));
     }
 
+    // 移除事件處理器
     off(messageType: string): void {
         const removed = this.messageHandlers.delete(messageType);
         console.log(`🗑️ [WebSocket] 移除處理器: ${messageType} - ${removed ? '成功' : '失敗'}`);
     }
 
+    // 主動關閉連線
     disconnect(): void {
         if (this.ws) {
             console.log('🔌 [WebSocket] 主動關閉連線');
@@ -130,6 +153,7 @@ export class GameWebSocket {
         }
     }
 
+    // 取得目前連線狀態
     getConnectionState(): string {
         if (!this.ws) return 'CLOSED';
 
@@ -142,9 +166,11 @@ export class GameWebSocket {
         }
     }
 
+    // 是否已連線
     isConnected(): boolean {
         return this.ws?.readyState === WebSocket.OPEN;
     }
 }
 
+// 單例 WebSocket 服務
 export const gameWebSocket = new GameWebSocket();

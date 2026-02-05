@@ -2,7 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { OrderDecision } from "game-shared-types"
 
-const OrderDecisionModal: React.FC<OrderDecision> = ({
+interface OrderDecisionModalProps extends OrderDecision {
+    // 玩家按下確認時的回呼
+    onConfirm: () => void;
+}
+
+const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
     isOpen,
     phase,
     players,
@@ -13,6 +18,7 @@ const OrderDecisionModal: React.FC<OrderDecision> = ({
     onConfirm
 }) => {
     const [dots, setDots] = useState('');
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     // 決定中的動畫效果
     useEffect(() => {
@@ -24,8 +30,15 @@ const OrderDecisionModal: React.FC<OrderDecision> = ({
         }
     }, [phase]);
 
+    useEffect(() => {
+        if (isOpen) {
+            setIsCollapsed(false);
+        }
+    }, [isOpen, phase]);
+
     if (!isOpen) return null;
 
+    // 決定中畫面
     const renderDecidingPhase = () => (
         <div className="text-center">
             <div className="mb-4">
@@ -48,25 +61,29 @@ const OrderDecisionModal: React.FC<OrderDecision> = ({
         </div>
     );
 
+    // 結果畫面
     const renderResultPhase = () => (
         <div className="text-center">
             <div className="mb-4">
                 <h4 className="text-success">🎯 順序決定完成！</h4>
 
                 {/* 顯示結果 */}
-                <div className="row justify-content-center mt-4">
-                    <div className="col-md-8">
-                        <div className="card bg-primary text-white mb-3">
-                            <div className="card-body">
-                                <h5 className="card-title">🥇 先手玩家</h5>
-                                <div className="fs-4">{result?.firstPlayer}</div>
+                <div className="justify-content-center mt-4 ">
+                    <div className="row decide-turn-order">
+                        <div className="col-md-6">
+                            <div className="card bg-primary text-white mb-3 ">
+                                <div className="card-body">
+                                    <h5 className="card-title">🥇 先手玩家</h5>
+                                    <div className="fs-4">{result?.firstPlayer}</div>
+                                </div>
                             </div>
                         </div>
-
-                        <div className="card bg-secondary text-white">
-                            <div className="card-body">
-                                <h5 className="card-title">🥈 後手玩家</h5>
-                                <div className="fs-4">{result?.secondPlayer}</div>
+                        <div className="col-md-6">
+                            <div className="card bg-secondary text-white mb-3">
+                                <div className="card-body">
+                                    <h5 className="card-title">🥈 後手玩家</h5>
+                                    <div className="fs-4">{result?.secondPlayer}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -120,17 +137,34 @@ const OrderDecisionModal: React.FC<OrderDecision> = ({
     );
 
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
-                    <div className="modal-header bg-primary text-white">
-                        <h5 className="modal-title">🎲 決定遊戲順序</h5>
-                    </div>
-                    <div className="modal-body p-4">
+        <div className="bottom-sheet">
+            <div className="bottom-sheet__backdrop" />
+            <div className={`bottom-sheet__panel ${isCollapsed ? 'is-collapsed' : ''}`}>
+                {
+                    !isCollapsed && (
+                        <div className="bottom-sheet__header">
+                            <button
+                                className="bottom-sheet__toggle"
+                                onClick={() => setIsCollapsed(!isCollapsed)}
+                            >
+                                {isCollapsed ? '展開' : '收合'}
+                            </button>
+                        </div>
+
+                    )
+                }
+
+                {!isCollapsed && (
+                    <div className="bottom-sheet__body">
                         {phase === 'deciding' && renderDecidingPhase()}
                         {(phase === 'result' || phase === 'waiting_confirmation') && renderResultPhase()}
                     </div>
-                </div>
+                )}
+                {isCollapsed && (
+                    <button className="bottom-sheet__expand" onClick={() => setIsCollapsed(false)}>
+                        展開操作
+                    </button>
+                )}
             </div>
         </div>
     );

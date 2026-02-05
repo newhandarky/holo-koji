@@ -3,16 +3,18 @@ import React, { createContext, useContext, useReducer } from 'react';
 import { GameState, GameAction } from "game-shared-types"
 import { gameReducer, initialState } from "../reducers/gameReducer"
 
-// Context
+// Context 型別定義（提供全域狀態與派發）
 interface GameContextType {
     state: GameState;
     dispatch: React.Dispatch<GameAction>;
 }
 
+// 建立遊戲狀態 Context
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-// Provider
+// Provider：包住整個應用，提供遊戲狀態
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    // 使用 reducer 管理全域遊戲狀態
     const [state, dispatch] = useReducer(gameReducer, initialState);
 
     return (
@@ -22,7 +24,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-// Hook
+// Hook：取得遊戲狀態與 dispatch
 export const useGame = () => {
     const context = useContext(GameContext);
     if (context === undefined) {

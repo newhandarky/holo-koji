@@ -1,24 +1,66 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 
+// Lobby 入口主畫面
 const Lobby: React.FC = () => {
+    // 玩家名稱輸入
     const [playerName, setPlayerName] = useState('');
+    // 房間代碼輸入
     const [roomId, setRoomId] = useState('');
+    // 對戰模式（online = 玩家對戰，npc = 對戰 AI）
+    const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
+    // AI 難度（僅 NPC 模式使用）
+    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
+    // 藝妓組合
+    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki' | 'onesan'>('default');
+    // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
+    // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+    // 路由導向工具
     const navigate = useNavigate();
+    // 最新玩家名稱（避免事件回呼讀到舊值）
+    const playerNameRef = useRef('');
 
+    // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
+        playerNameRef.current = playerName;
+    }, [playerName]);
+
+    // 若網址帶 roomId，預填加入房間欄位
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        let invitedRoomId = searchParams.get('roomId') ?? '';
+
+        if (!invitedRoomId && window.location.hash.includes('?')) {
+            const hashQuery = window.location.hash.split('?')[1] ?? '';
+            const hashParams = new URLSearchParams(hashQuery);
+            invitedRoomId = hashParams.get('roomId') ?? '';
+        }
+
+        if (invitedRoomId) {
+            setRoomId(invitedRoomId.toUpperCase());
+            setMatchMode('online');
+        }
+    }, []);
+
+    // 建立連線與註冊事件（只在首次掛載時執行）
+    useEffect(() => {
+        let isActive = true;
+
+        // 連線 WebSocket（避免重複連線）
         const connectWS = async () => {
             setConnectionStatus('connecting');
             try {
                 await gameWebSocket.connect(config.websocketUrl);
+                if (!isActive) return;
                 setConnectionStatus('connected');
                 console.log('✅ [Lobby] WebSocket 連線成功');
             } catch (error) {
+                if (!isActive) return;
                 setConnectionStatus('disconnected');
                 console.error('❌ [Lobby] WebSocket 連線失敗:', error);
             }
@@ -30,12 +72,13 @@ const Lobby: React.FC = () => {
             setConnectionStatus('connected');
         }
 
+        // 房間建立成功後處理
         const handleRoomCreated = (payload: any) => {
             console.log('🏠 [Lobby] 房間建立成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerName);
+            localStorage.setItem('currentPlayerId', playerNameRef.current);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
@@ -44,12 +87,13 @@ const Lobby: React.FC = () => {
             navigate(`/game/${payload.roomId}`);
         };
 
+        // 加入房間成功後處理
         const handlePlayerJoined = (payload: any) => {
             console.log('👤 [Lobby] 玩家加入成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerName);
+            localStorage.setItem('currentPlayerId', playerNameRef.current);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
@@ -58,6 +102,7 @@ const Lobby: React.FC = () => {
             navigate(`/game/${payload.roomId}`);
         };
 
+        // 收到伺服器錯誤時提示使用者
         const handleError = (payload: any) => {
             console.error('❌ [Lobby] 伺服器錯誤:', payload);
             setIsConnecting(false);
@@ -70,20 +115,28 @@ const Lobby: React.FC = () => {
         gameWebSocket.on('ERROR', handleError);
 
         return () => {
+            isActive = false;
             console.log('🧹 [Lobby] 組件卸載，清理事件監聽器');
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
         };
-    }, [navigate, playerName]);
+    }, [navigate]);
 
+    // 建立房間請求
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName });
-        gameWebSocket.send('CREATE_ROOM', { playerId: playerName });
+        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet });
+        gameWebSocket.send('CREATE_ROOM', {
+            playerId: playerName,
+            mode: matchMode,
+            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
+            geishaSet
+        });
     };
 
+    // 加入房間請求
     const joinRoom = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
@@ -91,6 +144,7 @@ const Lobby: React.FC = () => {
         gameWebSocket.send('JOIN_ROOM', { roomId, playerId: playerName });
     };
 
+    // 依連線狀態回傳文字顏色
     const getStatusColor = () => {
         switch (connectionStatus) {
             case 'connected': return 'text-success';
@@ -99,6 +153,7 @@ const Lobby: React.FC = () => {
         }
     };
 
+    // 依連線狀態回傳顯示文字
     const getStatusText = () => {
         switch (connectionStatus) {
             case 'connected': return '🟢 已連接到伺服器';
@@ -107,8 +162,8 @@ const Lobby: React.FC = () => {
         }
     };
 
-    // 檢查當前網域，決定是否使用 Hash
-    const useHash = () => {
+    // 檢查當前網域，決定是否使用 Hash Router
+    const shouldUseHash = () => {
         return window.location.host.includes('github.io');
     };
 
@@ -126,13 +181,70 @@ const Lobby: React.FC = () => {
                             <small className="text-muted">
                                 環境: {process.env.NODE_ENV}<br />
                                 WebSocket: {config.websocketUrl}<br />
-                                Router: {useHash() ? 'HashRouter' : 'BrowserRouter'}
+                                Router: {shouldUseHash() ? 'HashRouter' : 'BrowserRouter'}
                             </small>
                         </div>
                     )}
                 </div>
 
                 <div className="mb-3">
+                    <label className="form-label">對戰模式</label>
+                    <div className="d-flex gap-3 mb-3">
+                        <label className="form-check-label">
+                            <input
+                                type="radio"
+                                className="form-check-input me-2"
+                                name="matchMode"
+                                value="online"
+                                checked={matchMode === 'online'}
+                                onChange={() => setMatchMode('online')}
+                                disabled={isConnecting}
+                            />
+                            線上玩家
+                        </label>
+                        <label className="form-check-label">
+                            <input
+                                type="radio"
+                                className="form-check-input me-2"
+                                name="matchMode"
+                                value="npc"
+                                checked={matchMode === 'npc'}
+                                onChange={() => setMatchMode('npc')}
+                                disabled={isConnecting}
+                            />
+                            對戰 NPC
+                        </label>
+                    </div>
+                    {matchMode === 'npc' && (
+                        <div className="mb-3">
+                            <label className="form-label">AI 強度</label>
+                            <select
+                                className="form-select"
+                                value={aiDifficulty}
+                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
+                                disabled={isConnecting}
+                            >
+                                <option value="easy">しぐれうい</option>
+                                <option value="medium">大空スバル</option>
+                                <option value="hard">兎田ぺこら</option>
+                                <option value="expert">猫又おかゆ</option>
+                                <option value="hell">ときのそら</option>
+                            </select>
+                        </div>
+                    )}
+                    <div className="mb-3">
+                        <label className="form-label">藝妓組合</label>
+                        <select
+                            className="form-select"
+                            value={geishaSet}
+                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki' | 'onesan')}
+                            disabled={isConnecting}
+                        >
+                            <option value="default">預設</option>
+                            <option value="akatsuki">曉</option>
+                            <option value="onesan">大姊姊組</option>
+                        </select>
+                    </div>
                     <label className="form-label">玩家名稱</label>
                     <input
                         type="text"
@@ -167,13 +279,13 @@ const Lobby: React.FC = () => {
                         placeholder="輸入房間代碼"
                         value={roomId}
                         onChange={e => setRoomId(e.target.value.toUpperCase())}
-                        disabled={isConnecting}
+                        disabled={isConnecting || matchMode === 'npc'}
                         maxLength={6}
                     />
                     <button
                         className="btn btn-success w-100"
                         onClick={joinRoom}
-                        disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected'}
+                        disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected' || matchMode === 'npc'}
                     >
                         {isConnecting ? (
                             <>
@@ -182,6 +294,11 @@ const Lobby: React.FC = () => {
                             </>
                         ) : '🚪 加入房間'}
                     </button>
+                    {matchMode === 'npc' && (
+                        <div className="text-muted small mt-2">
+                            NPC 模式不需要輸入房間代碼，直接建立房間即可開始對戰。
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-4 pt-3 border-top">

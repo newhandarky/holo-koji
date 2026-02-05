@@ -1,25 +1,42 @@
 {
+  // TypeScript 編譯器行為設定
   "compilerOptions": {
+    // 編譯輸出目標
     "target": "es5",
+    // 允許使用的標準函式庫
     "lib": [
       "dom",
       "dom.iterable",
       "esnext"
     ],
+    // 允許 JS 與 TS 混用
     "allowJs": true,
+    // 跳過第三方型別檢查，降低編譯時間
     "skipLibCheck": true,
+    // 允許 CommonJS/ESM 互通的匯入行為
     "esModuleInterop": true,
+    // 支援預設匯入語法
     "allowSyntheticDefaultImports": true,
+    // 啟用嚴格模式
     "strict": true,
+    // 強制檔名大小寫一致
     "forceConsistentCasingInFileNames": true,
+    // 禁止 switch 穿透
     "noFallthroughCasesInSwitch": true,
+    // 模組格式
     "module": "esnext",
+    // 模組解析方式
     "moduleResolution": "node",
+    // 允許匯入 JSON
     "resolveJsonModule": true,
+    // 以獨立模組方式編譯，避免型別污染
     "isolatedModules": true,
+    // 不輸出編譯檔案，交由建置工具處理
     "noEmit": true,
+    // React JSX 轉換策略
     "jsx": "react-jsx"
   },
+  // 專案需要納入型別檢查的範圍
   "include": [
     "src"
   ]

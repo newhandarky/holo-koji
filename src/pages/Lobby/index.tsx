@@ -30,6 +30,23 @@ const Lobby: React.FC = () => {
         playerNameRef.current = playerName;
     }, [playerName]);
 
+    // 若網址帶 roomId，預填加入房間欄位
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        let invitedRoomId = searchParams.get('roomId') ?? '';
+
+        if (!invitedRoomId && window.location.hash.includes('?')) {
+            const hashQuery = window.location.hash.split('?')[1] ?? '';
+            const hashParams = new URLSearchParams(hashQuery);
+            invitedRoomId = hashParams.get('roomId') ?? '';
+        }
+
+        if (invitedRoomId) {
+            setRoomId(invitedRoomId.toUpperCase());
+            setMatchMode('online');
+        }
+    }, []);
+
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
         let isActive = true;

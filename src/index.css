@@ -706,6 +706,37 @@ code {
   box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
 }
 
+/* LIFF 錯誤提示 */
+.liff-error-banner {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 9999;
+  background: #ffe8e8;
+  border: 1px solid #ffb3b3;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 20px rgba(255, 0, 0, 0.12);
+  color: #7a1f1f;
+}
+
+.liff-error-banner__title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.liff-error-banner__message {
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+
+.liff-error-banner__hint {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #8b3a3a;
+}
+
 /* 抽牌卡片翻轉動畫 */
 .draw-card {
   perspective: 800px;

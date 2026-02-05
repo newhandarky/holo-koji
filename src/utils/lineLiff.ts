@@ -8,6 +8,8 @@ declare global {
 
 let liffInitPromise: Promise<void> | null = null;
 
+const isLikelyLineClient = () => /Line\//i.test(navigator.userAgent);
+
 const ensureLiffReady = async () => {
     if (!window.liff || !config.liffId) {
         return;
@@ -22,6 +24,21 @@ const ensureLiffReady = async () => {
 
     await liffInitPromise;
 };
+
+export const initLiffIfPossible = async () => {
+    if (!window.liff || !config.liffId) {
+        return { ready: false as const, reason: 'missing' as const };
+    }
+
+    try {
+        await ensureLiffReady();
+        return { ready: true as const };
+    } catch (error) {
+        return { ready: false as const, reason: 'init-failed' as const, error };
+    }
+};
+
+export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || !!window.liff;
 
 const resolveInviteUrl = (roomId: string) => {
     const origin = window.location.origin;

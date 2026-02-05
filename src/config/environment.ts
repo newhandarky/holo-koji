@@ -3,6 +3,7 @@
 interface EnvironmentConfig {
     websocketUrl: string;
     apiUrl: string;
+    liffId: string;
     isDevelopment: boolean;
     isProduction: boolean;
 }
@@ -21,6 +22,8 @@ const config: EnvironmentConfig = {
             ? 'https://holo-koji-server.onrender.com'
             : 'http://localhost:3001'
     ),
+    // LIFF ID（LINE 邀請好友功能）
+    liffId: process.env.REACT_APP_LIFF_ID || '2009040550-o884r3CI',
     // 是否為開發環境
     isDevelopment: process.env.NODE_ENV === 'development',
     // 是否為生產環境
@@ -31,6 +34,7 @@ const config: EnvironmentConfig = {
 console.log('🔧 [Environment] 配置資訊:');
 console.log('  WebSocket URL:', config.websocketUrl);
 console.log('  API URL:', config.apiUrl);
+console.log('  LIFF ID:', config.liffId);
 console.log('  環境:', process.env.NODE_ENV);
 console.log('  是否為生產環境:', config.isProduction);
 console.log('  是否為開發環境:', config.isDevelopment);

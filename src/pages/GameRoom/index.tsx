@@ -8,6 +8,7 @@ import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
+import { shareRoomInvite } from '../../utils/lineLiff';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -226,6 +227,23 @@ const GameRoom: React.FC = () => {
                                 </button>
                                 <button className="btn btn-primary btn-sm" onClick={copyRoomCode}>
                                     📋 複製
+                                </button>
+                                <button
+                                    className="btn btn-success btn-sm ms-2"
+                                    onClick={async () => {
+                                        if (!roomId) return;
+                                        try {
+                                            const result = await shareRoomInvite(roomId);
+                                            if (result.mode === 'copy') {
+                                                alert('已複製邀請連結，請貼給好友！');
+                                            }
+                                        } catch (error) {
+                                            console.error('❌ LINE 邀請失敗:', error);
+                                            alert('LINE 邀請失敗，請改用複製連結分享。');
+                                        }
+                                    }}
+                                >
+                                    LINE 邀請好友
                                 </button>
                             </div>
                         </div>

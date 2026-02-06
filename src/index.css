@@ -706,6 +706,15 @@ code {
   box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
 }
 
+/* 玩家頭像 */
+.player-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
 /* LIFF 錯誤提示 */
 .liff-error-banner {
   position: fixed;

@@ -4,6 +4,7 @@ interface EnvironmentConfig {
     websocketUrl: string;
     apiUrl: string;
     liffId: string;
+    webAppUrl: string;
     isDevelopment: boolean;
     isProduction: boolean;
 }
@@ -24,6 +25,8 @@ const config: EnvironmentConfig = {
     ),
     // LIFF ID（LINE 邀請好友功能）
     liffId: process.env.REACT_APP_LIFF_ID || '2009040550-o884r3CI',
+    // Web App URL（用於 LINE 分享連結）
+    webAppUrl: process.env.REACT_APP_WEB_APP_URL || 'https://newhandarky.github.io/holo-koji',
     // 是否為開發環境
     isDevelopment: process.env.NODE_ENV === 'development',
     // 是否為生產環境

@@ -239,7 +239,8 @@ const GameRoom: React.FC = () => {
                                             }
                                         } catch (error) {
                                             console.error('❌ LINE 邀請失敗:', error);
-                                            alert('LINE 邀請失敗，請改用複製連結分享。');
+                                            const message = error instanceof Error ? error.message : 'LINE 邀請失敗，請改用複製連結分享。';
+                                            alert(message);
                                         }
                                     }}
                                 >
@@ -330,7 +331,14 @@ const GameRoom: React.FC = () => {
                                     <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
                                         <div className="card-body py-2">
                                             <div className="d-flex justify-content-between align-items-center">
-                                                <span>
+                                                <span className="d-inline-flex align-items-center gap-2">
+                                                    {player.avatarUrl && (
+                                                        <img
+                                                            className="player-avatar"
+                                                            src={player.avatarUrl}
+                                                            alt={`${player.name} 頭像`}
+                                                        />
+                                                    )}
                                                     <strong>{player.name}</strong>
                                                     {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
                                                     {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}

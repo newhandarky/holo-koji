@@ -30,6 +30,8 @@ export interface ActionToken {
 export interface Player {
     id: string;                     // 玩家 ID
     name: string;                   // 玩家名稱
+    lineUserId?: string;            // LINE 使用者 ID
+    avatarUrl?: string;             // LINE 頭像
     hand: ItemCard[];               // 手牌
     playedCards: ItemCard[];        // 已打出的卡片
     secretCards: ItemCard[];        // 秘密保留卡片

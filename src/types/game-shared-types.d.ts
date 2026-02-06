@@ -6,4 +6,9 @@ declare module 'game-shared-types' {
     export interface GameState {
         geishaSet?: GeishaSetKey;
     }
+
+    export interface Player {
+        lineUserId?: string;
+        avatarUrl?: string;
+    }
 }

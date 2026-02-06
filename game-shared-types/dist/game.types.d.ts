@@ -19,6 +19,8 @@ export interface ActionToken {
 export interface Player {
     id: string;
     name: string;
+    lineUserId?: string;
+    avatarUrl?: string;
     hand: ItemCard[];
     playedCards: ItemCard[];
     secretCards: ItemCard[];

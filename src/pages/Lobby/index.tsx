@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
+import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -20,6 +21,8 @@ const Lobby: React.FC = () => {
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+    // LINE 使用者資料（若在 LIFF 內）
+    const [lineProfile, setLineProfile] = useState<LineProfile | null>(null);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
@@ -32,19 +35,53 @@ const Lobby: React.FC = () => {
 
     // 若網址帶 roomId，預填加入房間欄位
     useEffect(() => {
-        const searchParams = new URLSearchParams(window.location.search);
-        let invitedRoomId = searchParams.get('roomId') ?? '';
+        const { roomId: invitedRoomId, source } = getInviteRoomIdFromLocation();
+        if (!invitedRoomId) return;
 
-        if (!invitedRoomId && window.location.hash.includes('?')) {
-            const hashQuery = window.location.hash.split('?')[1] ?? '';
-            const hashParams = new URLSearchParams(hashQuery);
-            invitedRoomId = hashParams.get('roomId') ?? '';
-        }
+        const normalizedRoomId = invitedRoomId.toUpperCase();
+        setRoomId(normalizedRoomId);
+        setMatchMode('online');
 
-        if (invitedRoomId) {
-            setRoomId(invitedRoomId.toUpperCase());
-            setMatchMode('online');
+        if (source === 'liff') {
+            const nextParams = new URLSearchParams(window.location.search);
+            nextParams.set('roomId', normalizedRoomId);
+            nextParams.delete('liff.state');
+            const nextUrl = `${window.location.pathname}?${nextParams.toString()}`;
+            window.history.replaceState(null, '', nextUrl);
         }
+    }, []);
+
+    // 取得 LINE 使用者資料（若在 LIFF 內）
+    useEffect(() => {
+        let isActive = true;
+
+        const loadLineProfile = async () => {
+            try {
+                const profile = await getLineProfile();
+                if (!profile || !isActive) return;
+
+                setLineProfile(profile);
+                localStorage.setItem('lineUserId', profile.userId);
+                if (profile.pictureUrl) {
+                    localStorage.setItem('lineAvatarUrl', profile.pictureUrl);
+                }
+                if (profile.displayName) {
+                    localStorage.setItem('lineDisplayName', profile.displayName);
+                }
+
+                if (!playerNameRef.current) {
+                    setPlayerName(profile.displayName);
+                }
+            } catch (error) {
+                console.warn('⚠️ 讀取 LINE 使用者資料失敗:', error);
+            }
+        };
+
+        loadLineProfile();
+
+        return () => {
+            isActive = false;
+        };
     }, []);
 
     // 建立連線與註冊事件（只在首次掛載時執行）
@@ -130,6 +167,9 @@ const Lobby: React.FC = () => {
         console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
+            displayName: lineProfile?.displayName ?? playerName,
+            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
+            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
             geishaSet
@@ -141,7 +181,13 @@ const Lobby: React.FC = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
         console.log('📤 [Lobby] 發送加入房間請求:', { roomId, playerId: playerName });
-        gameWebSocket.send('JOIN_ROOM', { roomId, playerId: playerName });
+        gameWebSocket.send('JOIN_ROOM', {
+            roomId,
+            playerId: playerName,
+            displayName: lineProfile?.displayName ?? playerName,
+            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
+            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined
+        });
     };
 
     // 依連線狀態回傳文字顏色

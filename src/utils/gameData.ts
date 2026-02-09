@@ -118,10 +118,49 @@ export const onesan = [
     }
 ];
 
+export const collaboration = [
+    {
+        name: 'アキ・ローゼンタール',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/marin.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration-items/gojo.png`
+    },
+    {
+        name: '癒月ちょこ',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/ren.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/inu.png`
+    },
+    {
+        name: 'ときのそら',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/yoru.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/weapon.jpg`
+    },
+    {
+        name: 'Mori Calliope',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/megumin.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/neko.jpg`
+    },
+    {
+        name: 'AZKi',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/arima.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/aqua.jpg`
+    },
+    {
+        name: 'Elizabeth Rose Bloodflame',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/furiren.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/bsg.png`
+    },
+    {
+        name: 'Nerissa Ravencroft',
+        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/erien.jpg`,
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/candy.png`
+    }
+];
+
 const geishaSetMap: Record<GeishaSetKey, typeof geishaData> = {
     default: geishaData,
     akatsuki,
-    onesan
+    onesan,
+    collaboration
 };
 
 const charmPointsDistribution = [2, 2, 2, 3, 3, 4, 5];

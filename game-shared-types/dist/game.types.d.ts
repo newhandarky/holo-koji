@@ -57,7 +57,7 @@ export interface OrderDecision {
     waitingFor: string[];
     currentPlayer: string;
 }
-export type GeishaSet = 'default' | 'akatsuki' | 'onesan';
+export type GeishaSet = 'default' | 'akatsuki' | 'onesan' | 'collaboration';
 export interface GameState {
     gameId: string;
     players: Player[];

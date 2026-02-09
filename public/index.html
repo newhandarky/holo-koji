@@ -29,6 +29,32 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <script>
+      (function () {
+        var isLine = /Line\//i.test(navigator.userAgent);
+        if (!isLine) return;
+
+        var root = document.getElementById('root');
+        var retryKey = 'liff-boot-retry';
+
+        setTimeout(function () {
+          if (!root || root.children.length > 0) return;
+
+          if (!sessionStorage.getItem(retryKey)) {
+            sessionStorage.setItem(retryKey, '1');
+            var url = new URL(window.location.href);
+            url.searchParams.set('reload', '1');
+            window.location.replace(url.toString());
+            return;
+          }
+
+          root.innerHTML =
+            '<div style="padding:16px;font-family:sans-serif;color:#555;">' +
+            '載入中…若畫面仍為空白，請返回再重開一次。' +
+            '</div>';
+        }, 1500);
+      })();
+    </script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <!--
       This HTML file is a template.

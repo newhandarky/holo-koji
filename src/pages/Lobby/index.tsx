@@ -16,7 +16,7 @@ const Lobby: React.FC = () => {
     // AI 難度（僅 NPC 模式使用）
     const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
     // 藝妓組合
-    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki' | 'onesan'>('default');
+    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki' | 'onesan' | 'collaboration'>('default');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -283,12 +283,13 @@ const Lobby: React.FC = () => {
                         <select
                             className="form-select"
                             value={geishaSet}
-                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki' | 'onesan')}
+                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki' | 'onesan' | 'collaboration')}
                             disabled={isConnecting}
                         >
                             <option value="default">預設</option>
                             <option value="akatsuki">曉</option>
                             <option value="onesan">大姊姊組</option>
+                            <option value="collaboration">擅自合作組</option>
                         </select>
                     </div>
                     <label className="form-label">玩家名稱</label>

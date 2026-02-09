@@ -8,7 +8,7 @@ import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
-import { shareRoomInvite } from '../../utils/lineLiff';
+import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -246,8 +246,24 @@ const GameRoom: React.FC = () => {
                                 >
                                     LINE 邀請好友
                                 </button>
+                                {!isLineClient() && roomId && (
+                                    <button
+                                        className="btn btn-outline-success btn-sm ms-2"
+                                        onClick={() => {
+                                            window.location.href = getLiffInviteUrl(roomId);
+                                        }}
+                                    >
+                                        用 LINE 開啟
+                                    </button>
+                                )}
                             </div>
                         </div>
+
+                        {!isLineClient() && (
+                            <div className="mt-2 text-muted">
+                                <small>提示：請在 LINE App 內開啟，才能使用選擇好友功能。</small>
+                            </div>
+                        )}
 
                         {showRoomCode && (
                             <div className="mt-3 p-3 bg-light rounded">

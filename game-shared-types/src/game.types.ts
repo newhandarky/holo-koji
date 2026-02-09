@@ -73,7 +73,7 @@ export interface OrderDecision {
     currentPlayer: string;
 }
 
-export type GeishaSet = 'default' | 'akatsuki' | 'onesan';
+export type GeishaSet = 'default' | 'akatsuki' | 'onesan' | 'collaboration';
 
 // 遊戲整體狀態
 export interface GameState {

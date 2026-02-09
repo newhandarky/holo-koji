@@ -10,6 +10,13 @@ let liffInitPromise: Promise<void> | null = null;
 
 const isLikelyLineClient = () => /Line\//i.test(navigator.userAgent);
 
+export const isLineClient = () => {
+    if (window.liff && typeof window.liff.isInClient === 'function') {
+        return window.liff.isInClient();
+    }
+    return isLikelyLineClient();
+};
+
 export interface LineProfile {
     userId: string;
     displayName: string;
@@ -109,6 +116,8 @@ const resolveLiffInviteUrl = (roomId: string) => {
     }
     return `https://liff.line.me/${config.liffId}?roomId=${encodeURIComponent(roomId)}`;
 };
+
+export const getLiffInviteUrl = (roomId: string) => resolveLiffInviteUrl(roomId);
 
 export const shareRoomInvite = async (roomId: string) => {
     const inviteUrl = resolveInviteUrl(roomId);

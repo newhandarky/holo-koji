@@ -715,6 +715,40 @@ code {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+/* 等待中按鈕群組（手機版避免跑版） */
+.waiting-room-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.waiting-room-actions--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.waiting-room-actions-group {
+  display: grid;
+  gap: 8px;
+}
+
+.waiting-room-button {
+  width: 100%;
+}
+
+@media (min-width: 576px) {
+  .waiting-room-actions-group {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .waiting-room-actions {
+    display: contents;
+  }
+  .waiting-room-button {
+    width: 100%;
+  }
+}
+
 /* LIFF 錯誤提示 */
 .liff-error-banner {
   position: fixed;

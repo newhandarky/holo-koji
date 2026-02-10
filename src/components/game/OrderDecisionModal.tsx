@@ -5,6 +5,7 @@ import { OrderDecision } from "game-shared-types"
 interface OrderDecisionModalProps extends OrderDecision {
     // 玩家按下確認時的回呼
     onConfirm: () => void;
+    getPlayerDisplayName?: (playerId: string) => string;
 }
 
 const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
@@ -15,7 +16,8 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
     confirmations,
     waitingFor,
     currentPlayer,
-    onConfirm
+    onConfirm,
+    getPlayerDisplayName
 }) => {
     const [dots, setDots] = useState('');
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -52,7 +54,7 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                         <div key={player} className="card p-3">
                             <div className="text-center">
                                 <div className="fs-5 mb-2">👤</div>
-                                <strong>{player}</strong>
+                                <strong>{getPlayerDisplayName ? getPlayerDisplayName(player) : player}</strong>
                             </div>
                         </div>
                     ))}
@@ -74,7 +76,11 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                             <div className="card bg-primary text-white mb-3 ">
                                 <div className="card-body">
                                     <h5 className="card-title">🥇 先手玩家</h5>
-                                    <div className="fs-4">{result?.firstPlayer}</div>
+                                    <div className="fs-4">
+                                        {result?.firstPlayer
+                                            ? (getPlayerDisplayName ? getPlayerDisplayName(result.firstPlayer) : result.firstPlayer)
+                                            : ''}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -82,7 +88,11 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                             <div className="card bg-secondary text-white mb-3">
                                 <div className="card-body">
                                     <h5 className="card-title">🥈 後手玩家</h5>
-                                    <div className="fs-4">{result?.secondPlayer}</div>
+                                    <div className="fs-4">
+                                        {result?.secondPlayer
+                                            ? (getPlayerDisplayName ? getPlayerDisplayName(result.secondPlayer) : result.secondPlayer)
+                                            : ''}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -99,7 +109,7 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                                     {confirmations.includes(player) ? '✓' : '⏳'}
                                 </span>
                                 <span className={confirmations.includes(player) ? 'text-success' : 'text-muted'}>
-                                    {player}
+                                    {getPlayerDisplayName ? getPlayerDisplayName(player) : player}
                                 </span>
                             </div>
                         ))}
@@ -109,7 +119,11 @@ const OrderDecisionModal: React.FC<OrderDecisionModalProps> = ({
                 {/* 等待其他玩家確認 */}
                 {waitingFor.length > 0 && !waitingFor.includes(currentPlayer) && (
                     <div className="alert alert-info mt-3">
-                        <small>等待 {waitingFor.join(', ')} 確認...</small>
+                        <small>
+                            等待 {waitingFor.map((player) => (
+                                getPlayerDisplayName ? getPlayerDisplayName(player) : player
+                            )).join(', ')} 確認...
+                        </small>
                     </div>
                 )}
 

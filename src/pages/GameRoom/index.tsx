@@ -1,5 +1,5 @@
 // src/pages/GameRoom/index.tsx - 添加順序決定彈窗
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -40,12 +40,33 @@ const GameRoom: React.FC = () => {
     const { state } = useGame();
     // 當前玩家 ID（從 localStorage 取得）
     const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
+    const [localLineName] = useState(() => localStorage.getItem('lineDisplayName') ?? '');
+    const [localLineAvatar] = useState(() => localStorage.getItem('lineAvatarUrl') ?? '');
     // 房主 ID（用於陣營顏色）
     const hostId = (state as { hostId?: string }).hostId ?? state.players[0]?.id ?? '';
     // 玩家資料（以伺服器狀態為主）
-    const playerProfile = currentPlayerId
-        ? (state.players.find(player => player.id === currentPlayerId) ?? createPlayerProfile(currentPlayerId))
+    const currentPlayer = currentPlayerId
+        ? (state.players.find(player => player.id === currentPlayerId) ?? null)
         : null;
+    const playerProfile = currentPlayerId
+        ? (currentPlayer ?? createPlayerProfile(currentPlayerId))
+        : null;
+    const playersById = useMemo(() => new Map(state.players.map((player) => [player.id, player])), [state.players]);
+    const getPlayerDisplayName = (playerId?: string) => {
+        if (!playerId) return '未知玩家';
+        const player = playersById.get(playerId);
+        return player?.name
+            || (playerId === currentPlayerId ? localLineName : '')
+            || playerId
+            || '未知玩家';
+    };
+    const getPlayerAvatar = (playerId?: string) => {
+        if (!playerId) return '';
+        const player = playersById.get(playerId);
+        return player?.avatarUrl || (playerId === currentPlayerId ? localLineAvatar : '') || '';
+    };
+    const displayName = getPlayerDisplayName(currentPlayerId);
+    const displayAvatar = getPlayerAvatar(currentPlayerId);
     const {
         isConnected,
         roundSummary,
@@ -205,7 +226,18 @@ const GameRoom: React.FC = () => {
             <div className="game-background d-flex align-items-center justify-content-center">
                 <div className="card p-4 text-center" style={{ minWidth: 450 }}>
                     <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
-                        <div>你是：<strong>{currentPlayerId || '未知玩家'}</strong></div>
+                        <div className="d-flex align-items-center gap-2">
+                            {displayAvatar && (
+                                <img
+                                    className="player-avatar"
+                                    src={displayAvatar}
+                                    alt={`${displayName} 頭像`}
+                                />
+                            )}
+                            <p className='mb-0'>你是：
+                                <strong>{displayName}</strong>
+                            </p>
+                        </div>
                         <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
                     </div>
                     <div className="spinner-custom mb-3"></div>
@@ -213,23 +245,21 @@ const GameRoom: React.FC = () => {
 
                     {/* 房間代碼顯示區域 */}
                     <div className="alert alert-primary">
-                        <div className="d-flex justify-content-between align-items-center">
-                            <div>
-                                <small className="text-muted">房間代碼</small>
-                                <div className="fs-4 fw-bold">{roomId}</div>
-                            </div>
-                            <div>
+                        <div className="waiting-room-actions-group mb-2">
+                            <div className="waiting-room-actions">
                                 <button
-                                    className="btn btn-outline-primary btn-sm me-2"
+                                    className="btn btn-outline-primary btn-sm waiting-room-button"
                                     onClick={() => setShowRoomCode(!showRoomCode)}
                                 >
                                     {showRoomCode ? '隱藏' : '顯示'}
                                 </button>
-                                <button className="btn btn-primary btn-sm" onClick={copyRoomCode}>
-                                    📋 複製
+                                <button className="btn btn-primary btn-sm waiting-room-button" onClick={copyRoomCode}>
+                                    複製
                                 </button>
+                            </div>
+                            <div className={`waiting-room-actions ${!isLineClient() && roomId ? '' : 'waiting-room-actions--single'}`}>
                                 <button
-                                    className="btn btn-success btn-sm ms-2"
+                                    className="btn btn-success btn-sm waiting-room-button"
                                     onClick={async () => {
                                         if (!roomId) return;
                                         try {
@@ -248,7 +278,7 @@ const GameRoom: React.FC = () => {
                                 </button>
                                 {!isLineClient() && roomId && (
                                     <button
-                                        className="btn btn-outline-success btn-sm ms-2"
+                                        className="btn btn-outline-success btn-sm waiting-room-button"
                                         onClick={() => {
                                             window.location.href = getLiffInviteUrl(roomId);
                                         }}
@@ -285,7 +315,7 @@ const GameRoom: React.FC = () => {
                                         <li key={player.id} className="d-flex justify-content-between align-items-center">
                                             <span>
                                                 <span className="badge bg-secondary me-2">{index + 1}</span>
-                                                {player.name}
+                                                {getPlayerDisplayName(player.id)}
                                             </span>
                                             {index === 0 && <span className="badge bg-warning text-dark">房主</span>}
                                         </li>
@@ -316,24 +346,27 @@ const GameRoom: React.FC = () => {
             <div className="container-fluid">
                 <div className={`card game-card p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
                     <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
-                        <div>你是：<strong>{currentPlayerId || '未知玩家'}</strong></div>
+                        <div className="d-flex align-items-center gap-2">
+                            {displayAvatar && (
+                                <img
+                                    className="player-avatar"
+                                    src={displayAvatar}
+                                    alt={`${displayName} 頭像`}
+                                />
+                            )}
+                            <div>你是：<strong>{displayName}</strong></div>
+                        </div>
                         <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
                     </div>
                     {/* 遊戲資訊欄 */}
                     <div className="row align-items-center mb-4">
-                        <div className="col-md-4">
-                            <h5 className="mb-0">房間: {roomId}</h5>
-                            <button className="btn btn-outline-info btn-sm mt-1" onClick={copyRoomCode}>
-                                📋 複製代碼
-                            </button>
-                        </div>
                         <div className="col-md-4 text-center">
                             <h5 className="mb-0">第 {state.round} 回合</h5>
                             <small className="text-muted">階段: {state.phase}</small>
                         </div>
                         <div className="col-md-4 text-end">
                             <span className="badge bg-primary fs-6">
-                                當前玩家: {state.players[state.currentPlayer]?.name || '未知'}
+                                當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)}
                             </span>
                         </div>
                     </div>
@@ -348,14 +381,14 @@ const GameRoom: React.FC = () => {
                                         <div className="card-body py-2">
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <span className="d-inline-flex align-items-center gap-2">
-                                                    {player.avatarUrl && (
+                                                    {getPlayerAvatar(player.id) && (
                                                         <img
                                                             className="player-avatar"
-                                                            src={player.avatarUrl}
-                                                            alt={`${player.name} 頭像`}
+                                                            src={getPlayerAvatar(player.id)}
+                                                            alt={`${getPlayerDisplayName(player.id)} 頭像`}
                                                         />
                                                     )}
-                                                    <strong>{player.name}</strong>
+                                                    <strong>{getPlayerDisplayName(player.id)}</strong>
                                                     {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
                                                     {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
                                                 </span>
@@ -411,7 +444,7 @@ const GameRoom: React.FC = () => {
                         <div className="d-flex flex-column gap-2">
                             {state.players.map((player) => (
                                 <div key={player.id} className="round-summary-row">
-                                    <span className="fw-semibold">{player.name}</span>
+                                    <span className="fw-semibold">{getPlayerDisplayName(player.id)}</span>
                                     <span>魅力 {player.score?.charm || 0}</span>
                                     <span>藝妓 {player.score?.tokens || 0}</span>
                                 </div>
@@ -439,6 +472,7 @@ const GameRoom: React.FC = () => {
                 waitingFor={state.orderDecision.waitingFor}
                 currentPlayer={currentPlayerId}
                 onConfirm={handleConfirmOrder}
+                getPlayerDisplayName={getPlayerDisplayName}
             />
 
             {readyStatus && (
@@ -453,7 +487,7 @@ const GameRoom: React.FC = () => {
                             <div className="d-flex flex-column gap-2 mb-3">
                                 {state.players.map((player) => (
                                     <div key={player.id} className="d-flex justify-content-between">
-                                        <span>{player.name}</span>
+                                        <span>{getPlayerDisplayName(player.id)}</span>
                                         <span>
                                             {readyStatus.confirmations.includes(player.id) ? '✅ 已準備' : '⏳ 等待中'}
                                         </span>
@@ -485,12 +519,12 @@ const GameRoom: React.FC = () => {
                                 <div className="bottom-sheet__body bottom-sheet__body--full">
                                     <div className="text-center mb-3">
                                         <h2 className="text-success mb-2">🎉 遊戲結束！</h2>
-                                        <p className="fs-5 mb-0">獲勝者: <strong>{state.winner}</strong></p>
+                                        <p className="fs-5 mb-0">獲勝者: <strong>{getPlayerDisplayName(state.winner)}</strong></p>
                                     </div>
                                     <div className="mb-4">
                                         {state.players.map((player) => (
                                             <div key={player.id} className="d-flex justify-content-between mb-1">
-                                                <span className="fw-semibold">{player.name}</span>
+                                                <span className="fw-semibold">{getPlayerDisplayName(player.id)}</span>
                                                 <span>魅力 {player.score?.charm || 0} / 藝妓 {player.score?.tokens || 0}</span>
                                             </div>
                                         ))}

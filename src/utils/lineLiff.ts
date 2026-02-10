@@ -121,7 +121,7 @@ export const getLiffInviteUrl = (roomId: string) => resolveLiffInviteUrl(roomId)
 
 export const shareRoomInvite = async (roomId: string) => {
     const inviteUrl = resolveInviteUrl(roomId);
-    const message = `一起玩花見小路！點此加入房間：${inviteUrl}`;
+    const message = `一起玩花見小路！點此加入房間`;
 
     if (!window.liff || !config.liffId) {
         await navigator.clipboard.writeText(inviteUrl);
@@ -150,7 +150,7 @@ export const shareRoomInvite = async (roomId: string) => {
                 size: 'mega',
                 hero: {
                     type: 'image',
-                    url: `${config.webAppUrl}/logo512.png`,
+                    url: `${config.webAppUrl}/images/stamps/message2.jpg`,
                     size: 'full',
                     aspectRatio: '20:13',
                     aspectMode: 'cover',
@@ -165,7 +165,7 @@ export const shareRoomInvite = async (roomId: string) => {
                     contents: [
                         {
                             type: 'text',
-                            text: '🎴 花見小路對戰邀請',
+                            text: message,
                             weight: 'bold',
                             size: 'lg',
                             color: '#1DB446'

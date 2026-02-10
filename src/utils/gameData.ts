@@ -122,7 +122,7 @@ export const collaboration = [
     {
         name: 'アキ・ローゼンタール',
         imageUrl: `${publicBaseUrl}/images/geisha/collaboration/marin.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration-items/gojo.png`
+        cardUrl: `${publicBaseUrl}/images/items/collaboration/gojo.png`
     },
     {
         name: '癒月ちょこ',

@@ -67,8 +67,8 @@
 
 ## 環境需求
 
-- Node.js（建議 16+）
-- npm
+- Node.js（需符合 `package.json` engines：`>=20 <24`）
+- npm（建議使用 Node.js 20 隨附版本或相容版本）
 
 ## 安裝依賴
 
@@ -119,6 +119,13 @@ npm run build
 ```
 
 輸出會在 `build/` 資料夾。
+
+## 開發流程（speckit / agent）
+
+- 專案級 agent 規則請參考 `AGENTS.md`。
+- 長期原則與品質門檻位於 `.specify/memory/constitution.md`。
+- 新功能、版本更新或大型行為調整請先在 `specs/` 建立對應 spec，依序維護 `spec.md`、`plan.md`、`tasks.md`。
+- 共用 Codex skills 透過 `.agents/skills/` 連結到本專案。
 
 ## 部署（GitHub Pages）
 

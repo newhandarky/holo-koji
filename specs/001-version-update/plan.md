@@ -16,9 +16,9 @@ Prepare the project for its first speckit-managed version update. The work is re
 **Package Manager**: npm  
 **Current Versions**:
 
-- Root app: `0.1.0`
-- Server: `1.0.0`
-- Shared types: `1.0.0`
+- Root app: `0.2.0`
+- Server: `0.2.0`
+- Shared types: `0.2.0`
 
 **Validation**:
 
@@ -50,21 +50,21 @@ specs/001-version-update/
 
 Recommended default: synchronize root, server, and shared package versions to the selected product version for this release. The current mismatch (`0.1.0` vs `1.0.0`) makes release status ambiguous.
 
-Candidate target: `0.2.0`, because the project appears pre-1.0 and this update packages existing feature progress rather than declaring stable API/gameplay maturity.
+Selected target: `0.2.0`, because the project appears pre-1.0 and this update packages existing feature progress rather than declaring stable API/gameplay maturity.
 
 ### Existing Worktree Scope
 
-Current uncommitted files must be classified before final release edits:
+Previously uncommitted files were classified before final release edits:
 
 - `.agents/` and `.specify/`: speckit workflow setup for this release process.
-- `WORKFLOW.md`: existing agent workflow file, likely related to automation/Linear handoff.
-- `src/pages/Lobby/index.tsx`: functional/UI change that should be reviewed before inclusion.
+- `WORKFLOW.md`: agent workflow file included with process setup.
+- `src/pages/Lobby/index.tsx`: committed separately before this metadata pass; treated as part of the release baseline.
 
 ## Phase 1 - Design
 
 ### Release Metadata
 
-If synchronized versioning is accepted, update:
+Synchronized versioning is accepted. Updated:
 
 - `package.json`
 - `server/package.json`

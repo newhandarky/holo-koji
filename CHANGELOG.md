@@ -2,7 +2,12 @@
 
 本檔案依目前 git commit 記錄整理，時間戳未完整保留，先以「未標註日期」呈現；後續可依實際提交日期補齊。
 
-## [Unreleased] - 未標註日期
+## [Unreleased]
+- 尚未規劃。
+
+## [0.2.0] - 2026-04-30
+- 導入 speckit / Codex agent workflow，新增 `.agents/skills`、`.specify`、`AGENTS.md` 與版本更新 spec。
+- 同步 root、server、`game-shared-types` package 版本策略。
 - Bottom Sheet 取代多數互動視窗並可收合
 - Top Sheet 抽牌提示（5 秒自動收合），抽牌卡片延遲滑入手牌區
 - Ready 準備機制（順序確認後才開始發牌/對戰）

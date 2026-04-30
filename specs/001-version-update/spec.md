@@ -2,8 +2,15 @@
 
 **Feature Branch**: `001-version-update`  
 **Created**: 2026-04-30  
-**Status**: Draft  
+**Status**: In Progress  
 **Input**: User wants to introduce shared speckit workflow and prepare a project version update.
+
+## Release Decision
+
+- **Target Version**: `0.2.0`
+- **Versioning Strategy**: Synchronize root `package.json`, `server/package.json`, and `game-shared-types/package.json` to `0.2.0`.
+- **Scope**: Include speckit/agent workflow setup, release metadata, changelog, README environment alignment, and existing Lobby change already committed before this release pass.
+- **Out of Scope**: Upcoming large feature rewrites or broad gameplay refactors.
 
 ## User Scenarios & Testing
 
@@ -81,7 +88,7 @@ As the project maintainer, I want repeatable validation before finalizing the ve
 ## Assumptions
 
 - The first speckit-managed release is expected to be a minor version update rather than a stable `1.0.0` release unless the maintainer decides otherwise.
-- Existing uncommitted changes must be reviewed before they are included in the release.
+- Existing Lobby changes were committed separately before this release metadata pass and are treated as part of the baseline for `0.2.0`.
 
 ## Out of Scope
 

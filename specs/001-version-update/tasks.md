@@ -12,9 +12,9 @@
 
 ## Phase 2 - Version Decision
 
-- [ ] T005 Decide target version for this release, recommended `0.2.0`.
-- [ ] T006 Decide whether `package.json`, `server/package.json`, and `game-shared-types/package.json` should use synchronized versions.
-- [ ] T007 Classify current uncommitted `src/pages/Lobby/index.tsx` as included in this release or separate work.
+- [x] T005 Decide target version for this release: `0.2.0`.
+- [x] T006 Decide synchronized versions for `package.json`, `server/package.json`, and `game-shared-types/package.json`.
+- [x] T007 Classify current `src/pages/Lobby/index.tsx` change as previously committed release baseline.
 
 ## Phase 3 - Release Metadata
 
@@ -22,10 +22,10 @@
 
 **Independent Test**: The selected package files contain the intended versions and no unrelated fields changed.
 
-- [ ] T008 Update root `package.json` version if included in strategy.
-- [ ] T009 Update `server/package.json` version if included in strategy.
-- [ ] T010 Update `game-shared-types/package.json` version if included in strategy.
-- [ ] T011 Review whether lockfiles need version-only updates.
+- [x] T008 Update root `package.json` version if included in strategy.
+- [x] T009 Update `server/package.json` version if included in strategy.
+- [x] T010 Update `game-shared-types/package.json` version if included in strategy.
+- [x] T011 Review whether lockfiles need version-only updates.
 
 ## Phase 4 - Release Documentation
 
@@ -33,15 +33,21 @@
 
 **Independent Test**: A maintainer can read the docs and understand version, date, notable changes, environment requirements, and validation status.
 
-- [ ] T012 Update `CHANGELOG.md` with a dated release entry.
-- [ ] T013 Update `README.md` Node.js requirement to match `package.json` engines if needed.
-- [ ] T014 Document speckit workflow entry points if they are part of this release process.
+- [x] T012 Update `CHANGELOG.md` with a dated release entry.
+- [x] T013 Update `README.md` Node.js requirement to match `package.json` engines if needed.
+- [x] T014 Document speckit workflow entry points if they are part of this release process.
 
 ## Phase 5 - Validation
 
-- [ ] T015 Run `CI=1 npm test -- --watchAll=false`.
-- [ ] T016 Run `npm run build`.
-- [ ] T017 Record validation results and remaining risks in closeout summary.
+- [x] T015 Run `CI=1 npm test -- --watchAll=false`.
+- [x] T016 Run `npm run build`.
+- [x] T017 Record validation results and remaining risks in closeout summary.
+
+## Validation Results
+
+- `CI=1 npm test -- --watchAll=false`: Passed. Existing console output includes environment logs and React/Router deprecation warnings.
+- `npm run build`: Passed with warning. Existing ESLint warning: `src/components/game/PendingInteractionModal.tsx` line 39, `title` is assigned but never used.
+- Residual risk: the build warning should be cleaned up in a focused follow-up or included in the next larger refactor if that file is already in scope.
 
 ## Dependencies
 

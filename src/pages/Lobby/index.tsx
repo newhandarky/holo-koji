@@ -316,37 +316,35 @@ const Lobby: React.FC = () => {
                     </button>
                 </div>
 
-                <hr className="my-4" />
-
-                <div>
-                    <label className="form-label">加入房間</label>
-                    <input
-                        type="text"
-                        className="form-control mb-2"
-                        placeholder="輸入房間代碼"
-                        value={roomId}
-                        onChange={e => setRoomId(e.target.value.toUpperCase())}
-                        disabled={isConnecting || matchMode === 'npc'}
-                        maxLength={6}
-                    />
-                    <button
-                        className="btn btn-success w-100"
-                        onClick={joinRoom}
-                        disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected' || matchMode === 'npc'}
-                    >
-                        {isConnecting ? (
-                            <>
-                                <span className="spinner-border spinner-border-sm me-2"></span>
-                                加入中...
-                            </>
-                        ) : '🚪 加入房間'}
-                    </button>
-                    {matchMode === 'npc' && (
-                        <div className="text-muted small mt-2">
-                            NPC 模式不需要輸入房間代碼，直接建立房間即可開始對戰。
+                {matchMode === 'online' && (
+                    <>
+                        <hr className="my-4" />
+                        <div>
+                            <label className="form-label">加入房間</label>
+                            <input
+                                type="text"
+                                className="form-control mb-2"
+                                placeholder="輸入房間代碼"
+                                value={roomId}
+                                onChange={e => setRoomId(e.target.value.toUpperCase())}
+                                disabled={isConnecting}
+                                maxLength={6}
+                            />
+                            <button
+                                className="btn btn-success w-100"
+                                onClick={joinRoom}
+                                disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected'}
+                            >
+                                {isConnecting ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2"></span>
+                                        加入中...
+                                    </>
+                                ) : '🚪 加入房間'}
+                            </button>
                         </div>
-                    )}
-                </div>
+                    </>
+                )}
 
                 <div className="mt-4 pt-3 border-top">
                     <small className="text-muted">

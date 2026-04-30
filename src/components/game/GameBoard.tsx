@@ -1,6 +1,6 @@
 // src/components/game/GameBoard.tsx
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import GeishaCard from './GeishaCard';
+import GeishaCard, { GeishaCardItemIconEntry } from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
@@ -12,6 +12,7 @@ import {
     GameAction,
     GameState
 } from 'game-shared-types';
+import { getItemIconDefinitionByType } from '../../utils/gameData';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -85,6 +86,36 @@ const GameBoard: React.FC<GameBoardProps> = ({
         });
         return map;
     }, [opponentState?.playedCards]);
+
+    const geishaItemIconMap = useMemo(() => {
+        const map = new Map<number, GeishaCardItemIconEntry[]>();
+
+        const appendEntries = (cards: ItemCard[] | undefined, owner: 'self' | 'opponent') => {
+            cards?.forEach((card) => {
+                const key = `${owner}:${card.type}`;
+                const entries = map.get(card.geishaId) ?? [];
+                const existingEntry = entries.find((entry) => `${entry.owner}:${entry.itemType}` === key);
+
+                if (existingEntry) {
+                    existingEntry.count += 1;
+                } else {
+                    entries.push({
+                        itemType: card.type,
+                        definition: getItemIconDefinitionByType(card.type, geishaSet),
+                        owner,
+                        count: 1
+                    });
+                }
+
+                map.set(card.geishaId, entries);
+            });
+        };
+
+        appendEntries(myState?.playedCards, 'self');
+        appendEntries(opponentState?.playedCards, 'opponent');
+
+        return map;
+    }, [geishaSet, myState?.playedCards, opponentState?.playedCards]);
 
     // 依魅力值排序，上排 3/3/4/5，下排 2/2/2
     const { topRow, bottomRow } = useMemo(() => {
@@ -232,6 +263,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
+                        itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
                     />
                 ))}
             </div>
@@ -246,6 +278,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
+                        itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
                     />
                 ))}
             </div>

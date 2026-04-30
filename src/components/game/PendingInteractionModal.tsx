@@ -35,7 +35,6 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
         setIsCollapsed(false);
     }, [interaction.type]);
 
- 
     const title = interaction.type === 'GIFT_SELECTION'
         ? '對手執行了贈予，請選擇一張物品卡牌'
         : '對手執行了競爭，請選擇一組卡牌';
@@ -89,6 +88,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({ inter
             <div className={`bottom-sheet__panel ${isCollapsed ? 'is-collapsed' : ''}`}>
                 {
                     !isCollapsed && <div className="bottom-sheet__header">
+                        <h5 className="bottom-sheet__title">{title}</h5>
                         <button
                             className="bottom-sheet__toggle"
                             onClick={() => setIsCollapsed(!isCollapsed)}

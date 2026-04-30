@@ -46,8 +46,8 @@
 ## Validation Results
 
 - `CI=1 npm test -- --watchAll=false`: Passed. Existing console output includes environment logs and React/Router deprecation warnings.
-- `npm run build`: Passed with warning. Existing ESLint warning: `src/components/game/PendingInteractionModal.tsx` line 39, `title` is assigned but never used.
-- Residual risk: the build warning should be cleaned up in a focused follow-up or included in the next larger refactor if that file is already in scope.
+- `npm run build`: Passed. The previous `PendingInteractionModal.tsx` unused `title` warning was fixed by rendering the interaction title in the bottom sheet header.
+- Residual risk: none identified for this release metadata pass.
 
 ## Dependencies
 

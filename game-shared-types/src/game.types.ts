@@ -5,6 +5,7 @@ export interface Geisha {
     id: number;                     // 識別 ID
     name: string;                   // 藝妓名稱
     charmPoints: number;            // 魅力值
+    imageUrl: string;               // 顯示用人物圖片 URL
     controlledBy: PlayerId | null; // 控制方
 }
 

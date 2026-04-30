@@ -232,7 +232,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
-                        geishaSet={geishaSet}
                     />
                 ))}
             </div>
@@ -247,7 +246,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         hostId={hostId}
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
-                        geishaSet={geishaSet}
                     />
                 ))}
             </div>

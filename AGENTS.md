@@ -31,6 +31,22 @@
 - Before changing gameplay behavior, identify affected state transitions, Socket.IO events, and UI flows.
 - Treat hidden information as sensitive game state: opponent hand cards, secret cards, and pending choices must not leak through client-visible state.
 
+## Commit Message Rules
+
+- When the agent creates commits for the user, write commit messages in Traditional Chinese.
+- Use a clear title line followed by a body when the change is more than trivial.
+- Keep the title concise and outcome-focused.
+- Prefer a bullet list in the body that separates what changed, verification, and residual risks when applicable.
+- Example:
+
+```text
+整理 0.2.0 版本更新
+
+- 同步前端、後端與 shared types 版本號
+- 更新 README 與 CHANGELOG
+- 驗證：npm run build 通過
+```
+
 ## Speckit Workflow
 
 - Use `specs/` for new features, release work, and behavior changes that need planning.

@@ -2,6 +2,14 @@
 // src/components/game/GeishaCard.tsx
 import React, { useEffect, useState } from 'react';
 import { Geisha } from "game-shared-types"
+import { ItemIconDefinition } from '../../utils/gameData';
+
+export interface GeishaCardItemIconEntry {
+    itemType: string;
+    definition: ItemIconDefinition;
+    owner: 'self' | 'opponent';
+    count: number;
+}
 
 /**
  * GeishaCard 組件：顯示單張藝妓卡片
@@ -21,6 +29,8 @@ interface Props {
     myCamp: 'host' | 'guest';
     // 對手的陣營
     opponentCamp: 'host' | 'guest';
+    // 角色卡上的道具 icon 摘要
+    itemIcons?: GeishaCardItemIconEntry[];
 }
 
 const GeishaCard: React.FC<Props> = ({
@@ -30,7 +40,8 @@ const GeishaCard: React.FC<Props> = ({
     currentPlayerId,
     hostId,
     myCamp,
-    opponentCamp
+    opponentCamp,
+    itemIcons = []
 }) => {
     const [imageFailed, setImageFailed] = useState(false);
 
@@ -79,6 +90,34 @@ const GeishaCard: React.FC<Props> = ({
                         <span className="geisha-card__score-badge">魅力 {geisha.charmPoints}</span>
                     </div>
                     <span className="geisha-card__control">{controlLabel}</span>
+                </div>
+                <div className="geisha-card__details">
+                    <div className="geisha-card__icon-area">
+                        <span className="geisha-card__icon-title">對應道具</span>
+                        {itemIcons.length > 0 ? (
+                            <div className="geisha-card__icon-list">
+                                {itemIcons.map((entry) => (
+                                    <div
+                                        key={`${geisha.id}-${entry.owner}-${entry.itemType}`}
+                                        className={`geisha-card__icon-chip geisha-card__icon-chip--${entry.owner}`}
+                                        title={`${entry.definition.label} x${entry.count}`}
+                                    >
+                                        <span className={`geisha-card__icon-glyph ${entry.definition.accentClassName}`}>
+                                            {entry.definition.glyph}
+                                        </span>
+                                        <span className="geisha-card__icon-text">
+                                            <span className="geisha-card__icon-label">{entry.definition.label}</span>
+                                            <span className="geisha-card__icon-meta">
+                                                {entry.owner === 'self' ? '我方' : '對手'} x{entry.count}
+                                            </span>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="geisha-card__icon-empty">尚無對應道具</span>
+                        )}
+                    </div>
                 </div>
                 <div className="geisha-card__footer">
                     <div className={opponentCountClassName}>

@@ -31,6 +31,8 @@ const PlayerHand: React.FC<Props> = ({
 }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
+    // 本地維護焦點卡片（扇形內局部放大）
+    const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
     // 已選卡片 ID 集合（快速判斷是否選取）
     const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
     // 手牌 ID 組合鍵（用於偵測手牌變更）
@@ -46,12 +48,14 @@ const PlayerHand: React.FC<Props> = ({
     // 當手牌變更時重置選牌狀態，避免選到舊牌
     useEffect(() => {
         setSelected([]);
+        setFocusedCardId(null);
         onCardSelect([]);
     }, [cardIdsKey, onCardSelect]);
 
     // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
     const toggleCard = (card: ItemCard) => {
         setSelected((prevSelected) => {
+            setFocusedCardId(card.id);
             const exists = prevSelected.some(c => c.id === card.id);
             const nextSelected = exists
                 ? prevSelected.filter(c => c.id !== card.id)
@@ -64,11 +68,20 @@ const PlayerHand: React.FC<Props> = ({
 
     return (
         <div className="player-hand-row">
-            {cards.map(card => (
+            {cards.map((card, index) => {
+                const center = (cards.length - 1) / 2;
+                const relativeIndex = index - center;
+                const absRelative = Math.abs(relativeIndex);
+                const stackLevel = cards.length - Math.round(absRelative);
+                const rotationDeg = relativeIndex * 5;
+
+                return (
                 <div
                     key={card.id}
                     className={`item-card item-card--image item-card--hand ${
                         selectedIdSet.has(card.id) ? 'selected' : ''
+                    } ${
+                        focusedCardId === card.id ? 'item-card--focused' : ''
                     } ${
                         highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
                     } ${
@@ -79,6 +92,10 @@ const PlayerHand: React.FC<Props> = ({
                     onClick={() => toggleCard(card)}
                     style={{
                         backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})`,
+                        ['--fan-index' as string]: `${relativeIndex}`,
+                        ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
+                        ['--fan-abs-index' as string]: `${absRelative}`,
+                        ['--fan-z-index' as string]: `${stackLevel}`,
                         ['--motion-delay' as string]: `${drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
                         ['--motion-duration' as string]: `${drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
                     }}
@@ -89,7 +106,7 @@ const PlayerHand: React.FC<Props> = ({
                         <div className="item-card__motion-glow" aria-hidden="true" />
                     )}
                 </div>
-            ))}
+            )})}
         </div>
     );
 };

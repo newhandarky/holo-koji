@@ -606,15 +606,134 @@ code {
 .item-card.selected {
   border-color: #007bff;
   background-color: #e7f3ff;
-  transform: translateY(-3px);
   box-shadow: 0 4px 8px rgba(0,123,255,0.3);
 }
 
 .player-hand-row {
   display: flex;
-  flex-wrap: wrap;
-  overflow-x: visible;
-  padding-bottom: 12px;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-end;
+  overflow-x: hidden;
+  overflow-y: visible;
+  width: 100%;
+  padding: 10px 0 18px;
+  touch-action: pan-y;
+  --fan-step: 26px;
+  --fan-rise: 8px;
+  --fan-selected-rise: 16px;
+  --fan-focused-rise: 34px;
+  --fan-focused-scale: 1.16;
+  --fan-negative-margin: -38px;
+  --fan-tilt: 0.95deg;
+}
+
+.player-hand-row .item-card {
+  transform-origin: 50% 92%;
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+  z-index: var(--fan-z-index, 1);
+}
+
+.player-hand-row .item-card + .item-card {
+  margin-left: var(--fan-negative-margin);
+}
+
+.player-hand-row .item-card.selected {
+  box-shadow: 0 7px 14px rgba(0,123,255,0.26);
+  z-index: calc(var(--fan-z-index, 1) + 18);
+}
+
+.player-hand-row .item-card.item-card--focused {
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.34);
+  z-index: calc(var(--fan-z-index, 1) + 40);
+}
+
+.player-hand-row .item-card.item-card--focused.selected {
+  box-shadow: 0 16px 28px rgba(0, 94, 196, 0.34);
+}
+
+.player-hand-row .item-card:not(.item-card--motion-draw):not(.item-card--new) {
+  transform:
+    translateX(calc(var(--fan-step) * var(--fan-index, 0)))
+    translateY(calc(var(--fan-rise) * var(--fan-abs-index, 0)))
+    rotate(calc(var(--fan-rotate-deg, 0deg) * var(--fan-tilt)));
+}
+
+.player-hand-row .item-card.selected:not(.item-card--focused):not(.item-card--motion-draw):not(.item-card--new) {
+  transform:
+    translateX(calc(var(--fan-step) * var(--fan-index, 0)))
+    translateY(calc((var(--fan-rise) * var(--fan-abs-index, 0)) - var(--fan-selected-rise)))
+    rotate(calc(var(--fan-rotate-deg, 0deg) * var(--fan-tilt)));
+}
+
+.player-hand-row .item-card.item-card--focused:not(.item-card--motion-draw):not(.item-card--new) {
+  transform:
+    translateX(calc(var(--fan-step) * var(--fan-index, 0)))
+    translateY(calc((var(--fan-rise) * var(--fan-abs-index, 0)) - var(--fan-focused-rise)))
+    rotate(calc(var(--fan-rotate-deg, 0deg) * var(--fan-tilt)))
+    scale(var(--fan-focused-scale));
+  filter: saturate(1.04);
+}
+
+.player-hand-row .item-card.selected.item-card--focused:not(.item-card--motion-draw):not(.item-card--new) {
+  transform:
+    translateX(calc(var(--fan-step) * var(--fan-index, 0)))
+    translateY(calc((var(--fan-rise) * var(--fan-abs-index, 0)) - var(--fan-focused-rise) - 4px))
+    rotate(calc(var(--fan-rotate-deg, 0deg) * var(--fan-tilt)))
+    scale(var(--fan-focused-scale));
+}
+
+.player-hand-row .item-card.item-card--motion-draw,
+.player-hand-row .item-card.item-card--new {
+  z-index: calc(var(--fan-z-index, 1) + 28);
+}
+
+.player-hand-row .item-card.item-card--focused.item-card--motion-draw,
+.player-hand-row .item-card.item-card--focused.item-card--new {
+  z-index: calc(var(--fan-z-index, 1) + 42);
+}
+
+.player-hand-row .item-card__overlay {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.player-hand-row .item-card.item-card--focused .item-card__overlay {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@media (max-width: 767.98px) {
+  .player-hand-row {
+    --fan-step: 18px;
+    --fan-rise: 6px;
+    --fan-selected-rise: 13px;
+    --fan-focused-rise: 25px;
+    --fan-focused-scale: 1.11;
+    --fan-negative-margin: -42px;
+    --fan-tilt: 0.78deg;
+    padding-bottom: 14px;
+  }
+}
+
+@media (min-width: 768px) {
+  .player-hand-row {
+    --fan-step: 26px;
+    --fan-rise: 8px;
+    --fan-selected-rise: 16px;
+    --fan-focused-rise: 34px;
+    --fan-focused-scale: 1.16;
+    --fan-negative-margin: -34px;
+    --fan-tilt: 0.95deg;
+  }
+}
+
+@media (min-width: 1200px) {
+  .player-hand-row {
+    --fan-step: 29px;
+    --fan-negative-margin: -30px;
+  }
+}
+
+.player-hand-row {
   justify-content: center;
 }
 
@@ -633,10 +752,10 @@ code {
 
 /* 手牌專用尺寸（避免過大需要捲動） */
 .item-card--hand {
-  width: 60px;
-  min-width: 60px;
-  height: 60px;
-  margin:  2px;
+  width: 64px;
+  min-width: 64px;
+  height: 64px;
+  margin: 2px 0;
 }
 
 .item-card--hand .item-card__badge {

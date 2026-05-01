@@ -406,7 +406,7 @@ const GameRoom: React.FC = () => {
     return (
         <div className="game-background p-3">
             <div className="container-fluid">
-                <div className={`card game-card p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
+                <div className={`card game-card game-room-surface p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
                     <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
                         <div className="d-flex align-items-center gap-2">
                             {displayAvatar && (

@@ -4,6 +4,7 @@ import GeishaCard, { GeishaCardItemIconEntry } from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
+import { MotionCue } from './gameMotion';
 import {
     ItemCard,
     ActionToken,
@@ -29,6 +30,10 @@ interface GameBoardProps {
     highlightCardId?: string | null;
     // 是否啟用抽牌動畫
     highlightActive?: boolean;
+    // 主棋盤目前啟用中的動態提示
+    motionCues?: MotionCue[];
+    // 是否偏好低動作模式
+    prefersReducedMotion?: boolean;
 }
 
 // 遊戲主棋盤與行動控制區
@@ -39,7 +44,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     onSendAction,
     canAct,
     highlightCardId,
-    highlightActive
+    highlightActive,
+    motionCues = [],
+    prefersReducedMotion = false
 }) => {
     const geishaSet = state.geishaSet ?? 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
@@ -86,6 +93,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
         });
         return map;
     }, [opponentState?.playedCards]);
+
+    const boardMotionCues = useMemo(
+        () => motionCues.filter((cue) => cue.targetZone === 'board' && typeof cue.targetGeishaId === 'number'),
+        [motionCues]
+    );
+    const handMotionCues = useMemo(
+        () => motionCues.filter((cue) => cue.targetZone === 'hand'),
+        [motionCues]
+    );
+    const competitionResultMotionActive = useMemo(
+        () => motionCues.some((cue) => cue.kind === 'competition-result'),
+        [motionCues]
+    );
 
     const geishaItemIconMap = useMemo(() => {
         const map = new Map<number, GeishaCardItemIconEntry[]>();
@@ -264,6 +284,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
                         itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
+                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
+                        prefersReducedMotion={prefersReducedMotion}
                     />
                 ))}
             </div>
@@ -279,6 +301,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         myCamp={myCamp}
                         opponentCamp={opponentCamp}
                         itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
+                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
+                        prefersReducedMotion={prefersReducedMotion}
                     />
                 ))}
             </div>
@@ -306,6 +330,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 highlightActive={highlightActive}
                 getCharmByGeishaId={getCharmByGeishaId}
                 geishaSet={geishaSet}
+                motionCues={handMotionCues}
+                prefersReducedMotion={prefersReducedMotion}
             />
 
             <CompetitionGroupModal
@@ -315,6 +341,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onClose={handleCompetitionClose}
                 getCharmByGeishaId={getCharmByGeishaId}
                 geishaSet={geishaSet}
+                showResultMotionHint={competitionResultMotionActive}
+                prefersReducedMotion={prefersReducedMotion}
             />
         </div>
     );

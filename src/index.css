@@ -383,6 +383,97 @@ code {
   opacity: 0.72;
 }
 
+.geisha-card--motion-active {
+  box-shadow:
+    0 24px 34px rgba(78, 48, 25, 0.24),
+    0 0 0 2px rgba(255, 238, 192, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.geisha-card__motion-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.geisha-card__motion-cue {
+  --motion-duration: 920ms;
+  --motion-delay: 0ms;
+  position: absolute;
+  inset: auto 10px 42px 10px;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  animation: geishaMotionFly var(--motion-duration) ease-out var(--motion-delay) both;
+}
+
+.geisha-card__motion-cue--from-hand {
+  transform: translateY(44px) scale(0.92);
+}
+
+.geisha-card__motion-cue--from-gift-modal,
+.geisha-card__motion-cue--from-competition-modal {
+  transform: translateY(68px) scale(0.9);
+}
+
+.geisha-card__motion-cue--from-opponent-side {
+  transform: translate(-28px, -22px) scale(0.9);
+}
+
+.geisha-card__motion-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 249, 235, 0.92);
+  color: #5e3419;
+  font-size: 0.68rem;
+  font-weight: 700;
+  box-shadow: 0 10px 20px rgba(24, 18, 12, 0.22);
+}
+
+.geisha-card--motion-reduced .geisha-card__motion-cue {
+  inset: 10px 10px auto 10px;
+  animation-name: geishaMotionReduced;
+}
+
+@keyframes geishaMotionFly {
+  0% {
+    opacity: 0;
+    filter: blur(1px);
+  }
+  18% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -18px) scale(1.02);
+  }
+}
+
+@keyframes geishaMotionReduced {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  20% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+}
+
 .item-icon--coral {
   background: linear-gradient(180deg, #d96a5e, #b24d42);
 }
@@ -496,6 +587,29 @@ code {
   animation: cardSlideIn 0.5s ease;
 }
 
+.item-card--motion-draw {
+  animation:
+    cardSlideIn 0.5s ease,
+    cardDrawGlow var(--motion-duration, 960ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.item-card--motion-reduced {
+  animation:
+    cardSlideIn 0.5s ease,
+    cardDrawReduced var(--motion-duration, 520ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.item-card__motion-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 232, 173, 0.95);
+  box-shadow: 0 0 18px rgba(255, 214, 122, 0.52);
+  z-index: 3;
+  pointer-events: none;
+  animation: cardMotionGlow var(--motion-duration, 960ms) ease-out var(--motion-delay, 0ms) both;
+}
+
 @keyframes cardSlideIn {
   0% {
     transform: translateY(-120%);
@@ -504,6 +618,48 @@ code {
   100% {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes cardDrawGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 210, 99, 0);
+    transform: translateY(-8px) scale(0.96);
+  }
+  35% {
+    box-shadow: 0 0 20px rgba(255, 210, 99, 0.4);
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 210, 99, 0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cardDrawReduced {
+  0% {
+    opacity: 0.82;
+    transform: scale(0.97);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes cardMotionGlow {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 
@@ -517,6 +673,18 @@ code {
 .gift-selection-grid--nowrap {
   flex-wrap: nowrap;
   gap: 12px;
+}
+
+.gift-selection-grid--motion-source,
+.interaction-group--motion-source,
+.bottom-sheet__panel--motion-source {
+  animation: motionSourcePulse 0.9s ease-out both;
+}
+
+.bottom-sheet__panel--motion-reduced,
+.gift-selection-grid--motion-source.bottom-sheet__panel--motion-reduced,
+.interaction-group--motion-source.bottom-sheet__panel--motion-reduced {
+  animation: motionSourceReduced 0.52s ease-out both;
 }
 
 .gift-selection-card {
@@ -538,6 +706,33 @@ code {
   margin-top: 6px;
   font-size: 0.85rem;
   color: #0d6efd;
+}
+
+@keyframes motionSourcePulse {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 201, 125, 0);
+    transform: translateY(0);
+  }
+  35% {
+    box-shadow: 0 0 0 2px rgba(255, 201, 125, 0.34);
+    transform: translateY(-2px);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 201, 125, 0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes motionSourceReduced {
+  0% {
+    opacity: 0.86;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* 互動視窗戰況摘要 */
@@ -1182,5 +1377,19 @@ code {
   .geisha-card__icon-meta,
   .geisha-card__icon-empty {
     font-size: 0.54rem;
+  }
+
+  .geisha-card__motion-cue {
+    inset: auto 6px 34px 6px;
+  }
+
+  .geisha-card__motion-chip {
+    padding: 5px 8px;
+    font-size: 0.58rem;
+  }
+
+  .item-card__motion-glow {
+    inset: -2px;
+    border-radius: 12px;
   }
 }

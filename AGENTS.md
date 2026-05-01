@@ -76,6 +76,13 @@ If a command cannot be run, report the reason and the residual risk.
 
 For backend-only changes, run the most relevant server command available in `server/package.json`; if no useful automated test exists, state that clearly.
 
+## UI Review Ownership
+
+- The user performs detailed UI visual review manually.
+- The agent should normally run automated checks and only perform minimal UI smoke tests when explicitly requested.
+- If the user reports that a UI screen has already been checked, record that result in the active spec/tasks instead of re-running browser inspection.
+- When UI verification remains unperformed by the user, report it as a residual manual review item rather than spending extra browser-inspection tokens by default.
+
 ## Release And Versioning
 
 - Decide whether root, server, and `game-shared-types` versions are synchronized before editing package metadata.

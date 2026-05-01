@@ -3,6 +3,8 @@ export type PlayerId = 'player1' | 'player2';
 // 藝妓狀態
 export interface Geisha {
     id: number;                     // 識別 ID
+    characterId?: string;           // 角色資料識別
+    boardSlotId?: number;           // 場上位置識別
     name: string;                   // 藝妓名稱
     charmPoints: number;            // 魅力值
     imageUrl: string;               // 顯示用人物圖片 URL
@@ -14,6 +16,11 @@ export interface ItemCard {
     id: string;                     // 唯一識別
     geishaId: number;               // 對應藝妓 ID
     type: string;                   // 卡片類型（文字描述）
+    boardSlotId?: number;           // 對應場上位置
+    itemAssetName?: string;         // 穩定內部道具名稱
+    itemLabel?: string;             // 顯示用道具名稱
+    itemImageUrl?: string;          // 顯示用道具圖片
+    itemIconUrl?: string;           // 顯示用道具 icon
 }
 
 export type ActionType = 'secret' | 'trade-off' | 'gift' | 'competition';

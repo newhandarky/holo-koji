@@ -1,6 +1,6 @@
 import React from 'react';
 import { ItemCard, GeishaSetKey } from 'game-shared-types';
-import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface CompetitionGroupModalProps {
     // 是否開啟視窗
@@ -23,7 +23,7 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
-        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
+        style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
     >
         <div className="item-card__overlay" />
         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>

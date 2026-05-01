@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ItemCard, GeishaSetKey } from 'game-shared-types';
-import { getGeishaNameById, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardLabel, getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
 
 interface DrawCardModalProps {
     // 是否開啟視窗
@@ -42,8 +42,11 @@ const DrawCardModal: React.FC<DrawCardModalProps> = ({ isOpen, card, onConfirm, 
                     <div className="bottom-sheet__body text-center">
                         <div className="draw-card">
                             <div className="draw-card__inner">
-                                <div className="draw-card__front">
-                                    <div className="fs-5">{getGeishaNameById(card.geishaId, geishaSet ?? 'default')}</div>
+                                <div
+                                    className="draw-card__front"
+                                    style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
+                                >
+                                    <div className="fs-5">{getItemCardLabel(card, geishaSet ?? 'default')}</div>
                                     <small className="text-muted">魅力值 {getGeishaCharmById(card.geishaId)}</small>
                                 </div>
                             </div>

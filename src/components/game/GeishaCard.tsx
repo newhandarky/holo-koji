@@ -134,9 +134,18 @@ const GeishaCard: React.FC<Props> = ({
                                         className={`geisha-card__icon-chip geisha-card__icon-chip--${entry.owner}`}
                                         title={`${entry.definition.label} x${entry.count}`}
                                     >
-                                        <span className={`geisha-card__icon-glyph ${entry.definition.accentClassName}`}>
-                                            {entry.definition.glyph}
-                                        </span>
+                                        {entry.definition.imageUrl ? (
+                                            <img
+                                                className="geisha-card__icon-image"
+                                                src={entry.definition.imageUrl}
+                                                alt={entry.definition.label}
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <span className={`geisha-card__icon-glyph ${entry.definition.accentClassName}`}>
+                                                {entry.definition.glyph}
+                                            </span>
+                                        )}
                                         <span className="geisha-card__icon-text">
                                             <span className="geisha-card__icon-label">{entry.definition.label}</span>
                                             <span className="geisha-card__icon-meta">

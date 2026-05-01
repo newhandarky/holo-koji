@@ -1,6 +1,8 @@
 export type PlayerId = 'player1' | 'player2';
 export interface Geisha {
     id: number;
+    characterId?: string;
+    boardSlotId?: number;
     name: string;
     charmPoints: number;
     imageUrl: string;
@@ -10,6 +12,11 @@ export interface ItemCard {
     id: string;
     geishaId: number;
     type: string;
+    boardSlotId?: number;
+    itemAssetName?: string;
+    itemLabel?: string;
+    itemImageUrl?: string;
+    itemIconUrl?: string;
 }
 export type ActionType = 'secret' | 'trade-off' | 'gift' | 'competition';
 export type GamePhase = 'waiting' | 'deciding_order' | 'playing' | 'resolution' | 'ended';

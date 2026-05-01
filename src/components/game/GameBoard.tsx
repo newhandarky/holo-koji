@@ -13,7 +13,7 @@ import {
     GameAction,
     GameState
 } from 'game-shared-types';
-import { getItemIconDefinitionByType } from '../../utils/gameData';
+import { getItemIconDefinitionForCard } from '../../utils/gameData';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -121,7 +121,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 } else {
                     entries.push({
                         itemType: card.type,
-                        definition: getItemIconDefinitionByType(card.type, geishaSet),
+                        definition: getItemIconDefinitionForCard(card, geishaSet),
                         owner,
                         count: 1
                     });

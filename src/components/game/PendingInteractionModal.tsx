@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ItemCard, PendingInteraction, GameAction, Player, GeishaSetKey } from 'game-shared-types';
-import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
     // 互動內容（贈予 / 競爭）
@@ -23,7 +23,7 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"
-        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
+        style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
     >
         <div className="item-card__overlay" />
         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>

@@ -1,7 +1,7 @@
 // src/components/game/PlayerHand.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { ItemCard, GeishaSetKey } from "game-shared-types"
-import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 import { MotionCue } from './gameMotion';
 
 /**
@@ -78,7 +78,7 @@ const PlayerHand: React.FC<Props> = ({
                     }`}
                     onClick={() => toggleCard(card)}
                     style={{
-                        backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})`,
+                        backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})`,
                         ['--motion-delay' as string]: `${drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
                         ['--motion-duration' as string]: `${drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
                     }}

@@ -150,46 +150,148 @@ code {
 }
 
 /* 藝妓卡片樣式 */
-.geisha-card {
-  --geisha-border: #d6cfc2;
-  flex: 1 1 0;
-  max-width: 168px;
+.geisha-coverflow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.geisha-coverflow__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.geisha-coverflow__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   min-width: 0;
-  border: 2px solid var(--geisha-border);
-  border-radius: 18px;
+}
+
+.geisha-coverflow__eyebrow {
+  color: rgba(255, 241, 233, 0.72);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.geisha-coverflow__position {
+  color: #fff7ef;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.geisha-coverflow__controls {
+  display: flex;
+  gap: 8px;
+}
+
+.geisha-coverflow__nav {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 233, 224, 0.22);
+  border-radius: 999px;
+  background: rgba(34, 18, 18, 0.72);
+  color: #fff8ef;
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.24);
+  transition: transform 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+}
+
+.geisha-coverflow__nav:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(245, 206, 182, 0.44);
+}
+
+.geisha-coverflow__nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.geisha-coverflow__viewport {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 8px clamp(18px, 7vw, 92px) 16px;
+  margin: 0 calc(clamp(18px, 7vw, 92px) * -1);
+  scrollbar-width: none;
+  cursor: grab;
+  touch-action: pan-x;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: clamp(18px, 7vw, 92px);
+}
+
+.geisha-coverflow__viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.geisha-coverflow__viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.geisha-coverflow__track {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(12px, 2vw, 20px);
+}
+
+.geisha-coverflow__slide {
+  flex: 0 0 clamp(214px, 30vw, 296px);
+  scroll-snap-align: center;
+  transition: transform 0.24s ease, opacity 0.24s ease, filter 0.24s ease;
+  opacity: 0.56;
+  filter: saturate(0.78);
+  transform: scale(0.86);
+}
+
+.geisha-coverflow__slide.is-adjacent {
+  opacity: 0.82;
+  filter: saturate(0.92);
+  transform: scale(0.93);
+}
+
+.geisha-coverflow__slide.is-active {
+  opacity: 1;
+  filter: none;
+  transform: scale(1);
+}
+
+.geisha-card {
+  --geisha-border: rgba(255, 237, 222, 0.24);
+  width: 100%;
+  border: 3px solid var(--geisha-border);
+  border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(255, 250, 241, 0.98), rgba(243, 230, 207, 0.92));
+    linear-gradient(180deg, rgba(38, 18, 22, 0.92), rgba(19, 11, 13, 0.96));
   box-shadow:
-    0 18px 28px rgba(78, 48, 25, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    0 24px 44px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-.geisha-card:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 24px 34px rgba(78, 48, 25, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
 .geisha-card__media {
   position: relative;
   aspect-ratio: 9 / 16;
   min-height: 0;
-  border-radius: 16px;
+  border-radius: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top, rgba(255, 248, 228, 0.95), rgba(182, 149, 115, 0.88));
+    radial-gradient(circle at top, rgba(109, 44, 50, 0.54), rgba(16, 9, 11, 0.98));
 }
 
 .geisha-card__artwork,
 .geisha-card__fallback,
 .geisha-card__scrim,
-.geisha-card__header,
-.geisha-card__details,
+.geisha-card__overlay,
 .geisha-card__footer {
   position: absolute;
   inset: 0;
@@ -209,7 +311,7 @@ code {
   gap: 8px;
   padding: 18px 14px;
   background:
-    linear-gradient(180deg, rgba(102, 67, 39, 0.88), rgba(53, 34, 23, 0.92));
+    linear-gradient(180deg, rgba(91, 33, 40, 0.9), rgba(31, 12, 16, 0.96));
   color: #fff7eb;
   text-align: center;
 }
@@ -233,209 +335,142 @@ code {
 
 .geisha-card__scrim {
   background:
-    linear-gradient(180deg, rgba(24, 18, 12, 0.1), rgba(24, 18, 12, 0.58) 78%, rgba(24, 18, 12, 0.84));
+    linear-gradient(180deg, rgba(12, 7, 8, 0.04), rgba(12, 7, 8, 0.18) 30%, rgba(12, 7, 8, 0.54) 72%, rgba(12, 7, 8, 0.84));
   z-index: 1;
 }
 
-.geisha-card__score-badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(40, 27, 18, 0.72);
-  color: #fff;
-  font-size: 0.74rem;
-  white-space: nowrap;
-}
-
-.geisha-card__header,
-.geisha-card__details,
+.geisha-card__overlay,
 .geisha-card__footer {
   z-index: 2;
-  padding: 12px;
+  pointer-events: none;
 }
 
-.geisha-card__header {
+.geisha-card__overlay {
+  inset: 0 auto auto 0;
+  width: 78%;
+  height: 40%;
+  background: linear-gradient(135deg, rgba(18, 10, 12, 0.88) 0%, rgba(18, 10, 12, 0.84) 48%, rgba(18, 10, 12, 0.14) 48.5%, rgba(18, 10, 12, 0) 100%);
+  padding: 16px 18px;
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 8px;
+  justify-content: flex-start;
 }
 
-.geisha-card__details {
-  inset: auto 0 58px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.geisha-card__footer {
-  top: auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.geisha-card__nameplate {
+.geisha-card__overlay-content {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+  gap: 10px;
+  max-width: min(68%, 150px);
 }
 
 .geisha-card__name {
   color: #fff8ef;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 1.3;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
-  word-break: break-word;
+  line-height: 1.28;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  overflow-wrap: anywhere;
 }
 
-.geisha-card__control {
-  padding: 4px 9px;
+.geisha-card__overlay-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.geisha-card__score-badge {
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(255, 247, 232, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  color: #fff8ef;
-  font-size: 0.7rem;
+  background: rgba(245, 237, 224, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff4ea;
+  font-size: 0.74rem;
+  font-weight: 700;
   white-space: nowrap;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
+}
+
+.geisha-card__slot-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(249, 242, 233, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 16px rgba(0, 0, 0, 0.24);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.geisha-card__slot-icon-image,
+.geisha-card__slot-icon-glyph {
+  width: 100%;
+  height: 100%;
+}
+
+.geisha-card__slot-icon-image {
+  object-fit: cover;
+}
+
+.geisha-card__slot-icon-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff9f2;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.geisha-card__footer {
+  inset: auto 0 0;
+  height: 10%;
+  min-height: 42px;
+  display: flex;
 }
 
 .geisha-card__count {
-  min-width: 62px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(17, 14, 11, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 8px 12px;
   color: #fff8ef;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
   align-items: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(6px);
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
 }
 
-.geisha-card__count--host {
-  background: linear-gradient(180deg, rgba(167, 33, 49, 0.84), rgba(121, 20, 34, 0.88));
+.geisha-card__count--self {
+  background: linear-gradient(90deg, rgba(19, 78, 163, 0.94), rgba(16, 56, 119, 0.9));
 }
 
-.geisha-card__count--guest {
-  background: linear-gradient(180deg, rgba(27, 90, 184, 0.84), rgba(17, 61, 134, 0.88));
+.geisha-card__count--opponent {
+  background: linear-gradient(90deg, rgba(144, 28, 46, 0.9), rgba(187, 44, 64, 0.94));
 }
 
 .geisha-card__count-label {
   font-size: 0.68rem;
-  opacity: 0.85;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .geisha-card__count-value {
   font-size: 1rem;
   font-weight: 700;
-}
-
-.geisha-card__icon-area {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(14, 11, 9, 0.56);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-}
-
-.geisha-card__icon-title {
-  color: rgba(255, 248, 239, 0.84);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.geisha-card__icon-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.geisha-card__icon-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 8px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.09);
-}
-
-.geisha-card__icon-chip--self {
-  border: 1px solid rgba(255, 209, 214, 0.36);
-}
-
-.geisha-card__icon-chip--opponent {
-  border: 1px solid rgba(205, 225, 255, 0.36);
-}
-
-.geisha-card__icon-glyph {
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fffaf1;
-  font-size: 0.84rem;
-  font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.geisha-card__icon-image {
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.22);
-}
-
-.geisha-card__icon-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.geisha-card__icon-label,
-.geisha-card__icon-meta,
-.geisha-card__icon-empty {
-  color: #fff8ef;
-}
-
-.geisha-card__icon-label {
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.geisha-card__icon-meta {
-  font-size: 0.62rem;
-  opacity: 0.84;
-}
-
-.geisha-card__icon-empty {
-  font-size: 0.72rem;
-  opacity: 0.72;
+  flex: 0 0 auto;
 }
 
 .geisha-card--motion-active {
   box-shadow:
-    0 24px 34px rgba(78, 48, 25, 0.24),
-    0 0 0 2px rgba(255, 238, 192, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    0 26px 46px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 236, 195, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .geisha-card__motion-layer {
@@ -450,7 +485,7 @@ code {
   --motion-duration: 920ms;
   --motion-delay: 0ms;
   position: absolute;
-  inset: auto 10px 42px 10px;
+  inset: auto 10px 56px 10px;
   display: flex;
   justify-content: center;
   opacity: 0;
@@ -1333,19 +1368,6 @@ code {
   }
 }
 
-/* 藝妓排列的上下兩排 */
-.geisha-row {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  gap: clamp(6px, 1.8vw, 12px);
-  align-items: stretch;
-}
-
-.geisha-row--bottom {
-  margin-top: 12px;
-}
-
 /* 玩家資訊卡片的陣營顏色 */
 .player-card--host {
   border: 2px solid #dc3545;
@@ -1359,96 +1381,99 @@ code {
   position: relative;
 }
 
-/* 藝妓卡片依陣營加邊框 */
-.geisha-card--host {
+/* 藝妓卡片依玩家視角加邊框 */
+.geisha-card--self-controlled {
+  --geisha-border: #2563eb;
+}
+
+.geisha-card--opponent-controlled {
   --geisha-border: #dc3545;
 }
 
-.geisha-card--guest {
-  --geisha-border: #0d6efd;
-}
-
 @media (max-width: 768px) {
+  .geisha-coverflow {
+    gap: 12px;
+  }
+
+  .geisha-coverflow__header {
+    align-items: flex-start;
+  }
+
+  .geisha-coverflow__summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .geisha-coverflow__viewport {
+    padding-inline: 22px;
+    margin-inline: -22px;
+    scroll-padding-inline: 22px;
+  }
+
+  .geisha-coverflow__slide {
+    flex-basis: min(76vw, 292px);
+    opacity: 0.66;
+    transform: scale(0.9);
+  }
+
+  .geisha-coverflow__slide.is-adjacent {
+    transform: scale(0.95);
+  }
+
   .geisha-card {
-    max-width: none;
+    border-radius: 24px;
   }
 
-  .geisha-card__header,
-  .geisha-card__details,
-  .geisha-card__footer {
-    padding: 8px;
+  .geisha-card__media {
+    border-radius: 20px;
   }
 
-  .geisha-card__details {
-    inset: auto 0 56px;
-    padding-top: 0;
-    padding-bottom: 0;
+  .geisha-card__overlay {
+    width: 84%;
+    height: 42%;
+    padding: 14px 14px;
+  }
+
+  .geisha-card__overlay-content {
+    gap: 8px;
+    max-width: min(72%, 136px);
   }
 
   .geisha-card__name {
-    font-size: 0.84rem;
+    font-size: 0.88rem;
   }
 
-  .geisha-card__score-badge,
-  .geisha-card__control {
-    font-size: 0.62rem;
+  .geisha-card__overlay-meta {
+    gap: 8px;
   }
 
-  .geisha-card__count {
-    min-width: 0;
-    padding: 6px 7px;
+  .geisha-card__score-badge {
+    padding: 4px 8px;
+    font-size: 0.64rem;
   }
 
-  .geisha-card__count-label {
-    font-size: 0.58rem;
-  }
-
-  .geisha-card__count-value {
-    font-size: 0.84rem;
-  }
-
-  .geisha-card__icon-area {
-    gap: 6px;
-    padding: 8px;
-    border-radius: 12px;
-  }
-
-  .geisha-card__icon-title {
-    font-size: 0.58rem;
-  }
-
-  .geisha-card__icon-chip {
-    gap: 6px;
-    padding: 5px 6px;
+  .geisha-card__slot-icon {
+    width: 30px;
+    height: 30px;
     border-radius: 10px;
   }
 
-  .geisha-card__icon-glyph {
-    flex-basis: 24px;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
-    font-size: 0.72rem;
+  .geisha-card__count {
+    padding: 6px 9px;
+    min-height: 40px;
   }
 
-  .geisha-card__icon-image {
-    flex-basis: 24px;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
+  .geisha-card__count-label {
+    font-size: 0.56rem;
   }
 
-  .geisha-card__icon-label {
-    font-size: 0.66rem;
-  }
-
-  .geisha-card__icon-meta,
-  .geisha-card__icon-empty {
-    font-size: 0.54rem;
+  .geisha-card__count-value {
+    font-size: 0.88rem;
   }
 
   .geisha-card__motion-cue {
-    inset: auto 6px 34px 6px;
+    inset: auto 6px 50px 6px;
   }
 
   .geisha-card__motion-chip {

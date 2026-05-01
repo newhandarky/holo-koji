@@ -15,6 +15,8 @@ interface CompetitionGroupModalProps {
     getCharmByGeishaId?: (geishaId: number) => number;
     // 藝妓組合
     geishaSet?: GeishaSetKey;
+    showResultMotionHint?: boolean;
+    prefersReducedMotion?: boolean;
 }
 
 const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSetKey) => (
@@ -35,7 +37,9 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     onSelect,
     onClose,
     getCharmByGeishaId,
-    geishaSet
+    geishaSet,
+    showResultMotionHint = false,
+    prefersReducedMotion = false
 }) => {
     if (!isOpen || cards.length !== 4) {
         return null;
@@ -51,7 +55,7 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     return (
         <div className="bottom-sheet">
             <div className="bottom-sheet__backdrop" />
-            <div className="bottom-sheet__panel">
+            <div className={`bottom-sheet__panel ${showResultMotionHint ? 'bottom-sheet__panel--motion-source' : ''} ${showResultMotionHint && prefersReducedMotion ? 'bottom-sheet__panel--motion-reduced' : ''}`}>
                 <div className="bottom-sheet__header">
                     <button className="btn-close" onClick={onClose} aria-label="關閉" />
                 </div>

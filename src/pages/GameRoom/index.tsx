@@ -1,11 +1,18 @@
 // src/pages/GameRoom/index.tsx - 添加順序決定彈窗
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
+import {
+    buildMotionSnapshot,
+    createDrawMotionCue,
+    deriveMotionCues,
+    MotionCue,
+    usePrefersReducedMotion
+} from '../../components/game/gameMotion';
 import config from '../../config/environment';
 import { Player, ActionToken } from "game-shared-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
@@ -92,6 +99,35 @@ const GameRoom: React.FC = () => {
     const [isRematchRequested, setIsRematchRequested] = useState(false);
     // 結算底部視窗是否收合
     const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
+    const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
+    const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
+    const prefersReducedMotion = usePrefersReducedMotion();
+
+    const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
+        if (cues.length === 0) {
+            return;
+        }
+
+        setActiveMotionCues((previous) => {
+            const next = [...previous, ...cues];
+            const seen = new Set<string>();
+
+            return next.filter((cue) => {
+                if (seen.has(cue.id)) {
+                    return false;
+                }
+
+                seen.add(cue.id);
+                return true;
+            });
+        });
+
+        cues.forEach((cue) => {
+            window.setTimeout(() => {
+                setActiveMotionCues((previous) => previous.filter((currentCue) => currentCue.id !== cue.id));
+            }, cue.durationMs + cue.delayMs + 160);
+        });
+    }, []);
 
     // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
@@ -132,6 +168,7 @@ const GameRoom: React.FC = () => {
 
             const revealTimer = window.setTimeout(() => {
                 setIsDrawHighlightActive(true);
+                enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
             }, 1000);
 
             const highlightTimer = window.setTimeout(() => {
@@ -160,7 +197,32 @@ const GameRoom: React.FC = () => {
         }, 1200);
 
         return () => window.clearTimeout(timer);
-    }, [drawQueue, currentPlayerId, consumeDrawEvent]);
+    }, [drawQueue, currentPlayerId, consumeDrawEvent, enqueueMotionCues, prefersReducedMotion]);
+
+    useEffect(() => {
+        if (!currentPlayerId || state.phase !== 'playing') {
+            previousMotionSnapshotRef.current = buildMotionSnapshot(state, currentPlayerId);
+            return;
+        }
+
+        const currentSnapshot = buildMotionSnapshot(state, currentPlayerId);
+        const previousSnapshot = previousMotionSnapshotRef.current;
+
+        if (previousSnapshot) {
+            enqueueMotionCues(deriveMotionCues(previousSnapshot, currentSnapshot, prefersReducedMotion));
+        }
+
+        previousMotionSnapshotRef.current = currentSnapshot;
+    }, [currentPlayerId, enqueueMotionCues, prefersReducedMotion, state]);
+
+    const activePendingMotionKind = useMemo<'gift-result' | 'competition-result' | null>(() => {
+        const cue = activeMotionCues.find((item) => item.kind === 'gift-result' || item.kind === 'competition-result');
+        if (cue?.kind === 'gift-result' || cue?.kind === 'competition-result') {
+            return cue.kind;
+        }
+
+        return null;
+    }, [activeMotionCues]);
 
 
 
@@ -414,6 +476,8 @@ const GameRoom: React.FC = () => {
                         canAct={canAct}
                         highlightCardId={drawHighlightCardId}
                         highlightActive={isDrawHighlightActive}
+                        motionCues={activeMotionCues}
+                        prefersReducedMotion={prefersReducedMotion}
                     />
 
                     {/* 離開遊戲按鈕 */}
@@ -567,6 +631,8 @@ const GameRoom: React.FC = () => {
                     getCharmByGeishaId={(geishaId) => state.geishas.find((geisha) => geisha.id === geishaId)?.charmPoints ?? 0}
                     geishaSet={state.geishaSet ?? 'default'}
                     onResolve={sendGameAction}
+                    activeMotionKind={activePendingMotionKind}
+                    prefersReducedMotion={prefersReducedMotion}
                 />
             )}
         </div>

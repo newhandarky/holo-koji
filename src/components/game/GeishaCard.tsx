@@ -1,8 +1,9 @@
 
 // src/components/game/GeishaCard.tsx
-import React, { useEffect, useState } from 'react';
+import React, { CSSProperties, useEffect, useState } from 'react';
 import { Geisha } from "game-shared-types"
 import { ItemIconDefinition } from '../../utils/gameData';
+import { MotionCue } from './gameMotion';
 
 export interface GeishaCardItemIconEntry {
     itemType: string;
@@ -31,6 +32,8 @@ interface Props {
     opponentCamp: 'host' | 'guest';
     // 角色卡上的道具 icon 摘要
     itemIcons?: GeishaCardItemIconEntry[];
+    motionCues?: MotionCue[];
+    prefersReducedMotion?: boolean;
 }
 
 const GeishaCard: React.FC<Props> = ({
@@ -41,7 +44,9 @@ const GeishaCard: React.FC<Props> = ({
     hostId,
     myCamp,
     opponentCamp,
-    itemIcons = []
+    itemIcons = [],
+    motionCues = [],
+    prefersReducedMotion = false
 }) => {
     const [imageFailed, setImageFailed] = useState(false);
 
@@ -64,10 +69,37 @@ const GeishaCard: React.FC<Props> = ({
             : '對手掌控';
     const myCountClassName = `geisha-card__count geisha-card__count--${myCamp}`;
     const opponentCountClassName = `geisha-card__count geisha-card__count--${opponentCamp}`;
+    const hasActiveMotion = motionCues.length > 0;
+    const cardClassName = `${className} ${hasActiveMotion ? 'geisha-card--motion-active' : ''} ${prefersReducedMotion && hasActiveMotion ? 'geisha-card--motion-reduced' : ''}`;
+    const renderMotionLabel = (cue: MotionCue) => {
+        if (cue.kind === 'gift-result') return cue.owner === 'self' ? '贈予入場' : '對手贈予';
+        if (cue.kind === 'competition-result') return cue.owner === 'self' ? '競爭入場' : '對手競爭';
+        return cue.owner === 'self' ? '我方出牌' : '對手出牌';
+    };
 
     return (
-        <div className={className}>
+        <div className={cardClassName}>
             <div className="geisha-card__media">
+                {motionCues.length > 0 && (
+                    <div className="geisha-card__motion-layer" aria-hidden="true">
+                        {motionCues.map((cue) => {
+                            const style = {
+                                ['--motion-delay' as string]: `${cue.delayMs}ms`,
+                                ['--motion-duration' as string]: `${cue.durationMs}ms`
+                            } as CSSProperties;
+
+                            return (
+                                <div
+                                    key={cue.id}
+                                    className={`geisha-card__motion-cue geisha-card__motion-cue--${cue.kind} geisha-card__motion-cue--from-${cue.sourceZone}`}
+                                    style={style}
+                                >
+                                    <span className="geisha-card__motion-chip">{renderMotionLabel(cue)}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
                 {showArtwork ? (
                     <img
                         className="geisha-card__artwork"

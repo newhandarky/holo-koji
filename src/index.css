@@ -1,9 +1,27 @@
 /* 全局重置與字體設定 */
+:root {
+  --ginza-bg:
+    radial-gradient(circle at 28% 22%, rgba(184, 28, 42, 0.42) 0, rgba(184, 28, 42, 0) 34%),
+    linear-gradient(135deg, #050304 0%, #140406 30%, #8d1020 51%, #160407 70%, #020203 100%);
+  --ginza-surface: rgba(18, 10, 12, 0.58);
+  --ginza-surface-border: rgba(255, 238, 215, 0.2);
+  --ginza-readable-text: #fff7ec;
+  --ginza-muted-text: rgba(255, 247, 236, 0.72);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #050304;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  background: var(--ginza-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -89,16 +107,19 @@ code {
   margin: 0 auto;
 }
 
-/* 遊戲主背景，用於 GameRoom 頁面 */
-.game-background {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* Ginza v2 app background shared by all page-level surfaces */
+.game-background,
+.lobby-background {
+  background: var(--ginza-bg);
+  background-color: #050304;
+  background-repeat: no-repeat;
+  background-size: cover;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
-/* 大廳背景，用於 Lobby 頁面 */
-.lobby-background {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  min-height: 100vh;
+.game-background > .text-center .text-muted {
+  color: var(--ginza-muted-text) !important;
 }
 
 /* 卡片通用樣式 */
@@ -109,6 +130,23 @@ code {
 }
 .game-card:hover {
   transform: translateY(-2px);
+}
+
+/* Active gameplay shell: remove Bootstrap's white card while keeping local panels readable. */
+.game-room-surface {
+  background:
+    linear-gradient(145deg, rgba(255, 245, 224, 0.13), rgba(20, 7, 9, 0.56)),
+    var(--ginza-surface);
+  border: 1px solid var(--ginza-surface-border);
+  box-shadow:
+    0 24px 52px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: var(--ginza-readable-text);
+  backdrop-filter: blur(10px);
+}
+
+.game-room-surface > .row.align-items-center .text-muted {
+  color: var(--ginza-muted-text) !important;
 }
 
 /* 藝妓卡片樣式 */

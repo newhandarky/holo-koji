@@ -1,6 +1,6 @@
 // src/components/game/GameBoard.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import GeishaCard, { GeishaCardItemIconEntry } from './GeishaCard';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
@@ -13,7 +13,7 @@ import {
     GameAction,
     GameState
 } from 'game-shared-types';
-import { getItemIconDefinitionForCard } from '../../utils/gameData';
+import { ItemIconDefinition, getItemIconDefinitionForCard } from '../../utils/gameData';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -40,7 +40,6 @@ interface GameBoardProps {
 const GameBoard: React.FC<GameBoardProps> = ({
     state,
     playerId,
-    hostId,
     onSendAction,
     canAct,
     highlightCardId,
@@ -52,6 +51,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
+    const [activeGeishaIndex, setActiveGeishaIndex] = useState(0);
+    const coverflowViewportRef = useRef<HTMLDivElement | null>(null);
+    const coverflowCardRefs = useRef<Array<HTMLDivElement | null>>([]);
+    const dragStateRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number } | null>(null);
+    const previousGeishaCountRef = useRef(0);
 
     // 取得當前玩家與自己的狀態
     const currentPlayer = state.players[state.currentPlayer];
@@ -107,52 +111,65 @@ const GameBoard: React.FC<GameBoardProps> = ({
         [motionCues]
     );
 
-    const geishaItemIconMap = useMemo(() => {
-        const map = new Map<number, GeishaCardItemIconEntry[]>();
-
-        const appendEntries = (cards: ItemCard[] | undefined, owner: 'self' | 'opponent') => {
-            cards?.forEach((card) => {
-                const key = `${owner}:${card.type}`;
-                const entries = map.get(card.geishaId) ?? [];
-                const existingEntry = entries.find((entry) => `${entry.owner}:${entry.itemType}` === key);
-
-                if (existingEntry) {
-                    existingEntry.count += 1;
-                } else {
-                    entries.push({
-                        itemType: card.type,
-                        definition: getItemIconDefinitionForCard(card, geishaSet),
-                        owner,
-                        count: 1
-                    });
-                }
-
-                map.set(card.geishaId, entries);
-            });
+    const allKnownItemCards = useMemo(() => {
+        const cards: ItemCard[] = [];
+        const appendCards = (cardGroup: ItemCard[] | undefined | null) => {
+            if (cardGroup?.length) {
+                cards.push(...cardGroup);
+            }
         };
 
-        appendEntries(myState?.playedCards, 'self');
-        appendEntries(opponentState?.playedCards, 'opponent');
+        state.players.forEach((player) => {
+            appendCards(player.hand);
+            appendCards(player.playedCards);
+            appendCards(player.secretCards);
+            appendCards(player.discardedCards);
+        });
+
+        appendCards(state.drawPile);
+        appendCards(state.discardPile);
+
+        if (state.removedCard) {
+            cards.push(state.removedCard);
+        }
+
+        if (state.pendingInteraction?.type === 'GIFT_SELECTION') {
+            appendCards(state.pendingInteraction.offeredCards);
+        }
+
+        if (state.pendingInteraction?.type === 'COMPETITION_SELECTION') {
+            state.pendingInteraction.groups.forEach((group) => appendCards(group));
+        }
+
+        return cards;
+    }, [state]);
+
+    const geishaItemIconMap = useMemo(() => {
+        const map = new Map<number, ItemIconDefinition>();
+
+        allKnownItemCards.forEach((card) => {
+            if (map.has(card.geishaId)) {
+                return;
+            }
+
+            map.set(card.geishaId, getItemIconDefinitionForCard(card, geishaSet));
+        });
 
         return map;
-    }, [geishaSet, myState?.playedCards, opponentState?.playedCards]);
+    }, [allKnownItemCards, geishaSet]);
 
-    // 依魅力值排序，上排 3/3/4/5，下排 2/2/2
-    const { topRow, bottomRow } = useMemo(() => {
-        const twoPoints = state.geishas.filter((geisha) => geisha.charmPoints === 2);
-        const highPoints = state.geishas
-            .filter((geisha) => geisha.charmPoints !== 2)
-            .sort((a, b) => a.charmPoints - b.charmPoints);
+    const orderedGeishas = useMemo(() => (
+        [...state.geishas].sort((left, right) => {
+            if (left.charmPoints !== right.charmPoints) {
+                return left.charmPoints - right.charmPoints;
+            }
 
-        return {
-            topRow: highPoints,
-            bottomRow: twoPoints
-        };
-    }, [state.geishas]);
+            const leftSlotOrder = left.boardSlotId ?? left.id;
+            const rightSlotOrder = right.boardSlotId ?? right.id;
+            return leftSlotOrder - rightSlotOrder;
+        })
+    ), [state.geishas]);
 
-    // 依房主判斷自身/對手陣營
-    const myCamp = playerId && hostId && playerId === hostId ? 'host' : 'guest';
-    const opponentCamp = myCamp === 'host' ? 'guest' : 'host';
     const charmMap = useMemo(() => {
         const map = new Map<number, number>();
         state.geishas.forEach((geisha) => {
@@ -161,6 +178,131 @@ const GameBoard: React.FC<GameBoardProps> = ({
         return map;
     }, [state.geishas]);
     const getCharmByGeishaId = useCallback((geishaId: number) => charmMap.get(geishaId) ?? 0, [charmMap]);
+
+    useEffect(() => {
+        setActiveGeishaIndex((currentIndex) => {
+            if (orderedGeishas.length === 0) {
+                return 0;
+            }
+
+            return Math.min(currentIndex, orderedGeishas.length - 1);
+        });
+    }, [orderedGeishas]);
+
+    const scrollToGeishaIndex = useCallback((targetIndex: number, behavior: ScrollBehavior = 'smooth') => {
+        const viewport = coverflowViewportRef.current;
+        const targetCard = coverflowCardRefs.current[targetIndex];
+
+        if (!viewport || !targetCard) {
+            return;
+        }
+
+        const targetLeft = targetCard.offsetLeft - ((viewport.clientWidth - targetCard.offsetWidth) / 2);
+        viewport.scrollTo({
+            left: Math.max(targetLeft, 0),
+            behavior
+        });
+    }, []);
+
+    useEffect(() => {
+        if (orderedGeishas.length !== previousGeishaCountRef.current) {
+            previousGeishaCountRef.current = orderedGeishas.length;
+            scrollToGeishaIndex(activeGeishaIndex, 'auto');
+        }
+    }, [orderedGeishas.length, activeGeishaIndex, scrollToGeishaIndex]);
+
+    const syncActiveIndexFromViewport = useCallback(() => {
+        const viewport = coverflowViewportRef.current;
+        if (!viewport || orderedGeishas.length === 0) {
+            return;
+        }
+
+        const viewportCenter = viewport.scrollLeft + (viewport.clientWidth / 2);
+        let nearestIndex = 0;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+
+        coverflowCardRefs.current.forEach((card, index) => {
+            if (!card) {
+                return;
+            }
+
+            const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
+            const distance = Math.abs(cardCenter - viewportCenter);
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = index;
+            }
+        });
+
+        setActiveGeishaIndex(nearestIndex);
+    }, [orderedGeishas.length]);
+
+    const handleCoverflowScroll = useCallback(() => {
+        if (dragStateRef.current) {
+            return;
+        }
+
+        window.requestAnimationFrame(syncActiveIndexFromViewport);
+    }, [syncActiveIndexFromViewport]);
+
+    const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+            return;
+        }
+
+        const viewport = coverflowViewportRef.current;
+        if (!viewport) {
+            return;
+        }
+
+        dragStateRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startScrollLeft: viewport.scrollLeft
+        };
+        viewport.classList.add('is-dragging');
+        event.currentTarget.setPointerCapture(event.pointerId);
+    }, []);
+
+    const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+        const viewport = coverflowViewportRef.current;
+        const dragState = dragStateRef.current;
+
+        if (!viewport || !dragState || dragState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        const deltaX = event.clientX - dragState.startX;
+        viewport.scrollLeft = dragState.startScrollLeft - deltaX;
+    }, []);
+
+    const releasePointerDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+        const viewport = coverflowViewportRef.current;
+        const dragState = dragStateRef.current;
+
+        if (!viewport || !dragState || dragState.pointerId !== event.pointerId) {
+            return;
+        }
+
+        dragStateRef.current = null;
+        viewport.classList.remove('is-dragging');
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        syncActiveIndexFromViewport();
+    }, [syncActiveIndexFromViewport]);
+
+    const handleCoverflowStep = useCallback((direction: 'prev' | 'next') => {
+        const offset = direction === 'prev' ? -1 : 1;
+        const nextIndex = Math.min(
+            Math.max(activeGeishaIndex + offset, 0),
+            orderedGeishas.length - 1
+        );
+
+        setActiveGeishaIndex(nextIndex);
+        scrollToGeishaIndex(nextIndex);
+    }, [activeGeishaIndex, orderedGeishas.length, scrollToGeishaIndex]);
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
@@ -272,40 +414,73 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return (
         <div>
             {renderOpponentActions()}
-            <div className="geisha-row mt-2">
-                {topRow.map((geisha: Geisha) => (
-                    <GeishaCard
-                        key={geisha.id}
-                        geisha={geisha}
-                        myCount={myCountMap.get(geisha.id) ?? 0}
-                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
-                        currentPlayerId={playerId}
-                        hostId={hostId}
-                        myCamp={myCamp}
-                        opponentCamp={opponentCamp}
-                        itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
-                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
-                        prefersReducedMotion={prefersReducedMotion}
-                    />
-                ))}
-            </div>
-            <div className="geisha-row geisha-row--bottom mb-4">
-                {bottomRow.map((geisha: Geisha) => (
-                    <GeishaCard
-                        key={geisha.id}
-                        geisha={geisha}
-                        myCount={myCountMap.get(geisha.id) ?? 0}
-                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
-                        currentPlayerId={playerId}
-                        hostId={hostId}
-                        myCamp={myCamp}
-                        opponentCamp={opponentCamp}
-                        itemIcons={geishaItemIconMap.get(geisha.id) ?? []}
-                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
-                        prefersReducedMotion={prefersReducedMotion}
-                    />
-                ))}
-            </div>
+            <section className="geisha-coverflow mt-2 mb-4" aria-label="人物卡 coverflow">
+                <div className="geisha-coverflow__header">
+                    <div className="geisha-coverflow__summary">
+                        <span className="geisha-coverflow__eyebrow">人物卡</span>
+                        <span className="geisha-coverflow__position">
+                            {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
+                        </span>
+                    </div>
+                    <div className="geisha-coverflow__controls" aria-label="人物卡切換按鈕">
+                        <button
+                            type="button"
+                            className="geisha-coverflow__nav"
+                            onClick={() => handleCoverflowStep('prev')}
+                            disabled={activeGeishaIndex === 0}
+                            aria-label="上一張人物卡"
+                        >
+                            ←
+                        </button>
+                        <button
+                            type="button"
+                            className="geisha-coverflow__nav"
+                            onClick={() => handleCoverflowStep('next')}
+                            disabled={activeGeishaIndex >= orderedGeishas.length - 1}
+                            aria-label="下一張人物卡"
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
+                <div
+                    ref={coverflowViewportRef}
+                    className="geisha-coverflow__viewport"
+                    onScroll={handleCoverflowScroll}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={releasePointerDrag}
+                    onPointerCancel={releasePointerDrag}
+                    onPointerLeave={releasePointerDrag}
+                >
+                    <div className="geisha-coverflow__track">
+                        {orderedGeishas.map((geisha: Geisha, index) => {
+                            const distanceFromActive = Math.abs(index - activeGeishaIndex);
+
+                            return (
+                                <div
+                                    key={geisha.id}
+                                    ref={(node) => {
+                                        coverflowCardRefs.current[index] = node;
+                                    }}
+                                    className={`geisha-coverflow__slide ${index === activeGeishaIndex ? 'is-active' : ''} ${distanceFromActive === 1 ? 'is-adjacent' : ''}`}
+                                    aria-current={index === activeGeishaIndex}
+                                >
+                                    <GeishaCard
+                                        geisha={geisha}
+                                        myCount={myCountMap.get(geisha.id) ?? 0}
+                                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
+                                        currentPlayerId={playerId}
+                                        itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
+                                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
+                                        prefersReducedMotion={prefersReducedMotion}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
 
             <ActionTokens
                 tokens={myState.actionTokens}

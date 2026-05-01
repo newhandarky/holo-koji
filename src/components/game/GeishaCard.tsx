@@ -1,16 +1,9 @@
 
 // src/components/game/GeishaCard.tsx
 import React, { CSSProperties, useEffect, useState } from 'react';
-import { Geisha } from "game-shared-types"
+import { Geisha } from "game-shared-types";
 import { ItemIconDefinition } from '../../utils/gameData';
 import { MotionCue } from './gameMotion';
-
-export interface GeishaCardItemIconEntry {
-    itemType: string;
-    definition: ItemIconDefinition;
-    owner: 'self' | 'opponent';
-    count: number;
-}
 
 /**
  * GeishaCard 組件：顯示單張藝妓卡片
@@ -24,14 +17,8 @@ interface Props {
     opponentCount: number;
     // 自己的玩家 ID
     currentPlayerId: string;
-    // 房主 ID（用於陣營顏色）
-    hostId: string;
-    // 自己的陣營
-    myCamp: 'host' | 'guest';
-    // 對手的陣營
-    opponentCamp: 'host' | 'guest';
-    // 角色卡上的道具 icon 摘要
-    itemIcons?: GeishaCardItemIconEntry[];
+    // 對應場上位置的道具 icon
+    itemIcon?: ItemIconDefinition | null;
     motionCues?: MotionCue[];
     prefersReducedMotion?: boolean;
 }
@@ -41,10 +28,7 @@ const GeishaCard: React.FC<Props> = ({
     myCount,
     opponentCount,
     currentPlayerId,
-    hostId,
-    myCamp,
-    opponentCamp,
-    itemIcons = [],
+    itemIcon = null,
     motionCues = [],
     prefersReducedMotion = false
 }) => {
@@ -54,21 +38,13 @@ const GeishaCard: React.FC<Props> = ({
         setImageFailed(false);
     }, [geisha.imageUrl]);
 
-    // 根據控制方加上樣式（以玩家 ID 判斷陣營）
-    const isHostControlled = Boolean(hostId) && geisha.controlledBy === hostId;
     const isMineControlled = Boolean(currentPlayerId) && geisha.controlledBy === currentPlayerId;
-    const className = `geisha-card ${isHostControlled ? 'geisha-card--host' :
-        geisha.controlledBy ? 'geisha-card--guest' : ""
+    const isOpponentControlled = Boolean(geisha.controlledBy) && !isMineControlled;
+    const className = `geisha-card ${isMineControlled ? 'geisha-card--self-controlled' :
+        isOpponentControlled ? 'geisha-card--opponent-controlled' : ''
         }`;
     const imageUrl = geisha.imageUrl?.trim() ?? '';
     const showArtwork = Boolean(imageUrl) && !imageFailed;
-    const controlLabel = !geisha.controlledBy
-        ? '未掌控'
-        : isMineControlled
-            ? '我方掌控'
-            : '對手掌控';
-    const myCountClassName = `geisha-card__count geisha-card__count--${myCamp}`;
-    const opponentCountClassName = `geisha-card__count geisha-card__count--${opponentCamp}`;
     const hasActiveMotion = motionCues.length > 0;
     const cardClassName = `${className} ${hasActiveMotion ? 'geisha-card--motion-active' : ''} ${prefersReducedMotion && hasActiveMotion ? 'geisha-card--motion-reduced' : ''}`;
     const renderMotionLabel = (cue: MotionCue) => {
@@ -116,58 +92,38 @@ const GeishaCard: React.FC<Props> = ({
                     </div>
                 )}
                 <div className="geisha-card__scrim" />
-                <div className="geisha-card__header">
-                    <div className="geisha-card__nameplate">
+                <div className="geisha-card__overlay">
+                    <div className="geisha-card__overlay-content">
                         <span className="geisha-card__name">{geisha.name}</span>
-                        <span className="geisha-card__score-badge">魅力 {geisha.charmPoints}</span>
-                    </div>
-                    <span className="geisha-card__control">{controlLabel}</span>
-                </div>
-                <div className="geisha-card__details">
-                    <div className="geisha-card__icon-area">
-                        <span className="geisha-card__icon-title">對應道具</span>
-                        {itemIcons.length > 0 ? (
-                            <div className="geisha-card__icon-list">
-                                {itemIcons.map((entry) => (
-                                    <div
-                                        key={`${geisha.id}-${entry.owner}-${entry.itemType}`}
-                                        className={`geisha-card__icon-chip geisha-card__icon-chip--${entry.owner}`}
-                                        title={`${entry.definition.label} x${entry.count}`}
-                                    >
-                                        {entry.definition.imageUrl ? (
-                                            <img
-                                                className="geisha-card__icon-image"
-                                                src={entry.definition.imageUrl}
-                                                alt={entry.definition.label}
-                                                loading="lazy"
-                                            />
-                                        ) : (
-                                            <span className={`geisha-card__icon-glyph ${entry.definition.accentClassName}`}>
-                                                {entry.definition.glyph}
-                                            </span>
-                                        )}
-                                        <span className="geisha-card__icon-text">
-                                            <span className="geisha-card__icon-label">{entry.definition.label}</span>
-                                            <span className="geisha-card__icon-meta">
-                                                {entry.owner === 'self' ? '我方' : '對手'} x{entry.count}
-                                            </span>
+                        <div className="geisha-card__overlay-meta">
+                            <span className="geisha-card__score-badge">魅力 {geisha.charmPoints}</span>
+                            {itemIcon ? (
+                                <span className="geisha-card__slot-icon" title={itemIcon.label}>
+                                    {itemIcon.imageUrl ? (
+                                        <img
+                                            className="geisha-card__slot-icon-image"
+                                            src={itemIcon.imageUrl}
+                                            alt={itemIcon.label}
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <span className={`geisha-card__slot-icon-glyph ${itemIcon.accentClassName}`}>
+                                            {itemIcon.glyph}
                                         </span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <span className="geisha-card__icon-empty">尚無對應道具</span>
-                        )}
+                                    )}
+                                </span>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
                 <div className="geisha-card__footer">
-                    <div className={opponentCountClassName}>
-                        <span className="geisha-card__count-label">對手</span>
-                        <span className="geisha-card__count-value">{opponentCount}</span>
-                    </div>
-                    <div className={myCountClassName}>
+                    <div className="geisha-card__count geisha-card__count--self">
                         <span className="geisha-card__count-label">我方</span>
                         <span className="geisha-card__count-value">{myCount}</span>
+                    </div>
+                    <div className="geisha-card__count geisha-card__count--opponent">
+                        <span className="geisha-card__count-label">對手</span>
+                        <span className="geisha-card__count-value">{opponentCount}</span>
                     </div>
                 </div>
             </div>

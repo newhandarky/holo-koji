@@ -16,6 +16,8 @@ Given the active game room is visible and the current player has hand cards:
 - The main hand area renders the current player's hand as a fan.
 - Desktop layout uses medium spread: cards overlap but each card has a clear clickable region.
 - Mobile layout keeps the fan form with denser overlap.
+- Hand cards keep a 9:16 card ratio.
+- The hand row stays within its parent width; increased spread is achieved through fan spacing, rotation, and overlap rather than a row wider than 100%.
 - The hand surface does not cause main page horizontal scrolling.
 - Card face image and charm indicator remain identifiable.
 

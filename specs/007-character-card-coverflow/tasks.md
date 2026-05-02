@@ -103,7 +103,7 @@ Complete Phase 1, Phase 2, and User Story 1. This delivers the manual seven-card
 ### Scope Guardrails
 
 - Do not redesign player hand, gift modal, competition modal, or top-sheet action flow.
-- Do not add autoplay, looping carousel behavior, or alternate card datasets.
+- Do not add autoplay or alternate card datasets. Manual first/last wrapping is allowed because it is part of the current coverflow navigation requirement.
 - Do not modify `server/`, `game-shared-types/`, Socket.IO contracts, scoring, turn order, or hidden-information boundaries.
 - Do not change the Ginza room shell outside what is required for the character-card browsing surface.
 
@@ -114,3 +114,9 @@ Complete Phase 1, Phase 2, and User Story 1. This delivers the manual seven-card
 - Manual browser review completed on 2026-05-02 at `http://localhost:3000` using an NPC room.
 - Manual review covered lobby -> NPC room creation -> active game room, left/right coverflow navigation, drag/scroll interaction, mobile-width layout, bottom-sheet coexistence, and 10-second idle no-autoplay observation.
 - Carried-over unresolved-match border state was not reproduced locally during this pass; implementation was verified to rely only on synced `geisha.controlledBy` and does not add local control inference.
+
+## Post-Closeout UI Tuning Record
+
+- 2026-05-02: Coverflow was adjusted to avoid viewport overflow and to place navigation controls on the left/right sides of the character-card surface.
+- 2026-05-02: Coverflow navigation was changed to wrap between first and last cards for both button navigation and manual swipe gestures.
+- 2026-05-02: The implementation uses a custom cyclic coverflow presentation rather than a dependency-based Swiper instance.

@@ -52,10 +52,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
     const [activeGeishaIndex, setActiveGeishaIndex] = useState(0);
-    const coverflowViewportRef = useRef<HTMLDivElement | null>(null);
-    const coverflowCardRefs = useRef<Array<HTMLDivElement | null>>([]);
-    const dragStateRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number } | null>(null);
-    const previousGeishaCountRef = useRef(0);
+    const swipeStateRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null);
 
     // 取得當前玩家與自己的狀態
     const currentPlayer = state.players[state.currentPlayer];
@@ -189,120 +186,74 @@ const GameBoard: React.FC<GameBoardProps> = ({
         });
     }, [orderedGeishas]);
 
-    const scrollToGeishaIndex = useCallback((targetIndex: number, behavior: ScrollBehavior = 'smooth') => {
-        const viewport = coverflowViewportRef.current;
-        const targetCard = coverflowCardRefs.current[targetIndex];
-
-        if (!viewport || !targetCard) {
-            return;
-        }
-
-        const targetLeft = targetCard.offsetLeft - ((viewport.clientWidth - targetCard.offsetWidth) / 2);
-        viewport.scrollTo({
-            left: Math.max(targetLeft, 0),
-            behavior
-        });
-    }, []);
-
-    useEffect(() => {
-        if (orderedGeishas.length !== previousGeishaCountRef.current) {
-            previousGeishaCountRef.current = orderedGeishas.length;
-            scrollToGeishaIndex(activeGeishaIndex, 'auto');
-        }
-    }, [orderedGeishas.length, activeGeishaIndex, scrollToGeishaIndex]);
-
-    const syncActiveIndexFromViewport = useCallback(() => {
-        const viewport = coverflowViewportRef.current;
-        if (!viewport || orderedGeishas.length === 0) {
-            return;
-        }
-
-        const viewportCenter = viewport.scrollLeft + (viewport.clientWidth / 2);
-        let nearestIndex = 0;
-        let nearestDistance = Number.POSITIVE_INFINITY;
-
-        coverflowCardRefs.current.forEach((card, index) => {
-            if (!card) {
-                return;
-            }
-
-            const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
-            const distance = Math.abs(cardCenter - viewportCenter);
-
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestIndex = index;
-            }
-        });
-
-        setActiveGeishaIndex(nearestIndex);
-    }, [orderedGeishas.length]);
-
-    const handleCoverflowScroll = useCallback(() => {
-        if (dragStateRef.current) {
-            return;
-        }
-
-        window.requestAnimationFrame(syncActiveIndexFromViewport);
-    }, [syncActiveIndexFromViewport]);
-
     const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
         if (event.pointerType === 'mouse' && event.button !== 0) {
             return;
         }
 
-        const viewport = coverflowViewportRef.current;
-        if (!viewport) {
-            return;
-        }
-
-        dragStateRef.current = {
+        swipeStateRef.current = {
             pointerId: event.pointerId,
             startX: event.clientX,
-            startScrollLeft: viewport.scrollLeft
+            startY: event.clientY
         };
-        viewport.classList.add('is-dragging');
         event.currentTarget.setPointerCapture(event.pointerId);
     }, []);
 
-    const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        const viewport = coverflowViewportRef.current;
-        const dragState = dragStateRef.current;
-
-        if (!viewport || !dragState || dragState.pointerId !== event.pointerId) {
-            return;
-        }
-
-        const deltaX = event.clientX - dragState.startX;
-        viewport.scrollLeft = dragState.startScrollLeft - deltaX;
-    }, []);
-
     const releasePointerDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        const viewport = coverflowViewportRef.current;
-        const dragState = dragStateRef.current;
+        const dragState = swipeStateRef.current;
 
-        if (!viewport || !dragState || dragState.pointerId !== event.pointerId) {
+        if (!dragState || dragState.pointerId !== event.pointerId) {
             return;
         }
 
-        dragStateRef.current = null;
-        viewport.classList.remove('is-dragging');
+        swipeStateRef.current = null;
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
             event.currentTarget.releasePointerCapture(event.pointerId);
         }
-        syncActiveIndexFromViewport();
-    }, [syncActiveIndexFromViewport]);
+
+        const deltaX = event.clientX - dragState.startX;
+        const deltaY = event.clientY - dragState.startY;
+        if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY)) {
+            return;
+        }
+        if (orderedGeishas.length === 0) {
+            return;
+        }
+
+        if (deltaX < 0) {
+            setActiveGeishaIndex((current) => (current + 1) % orderedGeishas.length);
+            return;
+        }
+
+        setActiveGeishaIndex((current) => (current - 1 + orderedGeishas.length) % orderedGeishas.length);
+    }, [orderedGeishas.length]);
 
     const handleCoverflowStep = useCallback((direction: 'prev' | 'next') => {
+        if (orderedGeishas.length === 0) {
+            return;
+        }
+
         const offset = direction === 'prev' ? -1 : 1;
-        const nextIndex = Math.min(
-            Math.max(activeGeishaIndex + offset, 0),
-            orderedGeishas.length - 1
-        );
+        const total = orderedGeishas.length;
+        const nextIndex = (activeGeishaIndex + offset + total) % total;
 
         setActiveGeishaIndex(nextIndex);
-        scrollToGeishaIndex(nextIndex);
-    }, [activeGeishaIndex, orderedGeishas.length, scrollToGeishaIndex]);
+    }, [activeGeishaIndex, orderedGeishas.length]);
+
+    const getCoverflowOffset = useCallback((index: number) => {
+        const total = orderedGeishas.length;
+        if (total <= 1) {
+            return 0;
+        }
+
+        let offset = index - activeGeishaIndex;
+        if (offset > total / 2) {
+            offset -= total;
+        } else if (offset < -total / 2) {
+            offset += total;
+        }
+        return offset;
+    }, [activeGeishaIndex, orderedGeishas.length]);
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
@@ -422,63 +373,60 @@ const GameBoard: React.FC<GameBoardProps> = ({
                             {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
                         </span>
                     </div>
-                    <div className="geisha-coverflow__controls" aria-label="人物卡切換按鈕">
-                        <button
-                            type="button"
-                            className="geisha-coverflow__nav"
-                            onClick={() => handleCoverflowStep('prev')}
-                            disabled={activeGeishaIndex === 0}
-                            aria-label="上一張人物卡"
-                        >
-                            ←
-                        </button>
-                        <button
-                            type="button"
-                            className="geisha-coverflow__nav"
-                            onClick={() => handleCoverflowStep('next')}
-                            disabled={activeGeishaIndex >= orderedGeishas.length - 1}
-                            aria-label="下一張人物卡"
-                        >
-                            →
-                        </button>
-                    </div>
                 </div>
-                <div
-                    ref={coverflowViewportRef}
-                    className="geisha-coverflow__viewport"
-                    onScroll={handleCoverflowScroll}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={releasePointerDrag}
-                    onPointerCancel={releasePointerDrag}
-                    onPointerLeave={releasePointerDrag}
-                >
-                    <div className="geisha-coverflow__track">
-                        {orderedGeishas.map((geisha: Geisha, index) => {
-                            const distanceFromActive = Math.abs(index - activeGeishaIndex);
+                <div className="geisha-coverflow__stage">
+                    <button
+                        type="button"
+                        className="geisha-coverflow__nav geisha-coverflow__nav--prev"
+                        onClick={() => handleCoverflowStep('prev')}
+                        aria-label="上一張人物卡"
+                    >
+                        ←
+                    </button>
+                    <div
+                        className="geisha-coverflow__viewport"
+                        onPointerDown={handlePointerDown}
+                        onPointerUp={releasePointerDrag}
+                        onPointerCancel={releasePointerDrag}
+                        onPointerLeave={releasePointerDrag}
+                    >
+                        <div className="geisha-coverflow__track">
+                            {orderedGeishas.map((geisha: Geisha, index) => {
+                                const offset = getCoverflowOffset(index);
+                                const distanceFromActive = Math.abs(offset);
 
-                            return (
-                                <div
-                                    key={geisha.id}
-                                    ref={(node) => {
-                                        coverflowCardRefs.current[index] = node;
-                                    }}
-                                    className={`geisha-coverflow__slide ${index === activeGeishaIndex ? 'is-active' : ''} ${distanceFromActive === 1 ? 'is-adjacent' : ''}`}
-                                    aria-current={index === activeGeishaIndex}
-                                >
-                                    <GeishaCard
-                                        geisha={geisha}
-                                        myCount={myCountMap.get(geisha.id) ?? 0}
-                                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
-                                        currentPlayerId={playerId}
-                                        itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
-                                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
-                                        prefersReducedMotion={prefersReducedMotion}
-                                    />
-                                </div>
-                            );
-                        })}
+                                return (
+                                    <div
+                                        key={geisha.id}
+                                        className={`geisha-coverflow__slide ${index === activeGeishaIndex ? 'is-active' : ''} ${distanceFromActive === 1 ? 'is-adjacent' : ''} ${distanceFromActive > 2 ? 'is-distant' : ''}`}
+                                        aria-current={index === activeGeishaIndex}
+                                        style={{
+                                            ['--coverflow-offset' as string]: `${offset}`,
+                                            ['--coverflow-abs-offset' as string]: `${distanceFromActive}`
+                                        }}
+                                    >
+                                        <GeishaCard
+                                            geisha={geisha}
+                                            myCount={myCountMap.get(geisha.id) ?? 0}
+                                            opponentCount={opponentCountMap.get(geisha.id) ?? 0}
+                                            currentPlayerId={playerId}
+                                            itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
+                                            motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
+                                            prefersReducedMotion={prefersReducedMotion}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
+                    <button
+                        type="button"
+                        className="geisha-coverflow__nav geisha-coverflow__nav--next"
+                        onClick={() => handleCoverflowStep('next')}
+                        aria-label="下一張人物卡"
+                    >
+                        →
+                    </button>
                 </div>
             </section>
 

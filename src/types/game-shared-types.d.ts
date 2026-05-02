@@ -1,7 +1,7 @@
 import 'game-shared-types';
 
 declare module 'game-shared-types' {
-    export type GeishaSetKey = 'default' | 'akatsuki' | 'onesan' | 'collaboration';
+    export type GeishaSetKey = 'default';
 
     export interface GameState {
         geishaSet?: GeishaSetKey;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ItemCard, GeishaSetKey } from 'game-shared-types';
+import { ItemCard, GeishaSet } from 'game-shared-types';
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface CompetitionGroupModalProps {
@@ -14,12 +14,12 @@ interface CompetitionGroupModalProps {
     // 取得魅力值（以伺服器資料為主）
     getCharmByGeishaId?: (geishaId: number) => number;
     // 藝妓組合
-    geishaSet?: GeishaSetKey;
+    geishaSet?: GeishaSet;
     showResultMotionHint?: boolean;
     prefersReducedMotion?: boolean;
 }
 
-const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSetKey) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSet) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"

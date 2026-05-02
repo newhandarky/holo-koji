@@ -15,8 +15,6 @@ const Lobby: React.FC = () => {
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
     const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
-    // 藝妓組合
-    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki' | 'onesan' | 'collaboration'>('default');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -164,7 +162,7 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!playerName.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet });
+        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet: 'default' });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
             displayName: lineProfile?.displayName ?? playerName,
@@ -172,7 +170,7 @@ const Lobby: React.FC = () => {
             avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
-            geishaSet
+            geishaSet: 'default'
         });
     };
 
@@ -280,17 +278,7 @@ const Lobby: React.FC = () => {
                     )}
                     <div className="mb-3">
                         <label className="form-label">藝妓組合</label>
-                        <select
-                            className="form-select"
-                            value={geishaSet}
-                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki' | 'onesan' | 'collaboration')}
-                            disabled={isConnecting}
-                        >
-                            <option value="default">預設</option>
-                            <option value="akatsuki">曉</option>
-                            <option value="onesan">大姊姊組</option>
-                            <option value="collaboration">擅自合作組</option>
-                        </select>
+                        <input className="form-control" value="預設（Ginza）" disabled />
                     </div>
                     <label className="form-label">玩家名稱</label>
                     <input

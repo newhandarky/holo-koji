@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, GeishaSetKey } from 'game-shared-types';
+import { ItemCard, GeishaSet } from 'game-shared-types';
 import { getItemCardLabel, getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
 
 interface DrawCardModalProps {
@@ -10,7 +10,7 @@ interface DrawCardModalProps {
     // 確認回呼
     onConfirm: () => void;
     // 藝妓組合
-    geishaSet?: GeishaSetKey;
+    geishaSet?: GeishaSet;
 }
 
 // 抽牌提示視窗（回合開始時顯示給自己）

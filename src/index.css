@@ -789,6 +789,24 @@ code {
   padding: 4px 8px;
 }
 
+.item-card--hand.item-card--missing-artwork {
+  background: linear-gradient(160deg, rgba(17, 24, 39, 0.92), rgba(51, 65, 85, 0.95));
+}
+
+.item-card--hand .item-card__fallback-label {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 14%;
+  z-index: 2;
+  color: #f8fafc;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
 .item-card__overlay {
   position: absolute;
   inset: 0;

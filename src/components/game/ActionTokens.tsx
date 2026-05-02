@@ -1,6 +1,6 @@
 // src/components/game/ActionTokens.tsx
 import React, { useState } from 'react';
-import { ActionToken, ItemCard, GeishaSetKey } from "game-shared-types"
+import { ActionToken, ItemCard, GeishaSet } from "game-shared-types"
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 /**
@@ -12,7 +12,7 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
     usedCards?: Partial<Record<ActionToken['type'], ItemCard[]>>; // 已使用行動的卡牌資訊
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
-    geishaSet?: GeishaSetKey;                         // 藝妓組合
+    geishaSet?: GeishaSet;                            // 藝妓組合
 }
 
 // 靜態資源基底路徑（支援 GitHub Pages）

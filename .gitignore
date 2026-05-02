@@ -12,6 +12,7 @@
 
 # 建置產物
 /build
+/dist
 
 # 其他
 .DS_Store
@@ -19,6 +20,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env*
 
 # 套件管理器與執行錯誤紀錄
 npm-debug.log*

@@ -47,7 +47,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     motionCues = [],
     prefersReducedMotion = false
 }) => {
-    const geishaSet = state.geishaSet ?? 'default';
+    const activeGeishaSet: 'default' = 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
@@ -149,11 +149,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 return;
             }
 
-            map.set(card.geishaId, getItemIconDefinitionForCard(card, geishaSet));
+            map.set(card.geishaId, getItemIconDefinitionForCard(card, activeGeishaSet));
         });
 
         return map;
-    }, [allKnownItemCards, geishaSet]);
+    }, [allKnownItemCards, activeGeishaSet]);
 
     const orderedGeishas = useMemo(() => (
         [...state.geishas].sort((left, right) => {
@@ -439,7 +439,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     'trade-off': myState.discardedCards
                 }}
                 getCharmByGeishaId={getCharmByGeishaId}
-                geishaSet={geishaSet}
+                geishaSet={activeGeishaSet}
             />
 
             {!canAct && (
@@ -452,7 +452,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 highlightCardId={highlightCardId}
                 highlightActive={highlightActive}
                 getCharmByGeishaId={getCharmByGeishaId}
-                geishaSet={geishaSet}
+                geishaSet={activeGeishaSet}
                 motionCues={handMotionCues}
                 prefersReducedMotion={prefersReducedMotion}
             />
@@ -463,7 +463,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onSelect={handleCompetitionConfirm}
                 onClose={handleCompetitionClose}
                 getCharmByGeishaId={getCharmByGeishaId}
-                geishaSet={geishaSet}
+                geishaSet={activeGeishaSet}
                 showResultMotionHint={competitionResultMotionActive}
                 prefersReducedMotion={prefersReducedMotion}
             />

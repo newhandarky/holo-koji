@@ -76,6 +76,7 @@ const GameRoom: React.FC = () => {
     const displayAvatar = getPlayerAvatar(currentPlayerId);
     const {
         isConnected,
+        error,
         roundSummary,
         readyStatus,
         confirmOrder,
@@ -85,6 +86,7 @@ const GameRoom: React.FC = () => {
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
+    const activeGeishaSet: 'default' = 'default';
     // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
     // 抽牌文字提示
@@ -259,6 +261,18 @@ const GameRoom: React.FC = () => {
                     <small className="text-muted">
                         正在連接到: {config.websocketUrl}
                     </small>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="game-background d-flex align-items-center justify-content-center">
+                <div className="card p-4 text-center" style={{ minWidth: 360, maxWidth: 520 }}>
+                    <h4 className="text-danger mb-3">無法進入對戰</h4>
+                    <p className="mb-4">{error}</p>
+                    <button className="btn btn-primary" onClick={() => navigate('/')}>返回大廳</button>
                 </div>
             </div>
         );
@@ -629,7 +643,7 @@ const GameRoom: React.FC = () => {
                     playerId={currentPlayerId}
                     players={state.players}
                     getCharmByGeishaId={(geishaId) => state.geishas.find((geisha) => geisha.id === geishaId)?.charmPoints ?? 0}
-                    geishaSet={state.geishaSet ?? 'default'}
+                    geishaSet={activeGeishaSet}
                     onResolve={sendGameAction}
                     activeMotionKind={activePendingMotionKind}
                     prefersReducedMotion={prefersReducedMotion}

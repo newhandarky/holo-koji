@@ -1,7 +1,7 @@
 // src/components/game/PlayerHand.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { ItemCard, GeishaSetKey } from "game-shared-types"
-import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
+import { ItemCard, GeishaSet } from "game-shared-types"
+import { getItemCardImage, getItemCardLabel, getGeishaCharmById } from '../../utils/gameData';
 import { MotionCue } from './gameMotion';
 
 /**
@@ -13,7 +13,7 @@ interface Props {
     highlightCardId?: string | null;                 // 新抽到的卡片 ID
     highlightActive?: boolean;                       // 是否啟用抽牌動畫
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
-    geishaSet?: GeishaSetKey; // 藝妓組合
+    geishaSet?: GeishaSet; // 藝妓組合
     motionCues?: MotionCue[];
     prefersReducedMotion?: boolean;
 }
@@ -74,6 +74,9 @@ const PlayerHand: React.FC<Props> = ({
                 const absRelative = Math.abs(relativeIndex);
                 const stackLevel = cards.length - Math.round(absRelative);
                 const rotationDeg = relativeIndex * 5;
+                const cardImage = getItemCardImage(card, geishaSet ?? 'default');
+                const hasCardImage = cardImage.trim().length > 0;
+                const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
 
                 return (
                 <div
@@ -88,10 +91,12 @@ const PlayerHand: React.FC<Props> = ({
                         drawMotionByCardId.has(card.id) ? 'item-card--motion-draw' : ''
                     } ${
                         prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
+                    } ${
+                        hasCardImage ? '' : 'item-card--missing-artwork'
                     }`}
                     onClick={() => toggleCard(card)}
                     style={{
-                        backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})`,
+                        backgroundImage: hasCardImage ? `url(${cardImage})` : 'none',
                         ['--fan-index' as string]: `${relativeIndex}`,
                         ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
                         ['--fan-abs-index' as string]: `${absRelative}`,
@@ -101,6 +106,9 @@ const PlayerHand: React.FC<Props> = ({
                     }}
                 >
                     <div className="item-card__overlay" />
+                    {!hasCardImage && (
+                        <div className="item-card__fallback-label">{fallbackLabel}</div>
+                    )}
                     <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                     {drawMotionByCardId.has(card.id) && (
                         <div className="item-card__motion-glow" aria-hidden="true" />

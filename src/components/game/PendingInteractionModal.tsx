@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, PendingInteraction, GameAction, Player, GeishaSetKey } from 'game-shared-types';
+import { ItemCard, PendingInteraction, GameAction, Player, GeishaSet } from 'game-shared-types';
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {
@@ -14,12 +14,12 @@ interface PendingInteractionModalProps {
     // 取得魅力值（以伺服器資料為主）
     getCharmByGeishaId?: (geishaId: number) => number;
     // 藝妓組合
-    geishaSet?: GeishaSetKey;
+    geishaSet?: GeishaSet;
     activeMotionKind?: 'gift-result' | 'competition-result' | null;
     prefersReducedMotion?: boolean;
 }
 
-const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSetKey) => (
+const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number, geishaSet?: GeishaSet) => (
     <div
         key={card.id}
         className="item-card item-card--image item-card--mini"

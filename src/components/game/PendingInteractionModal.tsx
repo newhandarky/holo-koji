@@ -30,6 +30,12 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
     </div>
 );
 
+const getCardCharm = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) =>
+    getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId);
+
+const getGroupCharmTotal = (cards: ItemCard[], getCharmByGeishaId?: (geishaId: number) => number) =>
+    cards.reduce((total, card) => total + getCardCharm(card, getCharmByGeishaId), 0);
+
 const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
     interaction,
     playerId,
@@ -56,24 +62,33 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
         ? '對手執行了贈予，請選擇一張物品卡牌'
         : '對手執行了競爭，請選擇一組卡牌';
 
+    const resolveCompetitionGroup = (chosenGroupIndex: number) => {
+        onResolve({
+            type: 'RESOLVE_COMPETITION',
+            payload: { playerId, chosenGroupIndex }
+        });
+    };
+
     const body = interaction.type === 'GIFT_SELECTION'
         ? (
             <>
                 <p>對手提供了下列卡片，請挑選 1 張：</p>
-                <div className={`gift-selection-grid gift-selection-grid--nowrap ${activeMotionKind === 'gift-result' ? 'gift-selection-grid--motion-source' : ''}`}>
-                            {interaction.offeredCards.map((card) => (
-                                <button
-                                    key={card.id}
-                                    className="gift-selection-card"
-                                    onClick={() => onResolve({
-                                        type: 'RESOLVE_GIFT',
-                                        payload: { playerId, chosenCardId: card.id }
-                                    })}
-                                >
-                                    {renderCard(card, getCharmByGeishaId, geishaSet)}
-                                    <span className="gift-selection-label">選擇此卡</span>
-                                </button>
-                            ))}
+                <div className={`gift-selection-grid gift-selection-grid--surface ${activeMotionKind === 'gift-result' ? 'gift-selection-grid--motion-source' : ''}`}>
+                    {interaction.offeredCards.map((card) => (
+                        <button
+                            key={card.id}
+                            className="gift-selection-card"
+                            onClick={() => onResolve({
+                                type: 'RESOLVE_GIFT',
+                                payload: { playerId, chosenCardId: card.id }
+                            })}
+                        >
+                            <span className="gift-selection-card__content">
+                                {renderCard(card, getCharmByGeishaId, geishaSet)}
+                            </span>
+                            <span className="gift-selection-label">選擇此卡</span>
+                        </button>
+                    ))}
                 </div>
             </>
         )
@@ -82,21 +97,25 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
                 <p>對手分成兩組，請挑選其中一組：</p>
                 {interaction.groups.map((group, index) => (
                     <div
+                        role="button"
+                        tabIndex={0}
                         key={index}
-                        className={`border rounded p-2 mb-2 ${activeMotionKind === 'competition-result' ? 'interaction-group--motion-source' : ''}`}
+                        className={`interaction-choice ${activeMotionKind === 'competition-result' ? 'interaction-group--motion-source' : ''}`}
+                        onClick={() => resolveCompetitionGroup(index)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                resolveCompetitionGroup(index);
+                            }
+                        }}
                     >
-                        <div className="d-flex flex-wrap">
+                        <div className="interaction-choice__cards">
                             {group.map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                         </div>
-                        <button
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => onResolve({
-                                type: 'RESOLVE_COMPETITION',
-                                payload: { playerId, chosenGroupIndex: index }
-                            })}
-                        >
+                        <div className="interaction-choice__meta">組別魅力合計：{getGroupCharmTotal(group, getCharmByGeishaId)}</div>
+                        <span className="btn btn-outline-danger btn-sm interaction-choice__submit">
                             選擇此組
-                        </button>
+                        </span>
                     </div>
                 ))}
             </>

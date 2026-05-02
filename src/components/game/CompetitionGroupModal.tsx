@@ -30,6 +30,12 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
     </div>
 );
 
+const getCardCharm = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => number) =>
+    getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId);
+
+const getGroupCharmTotal = (cards: ItemCard[], getCharmByGeishaId?: (geishaId: number) => number) =>
+    cards.reduce((total, card) => total + getCardCharm(card, getCharmByGeishaId), 0);
+
 // 競爭分組選擇視窗（提供 3 種不考慮順序的分組）
 const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
     isOpen,
@@ -62,21 +68,23 @@ const CompetitionGroupModal: React.FC<CompetitionGroupModalProps> = ({
                 <div className="bottom-sheet__body">
                     <p>請選擇要提供給對手的分組方式（對手會從兩組中選 1 組）：</p>
                     {groups.map((group, index) => (
-                        <div key={index} className="border rounded p-2 mb-3">
-                            <div className="row">
-                                <div className="col-6">
-                                    <div className="d-flex flex-wrap justify-content-center">
-                                            {group[0].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
+                        <div key={index} className="competition-option">
+                            <div className="competition-option__groups">
+                                <div className="competition-option__group">
+                                    <div className="competition-option__cards">
+                                        {group[0].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                                     </div>
+                                    <div className="competition-option__total">A 組魅力合計：{getGroupCharmTotal(group[0], getCharmByGeishaId)}</div>
                                 </div>
-                                <div className="col-6">
-                                    <div className="d-flex flex-wrap justify-content-center">
-                                            {group[1].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
+                                <div className="competition-option__group">
+                                    <div className="competition-option__cards">
+                                        {group[1].map((card) => renderCard(card, getCharmByGeishaId, geishaSet))}
                                     </div>
+                                    <div className="competition-option__total">B 組魅力合計：{getGroupCharmTotal(group[1], getCharmByGeishaId)}</div>
                                 </div>
                             </div>
                             <button
-                                className="btn btn-outline-danger btn-sm mt-2 w-100"
+                                className="btn btn-outline-danger btn-sm mt-2 w-100 competition-option__submit"
                                 onClick={() => onSelect(group.map(list => list.map(card => card.id)))}
                             >
                                 使用此分組

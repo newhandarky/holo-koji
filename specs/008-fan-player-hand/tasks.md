@@ -113,3 +113,9 @@ Complete Phase 1, Phase 2, and User Story 1 first. This delivers the core fan-ha
 - Status: Completed by user confirmation (active game room visual check)
 - Notes: User confirmed fan-hand UI update appears after server restart.
 - Residual risk: NPC/multiplayer full-path visual interactions still rely on user-side exploratory playthrough.
+
+## Post-Closeout UI Tuning Record
+
+- 2026-05-02: Hand cards were adjusted to 9:16 and reduced from the initial large test size while preserving the fan interaction.
+- 2026-05-02: `.player-hand-row` width was restored to 100%; spread should be tuned through fan spacing, rotation, and overlap variables instead of widening the row container.
+- Deferred: Additional request to increase spread by approximately 30% and add SM/XS hand-card size tiers should be handled in a follow-up layout/tuning scope, currently planned under 011 if the three-section room layout proceeds.

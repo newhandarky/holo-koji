@@ -16,6 +16,8 @@ Given the active game room is visible:
 - Exactly seven character cards are rendered in one coverflow browsing surface.
 - The coverflow is manual only and never auto-plays.
 - The user can change focus by drag/swipe and by left/right navigation controls.
+- Drag/swipe and left/right navigation controls wrap between first and last cards.
+- Navigation controls are placed at the left and right sides of the character-card browsing surface.
 - Mobile view shows one primary center card with partial neighboring cards visible.
 - Desktop view shows one primary center card with about two neighboring cards visible on each side.
 - Card order follows charm value ascending and preserves stable order for ties.

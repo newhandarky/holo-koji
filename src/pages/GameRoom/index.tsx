@@ -15,8 +15,9 @@ import {
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
-import { Player, ActionToken } from "game-shared-types"
+import { Player, ActionToken, ItemCard } from "game-shared-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
+import { getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -45,6 +46,16 @@ const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
     { section: 'info', label: '資訊' },
     { section: 'characterBoard', label: '角色' },
     { section: 'handActions', label: '手牌&指令' }
+];
+
+type ReplayActionType = 'secret' | 'trade-off' | null;
+
+const publicBaseUrl = process.env.PUBLIC_URL ?? '';
+const actionStatusConfig: Array<{ type: ActionToken['type']; label: string; iconUrl: string }> = [
+    { type: 'secret', label: '密約', iconUrl: `${publicBaseUrl}/images/actions/Secret.png` },
+    { type: 'trade-off', label: '取捨', iconUrl: `${publicBaseUrl}/images/actions/Discard.png` },
+    { type: 'gift', label: '贈予', iconUrl: `${publicBaseUrl}/images/actions/Gift.png` },
+    { type: 'competition', label: '競爭', iconUrl: `${publicBaseUrl}/images/actions/Competition.png` }
 ];
 
 // 遊戲房間主畫面
@@ -110,6 +121,7 @@ const GameRoom: React.FC = () => {
     const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
     const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
     const [focusSection, setFocusSection] = useState<FocusSection>('characterBoard');
+    const [expandedInfoReplayAction, setExpandedInfoReplayAction] = useState<ReplayActionType>(null);
     const previousFocusSectionRef = useRef<FocusSection>('characterBoard');
     const wasInteractionLockedRef = useRef(false);
     const canActBeforeBlockingRef = useRef(false);
@@ -282,6 +294,32 @@ const GameRoom: React.FC = () => {
         && !pendingInteraction
         && !isDrawModalOpen
         && !state.orderDecision.isOpen;
+    const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
+    const localActionTokenMap = useMemo(
+        () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
+        [currentPlayer?.actionTokens]
+    );
+    const localReplayCardsByAction = useMemo<Record<'secret' | 'trade-off', ItemCard[]>>(() => ({
+        secret: currentPlayer?.secretCards ?? [],
+        'trade-off': currentPlayer?.discardedCards ?? []
+    }), [currentPlayer?.discardedCards, currentPlayer?.secretCards]);
+
+    const isReplayEligible = useCallback((playerId: string, actionType: ActionToken['type']) => {
+        if (playerId !== currentPlayerId || (actionType !== 'secret' && actionType !== 'trade-off')) {
+            return false;
+        }
+        const token = localActionTokenMap.get(actionType);
+        return Boolean(token?.used && localReplayCardsByAction[actionType].length > 0);
+    }, [currentPlayerId, localActionTokenMap, localReplayCardsByAction]);
+
+    const handleInfoActionIconClick = useCallback((playerId: string, actionType: ActionToken['type']) => {
+        if (!isReplayEligible(playerId, actionType)) {
+            return;
+        }
+        if (actionType === 'secret' || actionType === 'trade-off') {
+            setExpandedInfoReplayAction(actionType);
+        }
+    }, [isReplayEligible]);
     useEffect(() => {
         if (state.phase !== 'playing') {
             setFocusSection('characterBoard');
@@ -460,19 +498,6 @@ const GameRoom: React.FC = () => {
         <div className="game-background p-3">
             <div className="container-fluid">
                 <div className={`card game-card game-room-surface p-3 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}>
-                    <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
-                        <div className="d-flex align-items-center gap-2">
-                            {displayAvatar && (
-                                <img
-                                    className="player-avatar"
-                                    src={displayAvatar}
-                                    alt={`${displayName} 頭像`}
-                                />
-                            )}
-                            <div>你是：<strong>{displayName}</strong></div>
-                        </div>
-                        <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
-                    </div>
                     <nav className="game-room-tabs" aria-label="遊戲區塊切換">
                         {SECTION_TABS.map((tab) => {
                             const isActive = focusSection === tab.section;
@@ -491,21 +516,41 @@ const GameRoom: React.FC = () => {
                     </nav>
                     <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
                         {focusSection === 'info' && (
-                            <div className="game-focus-content">
-                                <div className="row align-items-center mb-4">
-                                    <div className="col-md-4 text-center">
-                                        <h5 className="mb-0">第 {state.round} 回合</h5>
-                                        <small className="text-muted">階段: {state.phase}</small>
+                            <div className="game-focus-content game-info-panel">
+                                <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
+                                    <div className="d-flex align-items-center gap-2">
+                                        {displayAvatar && (
+                                            <img
+                                                className="player-avatar"
+                                                src={displayAvatar}
+                                                alt={`${displayName} 頭像`}
+                                            />
+                                        )}
+                                        <div>你是：<strong>{displayName}</strong></div>
                                     </div>
-                                    <div className="col-md-4 text-end">
-                                        <span className="badge bg-primary fs-6">
-                                            當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)}
-                                        </span>
-                                    </div>
+                                    <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
                                 </div>
-                                <div className="row mb-3">
+                                <div className="game-info-status-row mb-3">
+                                    <div className="game-info-status-row__current">當前玩家: {activeTurnPlayerName}</div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-danger btn-sm game-info-status-row__leave"
+                                        onClick={() => {
+                                            if (window.confirm('確定要離開遊戲嗎？')) {
+                                                navigate('/');
+                                            }
+                                        }}
+                                    >
+                                        離開遊戲
+                                    </button>
+                                </div>
+                                <div className="row mb-3 gy-3">
                                     {state.players.map((player, index) => {
                                         const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
+                                        const actionUsedMap = new Map(player.actionTokens.map((token) => [token.type, token.used]));
+                                        const isLocalPlayerRow = player.id === currentPlayerId;
+                                        const activeReplayCards = expandedInfoReplayAction ? localReplayCardsByAction[expandedInfoReplayAction] : [];
+
                                         return (
                                             <div key={player.id} className="col-md-6 mb-2">
                                                 <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
@@ -529,6 +574,52 @@ const GameRoom: React.FC = () => {
                                                                 魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
                                                             </small>
                                                         </div>
+                                                        <div className="game-info-action-row mt-2">
+                                                            {actionStatusConfig.map((actionItem) => {
+                                                                const used = actionUsedMap.get(actionItem.type) ?? false;
+                                                                const replayEligible = isReplayEligible(player.id, actionItem.type);
+                                                                const isReplayActive = replayEligible && expandedInfoReplayAction === actionItem.type;
+                                                                const classNames = [
+                                                                    'game-info-action',
+                                                                    used ? 'is-used' : 'is-available',
+                                                                    replayEligible ? 'is-replayable' : 'is-status-only',
+                                                                    isReplayActive ? 'is-replay-active' : ''
+                                                                ].filter(Boolean).join(' ');
+
+                                                                return (
+                                                                    <button
+                                                                        key={`${player.id}-${actionItem.type}`}
+                                                                        type="button"
+                                                                        className={classNames}
+                                                                        onClick={() => handleInfoActionIconClick(player.id, actionItem.type)}
+                                                                        disabled={!replayEligible}
+                                                                        aria-label={`${actionItem.label}${used ? '（已使用）' : '（未使用）'}`}
+                                                                    >
+                                                                        <img className="game-info-action__icon" src={actionItem.iconUrl} alt={actionItem.label} />
+                                                                        <span className="game-info-action__label">{actionItem.label}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {isLocalPlayerRow && expandedInfoReplayAction && activeReplayCards.length > 0 && (
+                                                            <div className="game-info-replay mt-2">
+                                                                <div className="game-info-replay__title">
+                                                                    {expandedInfoReplayAction === 'secret' ? '密約回看' : '取捨回看'}
+                                                                </div>
+                                                                <div className="game-info-replay__cards">
+                                                                    {activeReplayCards.map((card) => (
+                                                                        <div
+                                                                            key={card.id}
+                                                                            className="item-card item-card--image item-card--mini"
+                                                                            style={{ backgroundImage: `url(${getItemCardImage(card, activeGeishaSet)})` }}
+                                                                        >
+                                                                            <div className="item-card__overlay" />
+                                                                            <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -551,20 +642,6 @@ const GameRoom: React.FC = () => {
                         prefersReducedMotion={prefersReducedMotion}
                         focusSection={focusSection}
                     />
-
-                    {/* 離開遊戲按鈕 */}
-                    <div className="text-center mt-4 mb-2">
-                        <button
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => {
-                                if (window.confirm('確定要離開遊戲嗎？')) {
-                                    navigate('/');
-                                }
-                            }}
-                        >
-                            離開遊戲
-                        </button>
-                    </div>
                 </div>
             </div>
 

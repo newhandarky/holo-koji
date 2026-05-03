@@ -36,8 +36,6 @@ interface GameBoardProps {
     prefersReducedMotion?: boolean;
     // 目前房間聚焦區塊
     focusSection: FocusSection;
-    // 切換房間聚焦區塊
-    onFocusSectionChange: (section: FocusSection) => void;
 }
 
 export type FocusSection = 'info' | 'characterBoard' | 'handActions';
@@ -52,8 +50,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     highlightActive,
     motionCues = [],
     prefersReducedMotion = false,
-    focusSection,
-    onFocusSectionChange
+    focusSection
 }) => {
     const activeGeishaSet: 'default' = 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
@@ -185,11 +182,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
         return map;
     }, [state.geishas]);
     const getCharmByGeishaId = useCallback((geishaId: number) => charmMap.get(geishaId) ?? 0, [charmMap]);
-    const availableActionCount = useMemo(
-        () => myState?.actionTokens.filter((token) => !token.used).length ?? 0,
-        [myState?.actionTokens]
-    );
-
     useEffect(() => {
         setActiveGeishaIndex((currentIndex) => {
             if (orderedGeishas.length === 0) {
@@ -379,19 +371,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return (
         <div className="game-focus-column">
             <section className={`game-focus-section ${isCharacterExpanded ? 'is-expanded' : 'is-collapsed'}`}>
-                {!isCharacterExpanded && (
-                    <button
-                        type="button"
-                        className="game-focus-summary"
-                        onClick={() => onFocusSectionChange('characterBoard')}
-                        aria-label="展開角色區塊"
-                    >
-                        <span className="game-focus-summary__title">角色區</span>
-                        <span className="game-focus-summary__meta">
-                            人物卡 {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
-                        </span>
-                    </button>
-                )}
                 {isCharacterExpanded && (
                     <>
                         {renderOpponentActions()}
@@ -464,19 +443,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
             </section>
 
             <section className={`game-focus-section ${isHandExpanded ? 'is-expanded' : 'is-collapsed'}`}>
-                {!isHandExpanded && (
-                    <button
-                        type="button"
-                        className="game-focus-summary"
-                        onClick={() => onFocusSectionChange('handActions')}
-                        aria-label="展開手牌與指令區塊"
-                    >
-                        <span className="game-focus-summary__title">手牌與指令</span>
-                        <span className="game-focus-summary__meta">
-                            手牌 {myState.hand.length} | 可行動 {availableActionCount} {canAct ? '| 可操作' : ''}
-                        </span>
-                    </button>
-                )}
                 {isHandExpanded && (
                     <>
                         <ActionTokens

@@ -41,6 +41,12 @@ const createPlayerProfile = (id: string): Player => ({
     }
 });
 
+const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
+    { section: 'info', label: '資訊' },
+    { section: 'characterBoard', label: '角色' },
+    { section: 'handActions', label: '手牌&指令' }
+];
+
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -276,8 +282,6 @@ const GameRoom: React.FC = () => {
         && !pendingInteraction
         && !isDrawModalOpen
         && !state.orderDecision.isOpen;
-    const safeAvailableActionCount = currentPlayer?.actionTokens.filter((token) => !token.used).length ?? 0;
-
     useEffect(() => {
         if (state.phase !== 'playing') {
             setFocusSection('characterBoard');
@@ -469,20 +473,23 @@ const GameRoom: React.FC = () => {
                         </div>
                         <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
                     </div>
+                    <nav className="game-room-tabs" aria-label="遊戲區塊切換">
+                        {SECTION_TABS.map((tab) => {
+                            const isActive = focusSection === tab.section;
+                            return (
+                                <button
+                                    key={tab.section}
+                                    type="button"
+                                    className={`game-room-tabs__button ${isActive ? 'is-active' : ''}`}
+                                    onClick={() => setFocusSection(tab.section)}
+                                    aria-pressed={isActive}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </nav>
                     <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
-                        {focusSection !== 'info' && (
-                            <button
-                                type="button"
-                                className="game-focus-summary"
-                                onClick={() => setFocusSection('info')}
-                                aria-label="展開資訊區塊"
-                            >
-                                <span className="game-focus-summary__title">資訊區</span>
-                                <span className="game-focus-summary__meta">
-                                    第 {state.round} 回合 | 當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)} | 手牌 {currentPlayer?.hand.length ?? 0} | 可行動 {safeAvailableActionCount}
-                                </span>
-                            </button>
-                        )}
                         {focusSection === 'info' && (
                             <div className="game-focus-content">
                                 <div className="row align-items-center mb-4">
@@ -543,7 +550,6 @@ const GameRoom: React.FC = () => {
                         motionCues={activeMotionCues}
                         prefersReducedMotion={prefersReducedMotion}
                         focusSection={focusSection}
-                        onFocusSectionChange={setFocusSection}
                     />
 
                     {/* 離開遊戲按鈕 */}

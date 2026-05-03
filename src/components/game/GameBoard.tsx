@@ -34,7 +34,13 @@ interface GameBoardProps {
     motionCues?: MotionCue[];
     // 是否偏好低動作模式
     prefersReducedMotion?: boolean;
+    // 目前房間聚焦區塊
+    focusSection: FocusSection;
+    // 切換房間聚焦區塊
+    onFocusSectionChange: (section: FocusSection) => void;
 }
+
+export type FocusSection = 'info' | 'characterBoard' | 'handActions';
 
 // 遊戲主棋盤與行動控制區
 const GameBoard: React.FC<GameBoardProps> = ({
@@ -45,7 +51,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     highlightCardId,
     highlightActive,
     motionCues = [],
-    prefersReducedMotion = false
+    prefersReducedMotion = false,
+    focusSection,
+    onFocusSectionChange
 }) => {
     const activeGeishaSet: 'default' = 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
@@ -59,6 +67,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const myState = state.players.find((player) => player.id === playerId);
     const isMyTurn = canAct && currentPlayer?.id === playerId;
     const opponentState = state.players.find((player) => player.id !== playerId) ?? null;
+    const isCharacterExpanded = focusSection === 'characterBoard';
+    const isHandExpanded = focusSection === 'handActions';
 
     // 靜態資源基底路徑（支援 GitHub Pages）
     const publicBaseUrl = process.env.PUBLIC_URL ?? '';
@@ -175,6 +185,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
         return map;
     }, [state.geishas]);
     const getCharmByGeishaId = useCallback((geishaId: number) => charmMap.get(geishaId) ?? 0, [charmMap]);
+    const availableActionCount = useMemo(
+        () => myState?.actionTokens.filter((token) => !token.used).length ?? 0,
+        [myState?.actionTokens]
+    );
 
     useEffect(() => {
         setActiveGeishaIndex((currentIndex) => {
@@ -363,99 +377,137 @@ const GameBoard: React.FC<GameBoardProps> = ({
     };
 
     return (
-        <div>
-            {renderOpponentActions()}
-            <section className="geisha-coverflow mt-2 mb-4" aria-label="人物卡 coverflow">
-                <div className="geisha-coverflow__header">
-                    <div className="geisha-coverflow__summary">
-                        <span className="geisha-coverflow__eyebrow">人物卡</span>
-                        <span className="geisha-coverflow__position">
-                            {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
+        <div className="game-focus-column">
+            <section className={`game-focus-section ${isCharacterExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+                {!isCharacterExpanded && (
+                    <button
+                        type="button"
+                        className="game-focus-summary"
+                        onClick={() => onFocusSectionChange('characterBoard')}
+                        aria-label="展開角色區塊"
+                    >
+                        <span className="game-focus-summary__title">角色區</span>
+                        <span className="game-focus-summary__meta">
+                            人物卡 {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
                         </span>
-                    </div>
-                </div>
-                <div className="geisha-coverflow__stage">
-                    <button
-                        type="button"
-                        className="geisha-coverflow__nav geisha-coverflow__nav--prev"
-                        onClick={() => handleCoverflowStep('prev')}
-                        aria-label="上一張人物卡"
-                    >
-                        ←
                     </button>
-                    <div
-                        className="geisha-coverflow__viewport"
-                        onPointerDown={handlePointerDown}
-                        onPointerUp={releasePointerDrag}
-                        onPointerCancel={releasePointerDrag}
-                        onPointerLeave={releasePointerDrag}
-                    >
-                        <div className="geisha-coverflow__track">
-                            {orderedGeishas.map((geisha: Geisha, index) => {
-                                const offset = getCoverflowOffset(index);
-                                const distanceFromActive = Math.abs(offset);
+                )}
+                {isCharacterExpanded && (
+                    <>
+                        {renderOpponentActions()}
+                        <section className="geisha-coverflow mt-2 mb-4" aria-label="人物卡 coverflow">
+                            <div className="geisha-coverflow__header">
+                                <div className="geisha-coverflow__summary">
+                                    <span className="geisha-coverflow__eyebrow">人物卡</span>
+                                    <span className="geisha-coverflow__position">
+                                        {orderedGeishas.length > 0 ? `${activeGeishaIndex + 1} / ${orderedGeishas.length}` : '0 / 0'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="geisha-coverflow__stage">
+                                <button
+                                    type="button"
+                                    className="geisha-coverflow__nav geisha-coverflow__nav--prev"
+                                    onClick={() => handleCoverflowStep('prev')}
+                                    aria-label="上一張人物卡"
+                                >
+                                    ←
+                                </button>
+                                <div
+                                    className="geisha-coverflow__viewport"
+                                    onPointerDown={handlePointerDown}
+                                    onPointerUp={releasePointerDrag}
+                                    onPointerCancel={releasePointerDrag}
+                                    onPointerLeave={releasePointerDrag}
+                                >
+                                    <div className="geisha-coverflow__track">
+                                        {orderedGeishas.map((geisha: Geisha, index) => {
+                                            const offset = getCoverflowOffset(index);
+                                            const distanceFromActive = Math.abs(offset);
 
-                                return (
-                                    <div
-                                        key={geisha.id}
-                                        className={`geisha-coverflow__slide ${index === activeGeishaIndex ? 'is-active' : ''} ${distanceFromActive === 1 ? 'is-adjacent' : ''} ${distanceFromActive > 2 ? 'is-distant' : ''}`}
-                                        aria-current={index === activeGeishaIndex}
-                                        style={{
-                                            ['--coverflow-offset' as string]: `${offset}`,
-                                            ['--coverflow-abs-offset' as string]: `${distanceFromActive}`
-                                        }}
-                                    >
-                                        <GeishaCard
-                                            geisha={geisha}
-                                            myCount={myCountMap.get(geisha.id) ?? 0}
-                                            opponentCount={opponentCountMap.get(geisha.id) ?? 0}
-                                            currentPlayerId={playerId}
-                                            itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
-                                            motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
-                                            prefersReducedMotion={prefersReducedMotion}
-                                        />
+                                            return (
+                                                <div
+                                                    key={geisha.id}
+                                                    className={`geisha-coverflow__slide ${index === activeGeishaIndex ? 'is-active' : ''} ${distanceFromActive === 1 ? 'is-adjacent' : ''} ${distanceFromActive > 2 ? 'is-distant' : ''}`}
+                                                    aria-current={index === activeGeishaIndex}
+                                                    style={{
+                                                        ['--coverflow-offset' as string]: `${offset}`,
+                                                        ['--coverflow-abs-offset' as string]: `${distanceFromActive}`
+                                                    }}
+                                                >
+                                                    <GeishaCard
+                                                        geisha={geisha}
+                                                        myCount={myCountMap.get(geisha.id) ?? 0}
+                                                        opponentCount={opponentCountMap.get(geisha.id) ?? 0}
+                                                        currentPlayerId={playerId}
+                                                        itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
+                                                        motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
+                                                        prefersReducedMotion={prefersReducedMotion}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        className="geisha-coverflow__nav geisha-coverflow__nav--next"
-                        onClick={() => handleCoverflowStep('next')}
-                        aria-label="下一張人物卡"
-                    >
-                        →
-                    </button>
-                </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="geisha-coverflow__nav geisha-coverflow__nav--next"
+                                    onClick={() => handleCoverflowStep('next')}
+                                    aria-label="下一張人物卡"
+                                >
+                                    →
+                                </button>
+                            </div>
+                        </section>
+                    </>
+                )}
             </section>
 
-            <ActionTokens
-                tokens={myState.actionTokens}
-                onAction={handleAction}
-                disabled={!isMyTurn}
-                usedCards={{
-                    secret: myState.secretCards,
-                    'trade-off': myState.discardedCards
-                }}
-                getCharmByGeishaId={getCharmByGeishaId}
-                geishaSet={activeGeishaSet}
-            />
+            <section className={`game-focus-section ${isHandExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+                {!isHandExpanded && (
+                    <button
+                        type="button"
+                        className="game-focus-summary"
+                        onClick={() => onFocusSectionChange('handActions')}
+                        aria-label="展開手牌與指令區塊"
+                    >
+                        <span className="game-focus-summary__title">手牌與指令</span>
+                        <span className="game-focus-summary__meta">
+                            手牌 {myState.hand.length} | 可行動 {availableActionCount} {canAct ? '| 可操作' : ''}
+                        </span>
+                    </button>
+                )}
+                {isHandExpanded && (
+                    <>
+                        <ActionTokens
+                            tokens={myState.actionTokens}
+                            onAction={handleAction}
+                            disabled={!isMyTurn}
+                            usedCards={{
+                                secret: myState.secretCards,
+                                'trade-off': myState.discardedCards
+                            }}
+                            getCharmByGeishaId={getCharmByGeishaId}
+                            geishaSet={activeGeishaSet}
+                        />
 
-            {!canAct && (
-                <div className="alert alert-info py-2 mb-3">等待對手操作中...</div>
-            )}
+                        {!canAct && (
+                            <div className="alert alert-info py-2 mb-3">等待對手操作中...</div>
+                        )}
 
-            <PlayerHand
-                cards={myState.hand}
-                onCardSelect={handleCardSelect}
-                highlightCardId={highlightCardId}
-                highlightActive={highlightActive}
-                getCharmByGeishaId={getCharmByGeishaId}
-                geishaSet={activeGeishaSet}
-                motionCues={handMotionCues}
-                prefersReducedMotion={prefersReducedMotion}
-            />
+                        <PlayerHand
+                            cards={myState.hand}
+                            onCardSelect={handleCardSelect}
+                            highlightCardId={highlightCardId}
+                            highlightActive={highlightActive}
+                            getCharmByGeishaId={getCharmByGeishaId}
+                            geishaSet={activeGeishaSet}
+                            motionCues={handMotionCues}
+                            prefersReducedMotion={prefersReducedMotion}
+                        />
+                    </>
+                )}
+            </section>
 
             <CompetitionGroupModal
                 isOpen={isCompetitionModalOpen}

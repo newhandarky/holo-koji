@@ -17,6 +17,7 @@ interface Props {
     opponentCount: number;
     // 自己的玩家 ID
     currentPlayerId: string;
+    isFocused?: boolean;
     // 對應場上位置的道具 icon
     itemIcon?: ItemIconDefinition | null;
     motionCues?: MotionCue[];
@@ -28,6 +29,7 @@ const GeishaCard: React.FC<Props> = ({
     myCount,
     opponentCount,
     currentPlayerId,
+    isFocused = false,
     itemIcon = null,
     motionCues = [],
     prefersReducedMotion = false
@@ -40,7 +42,7 @@ const GeishaCard: React.FC<Props> = ({
 
     const isMineControlled = Boolean(currentPlayerId) && geisha.controlledBy === currentPlayerId;
     const isOpponentControlled = Boolean(geisha.controlledBy) && !isMineControlled;
-    const className = `geisha-card ${isMineControlled ? 'geisha-card--self-controlled' :
+    const className = `geisha-card ${isFocused ? 'geisha-card--focused' : ''} ${isMineControlled ? 'geisha-card--self-controlled' :
         isOpponentControlled ? 'geisha-card--opponent-controlled' : ''
         }`;
     const imageUrl = geisha.imageUrl?.trim() ?? '';
@@ -96,23 +98,30 @@ const GeishaCard: React.FC<Props> = ({
                     <div className="geisha-card__overlay-content">
                         <span className="geisha-card__name">{geisha.name}</span>
                         <div className="geisha-card__overlay-meta">
-                            <span className="geisha-card__score-badge">魅力 {geisha.charmPoints}</span>
                             {itemIcon ? (
-                                <span className="geisha-card__slot-icon" title={itemIcon.label}>
-                                    {itemIcon.imageUrl ? (
-                                        <img
-                                            className="geisha-card__slot-icon-image"
-                                            src={itemIcon.imageUrl}
-                                            alt={itemIcon.label}
-                                            loading="lazy"
-                                        />
-                                    ) : (
-                                        <span className={`geisha-card__slot-icon-glyph ${itemIcon.accentClassName}`}>
-                                            {itemIcon.glyph}
-                                        </span>
-                                    )}
+                                <span className="geisha-card__slot-icon-wrap">
+                                    <span className="geisha-card__slot-icon" title={itemIcon.label}>
+                                        {itemIcon.imageUrl ? (
+                                            <img
+                                                className="geisha-card__slot-icon-image"
+                                                src={itemIcon.imageUrl}
+                                                alt={itemIcon.label}
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <span className={`geisha-card__slot-icon-glyph ${itemIcon.accentClassName}`}>
+                                                {itemIcon.glyph}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="geisha-card__charm-badge">{geisha.charmPoints}</span>
                                 </span>
-                            ) : null}
+                            ) : (
+                                <span className="geisha-card__slot-icon-wrap">
+                                    <span className="geisha-card__slot-icon-fallback">?</span>
+                                    <span className="geisha-card__charm-badge">{geisha.charmPoints}</span>
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

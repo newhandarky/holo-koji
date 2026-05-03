@@ -123,86 +123,90 @@ const PlayerHand: React.FC<Props> = ({
 
     return (
         <div className="player-hand-panel">
-            <div className="player-hand-controls" role="group" aria-label="手牌焦點切換">
-                <button
-                    type="button"
-                    className="player-hand-controls__button"
-                    onClick={() => moveFocus('prev')}
-                    disabled={cards.length < 2}
-                    aria-label="上一張手牌"
-                >
-                    ←
-                </button>
-                <span className="player-hand-controls__status" aria-live="polite">
-                    {cards.length === 0 ? '0 / 0' : `${Math.max(focusedIndex, 0) + 1} / ${cards.length}`}
-                </span>
-                <button
-                    type="button"
-                    className="player-hand-controls__button"
-                    onClick={() => moveFocus('next')}
-                    disabled={cards.length < 2}
-                    aria-label="下一張手牌"
-                >
-                    →
-                </button>
-            </div>
+            <div className="player-hand-stage" role="group" aria-label="手牌焦點切換">
+                <div className="player-hand-stage__content">
+                    <div className="player-hand-row">
+                        {cards.map((card, index) => {
+                            const center = (cards.length - 1) / 2;
+                            const relativeIndex = index - center;
+                            const absRelative = Math.abs(relativeIndex);
+                            const stackLevel = cards.length - Math.round(absRelative);
+                            const rotationDeg = relativeIndex * 5;
+                            const cardImage = getItemCardImage(card, geishaSet ?? 'default');
+                            const hasCardImage = cardImage.trim().length > 0;
+                            const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
+                            const isSelected = selectedIdSet.has(card.id);
+                            const isFocused = focusedCardId === card.id;
 
-            <div className="player-hand-row">
-                {cards.map((card, index) => {
-                    const center = (cards.length - 1) / 2;
-                    const relativeIndex = index - center;
-                    const absRelative = Math.abs(relativeIndex);
-                    const stackLevel = cards.length - Math.round(absRelative);
-                    const rotationDeg = relativeIndex * 5;
-                    const cardImage = getItemCardImage(card, geishaSet ?? 'default');
-                    const hasCardImage = cardImage.trim().length > 0;
-                    const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
-                    const isSelected = selectedIdSet.has(card.id);
-                    const isFocused = focusedCardId === card.id;
+                            return (
+                                <button
+                                    key={card.id}
+                                    type="button"
+                                    className={`item-card item-card--image item-card--hand ${
+                                        isSelected ? 'selected' : ''
+                                    } ${
+                                        isFocused ? 'item-card--focused' : ''
+                                    } ${
+                                        highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
+                                    } ${
+                                        drawMotionByCardId.has(card.id) ? 'item-card--motion-draw' : ''
+                                    } ${
+                                        prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
+                                    } ${
+                                        hasCardImage ? '' : 'item-card--missing-artwork'
+                                    }`}
+                                    aria-pressed={isSelected}
+                                    onClick={() => toggleCard(card)}
+                                    style={{
+                                        backgroundImage: hasCardImage ? `url(${cardImage})` : 'none',
+                                        ['--fan-index' as string]: `${relativeIndex}`,
+                                        ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
+                                        ['--fan-abs-index' as string]: `${absRelative}`,
+                                        ['--fan-z-index' as string]: `${stackLevel}`,
+                                        ['--motion-delay' as string]: `${drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
+                                        ['--motion-duration' as string]: `${drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
+                                    }}
+                                >
+                                    <div className="item-card__overlay" />
+                                    {!hasCardImage && (
+                                        <div className="item-card__fallback-label">{fallbackLabel}</div>
+                                    )}
+                                    <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
+                                    {isSelected && (
+                                        <div className="item-card__selected-check" aria-hidden="true">✓</div>
+                                    )}
+                                    {drawMotionByCardId.has(card.id) && (
+                                        <div className="item-card__motion-glow" aria-hidden="true" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
 
-                    return (
+                    <div className="player-hand-controls">
                         <button
-                            key={card.id}
                             type="button"
-                            className={`item-card item-card--image item-card--hand ${
-                                isSelected ? 'selected' : ''
-                            } ${
-                                isFocused ? 'item-card--focused' : ''
-                            } ${
-                                highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
-                            } ${
-                                drawMotionByCardId.has(card.id) ? 'item-card--motion-draw' : ''
-                            } ${
-                                prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
-                            } ${
-                                hasCardImage ? '' : 'item-card--missing-artwork'
-                            }`}
-                            aria-pressed={isSelected}
-                            onClick={() => toggleCard(card)}
-                            style={{
-                                backgroundImage: hasCardImage ? `url(${cardImage})` : 'none',
-                                ['--fan-index' as string]: `${relativeIndex}`,
-                                ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
-                                ['--fan-abs-index' as string]: `${absRelative}`,
-                                ['--fan-z-index' as string]: `${stackLevel}`,
-                                ['--motion-delay' as string]: `${drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
-                                ['--motion-duration' as string]: `${drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
-                            }}
+                            className="player-hand-controls__button"
+                            onClick={() => moveFocus('prev')}
+                            disabled={cards.length < 2}
+                            aria-label="上一張手牌"
                         >
-                            <div className="item-card__overlay" />
-                            {!hasCardImage && (
-                                <div className="item-card__fallback-label">{fallbackLabel}</div>
-                            )}
-                            <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
-                            {isSelected && (
-                                <div className="item-card__selected-check" aria-hidden="true">✓</div>
-                            )}
-                            {drawMotionByCardId.has(card.id) && (
-                                <div className="item-card__motion-glow" aria-hidden="true" />
-                            )}
+                            ←
                         </button>
-                    );
-                })}
+                        <span className="player-hand-controls__status" aria-live="polite">
+                            {cards.length === 0 ? '0 / 0' : `${Math.max(focusedIndex, 0) + 1} / ${cards.length}`}
+                        </span>
+                        <button
+                            type="button"
+                            className="player-hand-controls__button"
+                            onClick={() => moveFocus('next')}
+                            disabled={cards.length < 2}
+                            aria-label="下一張手牌"
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

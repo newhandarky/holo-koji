@@ -50,12 +50,16 @@ const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
 
 type ReplayActionType = 'secret' | 'trade-off' | null;
 
-const publicBaseUrl = process.env.PUBLIC_URL ?? '';
+// const publicBaseUrl = process.env.PUBLIC_URL ?? '';
 const actionStatusConfig: Array<{ type: ActionToken['type']; label: string; iconUrl: string }> = [
-    { type: 'secret', label: '密約', iconUrl: `${publicBaseUrl}/images/actions/Secret.png` },
-    { type: 'trade-off', label: '取捨', iconUrl: `${publicBaseUrl}/images/actions/Discard.png` },
-    { type: 'gift', label: '贈予', iconUrl: `${publicBaseUrl}/images/actions/Gift.png` },
-    { type: 'competition', label: '競爭', iconUrl: `${publicBaseUrl}/images/actions/Competition.png` }
+    // { type: 'secret', label: '密約', iconUrl: `${publicBaseUrl}/images/actions/Secret.png` },
+    // { type: 'trade-off', label: '取捨', iconUrl: `${publicBaseUrl}/images/actions/Discard.png` },
+    // { type: 'gift', label: '贈予', iconUrl: `${publicBaseUrl}/images/actions/Gift.png` },
+    // { type: 'competition', label: '競爭', iconUrl: `${publicBaseUrl}/images/actions/Competition.png` }
+    { type: 'secret', label: '密約', iconUrl: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-320a8d17-6c9e-4575-9a40-aec696061ef3-ChatGPT-Image-2026-5-3-05_39_56.png` },
+    { type: 'trade-off', label: '取捨', iconUrl: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-8df4d047-16de-431b-9f0c-3072164b917e-ChatGPT-Image-2026-5-3-05_46_10.png` },
+    { type: 'gift', label: '贈予', iconUrl: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-5a7552fd-ecad-4af7-8d8c-3867e1c998a1-ChatGPT-Image-2026-5-3-06_07_13.png` },
+    { type: 'competition', label: '競爭', iconUrl: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-ed742264-8f13-4685-90ef-02da57f2918b-ChatGPT-Image-2026-5-3-06_02_38.png` }
 ];
 
 // 遊戲房間主畫面
@@ -495,9 +499,9 @@ const GameRoom: React.FC = () => {
     }
 
     return (
-        <div className="game-background p-3">
+        <div className="game-background game-room-page p-3">
             <div className="container-fluid">
-                <div className={`card game-card game-room-surface p-3 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}>
+                <div className={`card game-card game-room-surface p-2 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}>
                     <nav className="game-room-tabs" aria-label="遊戲區塊切換">
                         {SECTION_TABS.map((tab) => {
                             const isActive = focusSection === tab.section;
@@ -517,21 +521,10 @@ const GameRoom: React.FC = () => {
                     <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
                         {focusSection === 'info' && (
                             <div className="game-focus-content game-info-panel">
-                                <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
-                                    <div className="d-flex align-items-center gap-2">
-                                        {displayAvatar && (
-                                            <img
-                                                className="player-avatar"
-                                                src={displayAvatar}
-                                                alt={`${displayName} 頭像`}
-                                            />
-                                        )}
-                                        <div>你是：<strong>{displayName}</strong></div>
-                                    </div>
-                                    <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
-                                </div>
                                 <div className="game-info-status-row mb-3">
-                                    <div className="game-info-status-row__current">當前玩家: {activeTurnPlayerName}</div>
+                                    <div className="game-info-status-row__current">
+                                        {activeTurnPlayerName === displayName ? '你的回合' : '對手的回合'}
+                                    </div>
                                     <button
                                         type="button"
                                         className="btn btn-outline-danger btn-sm game-info-status-row__leave"

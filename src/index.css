@@ -122,6 +122,18 @@ code {
   color: var(--ginza-muted-text) !important;
 }
 
+.game-room-page {
+  box-sizing: border-box;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.game-room-page > .container-fluid {
+  height: 100%;
+  min-height: 0;
+}
+
 /* 卡片通用樣式 */
 .game-card {
   border: none;                /* 移除 Bootstrap card 默認邊框 */
@@ -153,8 +165,8 @@ code {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: calc(100dvh - 28px);
-  max-height: calc(100dvh - 28px);
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
 }
 
@@ -207,6 +219,8 @@ code {
 }
 
 .game-focus-section {
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(255, 238, 215, 0.2);
   border-radius: 14px;
   background: rgba(20, 10, 14, 0.36);
@@ -225,8 +239,14 @@ code {
 
 .game-focus-content {
   height: 100%;
+  box-sizing: border-box;
   padding: 12px;
-  overflow: auto;
+  overflow: hidden;
+}
+
+.game-focus-section--info .game-focus-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .game-focus-summary {
@@ -265,12 +285,11 @@ code {
 .game-focus-section.is-expanded .geisha-coverflow {
   height: 100%;
   min-height: 0;
-  margin-bottom: 0 !important;
+  flex: 1 1 auto;
+  margin: 0 !important;
 }
 
-.game-focus-section.is-expanded .geisha-coverflow__stage,
-.game-focus-section.is-expanded .geisha-coverflow__viewport,
-.game-focus-section.is-expanded .geisha-coverflow__track {
+.game-focus-section.is-expanded .geisha-coverflow__stage {
   min-height: 0;
 }
 
@@ -293,6 +312,8 @@ code {
   flex-direction: column;
   gap: 14px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -327,7 +348,9 @@ code {
 .geisha-coverflow__stage {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   min-width: 0;
 }
@@ -371,6 +394,11 @@ code {
 }
 
 .geisha-coverflow__viewport {
+  display: flex;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -383,7 +411,7 @@ code {
 
 .geisha-coverflow__track {
   position: relative;
-  height: clamp(410px, 64vw, 590px);
+  height: 100%;
   width: 100%;
 }
 
@@ -398,7 +426,7 @@ code {
   filter: saturate(0.72) brightness(0.7);
   transform:
     translateX(calc(-50% + (var(--coverflow-offset, 0) * clamp(118px, 11vw, 152px))))
-    translateY(calc(var(--coverflow-abs-offset, 0) * 16px))
+    translateY(calc(var(--coverflow-abs-offset, 0) * 10px))
     scale(var(--coverflow-scale));
   z-index: 1;
 }
@@ -514,14 +542,25 @@ code {
   inset: 0 auto auto 0;
   width: 47%;
   height: 40%;
-  background: linear-gradient(135deg, rgba(18, 10, 12, 0.88) 0%, rgba(18, 10, 12, 0.84) 48%, rgba(18, 10, 12, 0.14) 48.5%, rgba(18, 10, 12, 0) 100%);
+  background: transparent;
   padding: 16px 18px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
 }
 
+.geisha-card__overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(18, 10, 12, 0.9), rgba(18, 10, 12, 0.46));
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: -1;
+}
+
 .geisha-card__overlay-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -801,22 +840,25 @@ code {
 
 .player-hand-row {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: nowrap;
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
   overflow-x: hidden;
   overflow-y: visible;
   width: 100%;
   margin-left: 0;
-  padding: 4px 0 16px;
+  min-height: 0;
+  padding: 0;
   touch-action: pan-y;
-  --fan-step: 10px;
-  --fan-rise: 28px;
+  --fan-step: 18px;
+  --fan-rise: 22px;
   --fan-selected-rise: 28px;
-  --fan-focused-rise: 42px;
+  --fan-focused-rise: 38px;
   --fan-focused-scale: 1.1;
-  --fan-negative-margin: -112px;
-  --fan-tilt: 1.8;
+  --hand-card-width: 134px;
+  --fan-negative-margin: calc(var(--hand-card-width) * -0.63);
+  --fan-tilt: 1.65;
 }
 
 .player-hand-row .item-card {
@@ -894,33 +936,59 @@ code {
 
 @media (max-width: 767.98px) {
   .player-hand-row {
-    --fan-step: 6px;
-    --fan-rise: 18px;
-    --fan-selected-rise: 20px;
-    --fan-focused-rise: 34px;
-    --fan-focused-scale: 1.08;
-    --fan-negative-margin: -72px;
-    --fan-tilt: 1.5;
-    padding-bottom: 12px;
+    --hand-card-width: clamp(82px, 12vw, 94px);
+    --fan-step: clamp(5px, 1vw, 8px);
+    --fan-rise: 12px;
+    --fan-selected-rise: 14px;
+    --fan-focused-rise: 18px;
+    --fan-focused-scale: 1.04;
+    --fan-negative-margin: calc(var(--hand-card-width) * -0.55);
+    --fan-tilt: 1.24;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .player-hand-row {
+    --hand-card-width: clamp(66px, 18vw, 82px);
+    --fan-step: clamp(3px, 0.8vw, 5px);
+    --fan-rise: 8px;
+    --fan-selected-rise: 9px;
+    --fan-focused-rise: 12px;
+    --fan-focused-scale: 1.03;
+    --fan-negative-margin: calc(var(--hand-card-width) * -0.57);
+    --fan-tilt: 1.08;
+  }
+
+  .player-hand-row .item-card--hand {
+    border-radius: 8px;
+  }
+
+  .item-card--hand .item-card__badge {
+    left: 6px;
+    bottom: 6px;
+    font-size: 0.68rem;
+    padding: 3px 6px;
   }
 }
 
 @media (min-width: 768px) {
   .player-hand-row {
-    --fan-step: 10px;
-    --fan-rise: 28px;
+    --fan-step: 18px;
+    --fan-rise: 22px;
     --fan-selected-rise: 28px;
-    --fan-focused-rise: 42px;
+    --fan-focused-rise: 38px;
     --fan-focused-scale: 1.1;
-    --fan-negative-margin: -112px;
-    --fan-tilt: 1.8;
+    --hand-card-width: 134px;
+    --fan-negative-margin: calc(var(--hand-card-width) * -0.63);
+    --fan-tilt: 1.65;
   }
 }
 
 @media (min-width: 1200px) {
   .player-hand-row {
-    --fan-step: 12px;
-    --fan-negative-margin: -118px;
+    --fan-step: 22px;
+    --fan-rise: 26px;
+    --fan-negative-margin: calc(var(--hand-card-width) * -0.55);
   }
 }
 
@@ -943,9 +1011,9 @@ code {
 
 /* 手牌專用尺寸（避免過大需要捲動） */
 .item-card--hand {
-  width: 134px;
-  min-width: 134px;
-  height: 239px;
+  width: var(--hand-card-width);
+  min-width: var(--hand-card-width);
+  height: calc(var(--hand-card-width) * 16 / 9);
   margin: 2px 0;
   border-radius: 14px;
 }
@@ -953,8 +1021,28 @@ code {
 .player-hand-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+  flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
+}
+
+.player-hand-stage {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.player-hand-stage__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding-inline: 0;
 }
 
 .player-hand-controls {
@@ -963,11 +1051,13 @@ code {
   justify-content: center;
   gap: 12px;
   width: 100%;
+  flex: 0 0 auto;
+  padding-top: 6px;
 }
 
 .player-hand-controls__button {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
   border: 1px solid rgba(255, 226, 199, 0.55);
   background: rgba(25, 10, 15, 0.75);
@@ -1415,13 +1505,14 @@ code {
   z-index: 2000;
   display: flex;
   align-items: flex-end;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .bottom-sheet__backdrop {
   position: absolute;
   inset: 0;
   background: transparent;
+  pointer-events: none;
 }
 
 .decide-turn-order {
@@ -1629,12 +1720,12 @@ code {
 
 /* 行動標誌樣式 */
 .action-token {
-  border: 2px solid #28a745;    /* Bootstrap success */
+  border: 0;
   border-radius: 12px;
-  padding: 2px;
+  padding: 0;
   margin: 0;
   cursor: pointer;
-  background: #f8fff9;
+  background: transparent;
   transition: all 0.3s;
   width: 100%;
   height: 88px;
@@ -1646,7 +1737,6 @@ code {
   filter: none !important;
 }
 .action-token:hover {
-  background-color: #e8f5e8;
   transform: scale(1.02);
   opacity: 1 !important;
   filter: none !important;
@@ -1663,8 +1753,6 @@ code {
   filter: none !important;
 }
 .action-token.used {
-  border-color: #6c757d;       /* Bootstrap secondary */
-  background-color: #f8f9fa;
   cursor: not-allowed;
 }
 
@@ -1733,6 +1821,7 @@ code {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  gap: 8px;
 }
 
 .game-hand-actions-panel__body {
@@ -1740,14 +1829,83 @@ code {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: 8px;
   justify-content: flex-start;
   overflow: hidden;
 }
 
 .game-hand-actions-panel__footer {
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 234, 214, 0.18);
+  flex: 0 0 auto;
+  padding-top: 0;
+  border-top: 0;
+}
+
+@media (max-width: 767.98px) {
+  .game-room-page {
+    padding: 8px !important;
+  }
+
+  .game-room-page > .container-fluid {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .geisha-coverflow {
+    gap: 8px;
+  }
+
+  .geisha-coverflow__viewport {
+    min-height: 0;
+    height: 100%;
+    padding: 0 8px 4px;
+  }
+
+  .geisha-coverflow__track {
+    height: 100%;
+  }
+
+  .geisha-coverflow__slide {
+    width: min(70vw, 300px);
+    transform:
+      translateX(calc(-50% + (var(--coverflow-offset, 0) * clamp(82px, 20vw, 120px))))
+      translateY(calc(var(--coverflow-abs-offset, 0) * 8px))
+      scale(var(--coverflow-scale));
+  }
+
+  .geisha-card {
+    border-radius: 22px;
+  }
+
+  .geisha-card__media {
+    border-radius: 18px;
+  }
+
+  .geisha-card__overlay {
+    width: 43%;
+    height: 32%;
+    padding: 12px 12px;
+  }
+
+  .geisha-card__overlay-content {
+    gap: 8px;
+    max-width: min(68%, 108px);
+  }
+
+  .geisha-card__footer {
+    min-height: 34px;
+  }
+
+  .geisha-card__count {
+    padding: 6px 8px;
+  }
+
+  .geisha-card__count-label {
+    font-size: 0.6rem;
+  }
+
+  .geisha-card__count-value {
+    font-size: 0.86rem;
+  }
 }
 
 /* 回合狀態提示列 */
@@ -1793,10 +1951,15 @@ code {
   align-items: center;
   font-size: 0.92rem;
   font-weight: 700;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .game-info-status-row__leave {
-  min-width: 108px;
+  min-width: 96px;
+  white-space: nowrap;
 }
 
 .game-info-action-row {
@@ -2044,11 +2207,13 @@ code {
   }
 
   .game-info-status-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
   }
 
   .game-info-status-row__leave {
-    width: 100%;
+    width: auto;
+    min-width: 92px;
   }
 
   .game-info-action {
@@ -2080,12 +2245,22 @@ code {
   }
 
   .geisha-coverflow__viewport {
-    padding-inline: 46px;
+    min-height: 0;
+    height: 100%;
+    padding: 0 8px 4px;
     margin-inline: 0;
   }
 
+  .geisha-coverflow__track {
+    height: 100%;
+  }
+
   .geisha-coverflow__slide {
-    width: min(74vw, 286px);
+    width: min(70vw, 300px);
+    transform:
+      translateX(calc(-50% + (var(--coverflow-offset, 0) * clamp(82px, 20vw, 120px))))
+      translateY(calc(var(--coverflow-abs-offset, 0) * 6px))
+      scale(var(--coverflow-scale));
   }
 
   .geisha-coverflow__slide.is-adjacent {
@@ -2140,7 +2315,7 @@ code {
 
   .geisha-card__count {
     padding: 6px 9px;
-    min-height: 40px;
+    min-height: 34px;
   }
 
   .geisha-card__count-label {

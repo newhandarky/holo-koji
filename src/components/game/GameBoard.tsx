@@ -379,34 +379,37 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
             <section className={`game-focus-section ${isHandExpanded ? 'is-expanded' : 'is-collapsed'}`}>
                 {isHandExpanded && (
-                    <>
-                        <ActionTokens
-                            tokens={myState.actionTokens}
-                            onAction={handleAction}
-                            disabled={!isMyTurn}
-                            usedCards={{
-                                secret: myState.secretCards,
-                                'trade-off': myState.discardedCards
-                            }}
-                            getCharmByGeishaId={getCharmByGeishaId}
-                            geishaSet={activeGeishaSet}
-                        />
+                    <div className="game-hand-actions-panel">
+                        <div className="game-hand-actions-panel__body">
+                            {!canAct && (
+                                <div className="alert alert-info py-2 mb-2">等待對手操作中...</div>
+                            )}
 
-                        {!canAct && (
-                            <div className="alert alert-info py-2 mb-3">等待對手操作中...</div>
-                        )}
-
-                        <PlayerHand
-                            cards={myState.hand}
-                            onCardSelect={handleCardSelect}
-                            highlightCardId={highlightCardId}
-                            highlightActive={highlightActive}
-                            getCharmByGeishaId={getCharmByGeishaId}
-                            geishaSet={activeGeishaSet}
-                            motionCues={handMotionCues}
-                            prefersReducedMotion={prefersReducedMotion}
-                        />
-                    </>
+                            <PlayerHand
+                                cards={myState.hand}
+                                onCardSelect={handleCardSelect}
+                                highlightCardId={highlightCardId}
+                                highlightActive={highlightActive}
+                                getCharmByGeishaId={getCharmByGeishaId}
+                                geishaSet={activeGeishaSet}
+                                motionCues={handMotionCues}
+                                prefersReducedMotion={prefersReducedMotion}
+                            />
+                        </div>
+                        <div className="game-hand-actions-panel__footer">
+                            <ActionTokens
+                                tokens={myState.actionTokens}
+                                onAction={handleAction}
+                                disabled={!isMyTurn}
+                                usedCards={{
+                                    secret: myState.secretCards,
+                                    'trade-off': myState.discardedCards
+                                }}
+                                getCharmByGeishaId={getCharmByGeishaId}
+                                geishaSet={activeGeishaSet}
+                            />
+                        </div>
+                    </div>
                 )}
             </section>
 

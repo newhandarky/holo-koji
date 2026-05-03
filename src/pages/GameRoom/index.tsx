@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
+import type { FocusSection } from '../../components/game/GameBoard';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import {
@@ -102,6 +103,11 @@ const GameRoom: React.FC = () => {
     // 結算底部視窗是否收合
     const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
     const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
+    const [focusSection, setFocusSection] = useState<FocusSection>('characterBoard');
+    const previousFocusSectionRef = useRef<FocusSection>('characterBoard');
+    const wasInteractionLockedRef = useRef(false);
+    const canActBeforeBlockingRef = useRef(false);
+    const previousCanActRef = useRef(false);
     const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
     const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -252,6 +258,54 @@ const GameRoom: React.FC = () => {
         confirmOrder();
     };
 
+    const isGameEnded = state.phase === 'ended';
+
+    const isWaiting = state.phase === 'waiting' || state.players.length < 2;
+
+    const pendingInteraction = state.pendingInteraction;
+    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
+    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
+    const isInteractionLocked = Boolean(pendingInteraction)
+        || isDrawModalOpen
+        || state.orderDecision.isOpen
+        || Boolean(readyStatus)
+        || isGameEnded;
+    const canAct =
+        state.phase === 'playing'
+        && state.players[state.currentPlayer]?.id === currentPlayerId
+        && !pendingInteraction
+        && !isDrawModalOpen
+        && !state.orderDecision.isOpen;
+    const safeAvailableActionCount = currentPlayer?.actionTokens.filter((token) => !token.used).length ?? 0;
+
+    useEffect(() => {
+        if (state.phase !== 'playing') {
+            setFocusSection('characterBoard');
+            previousFocusSectionRef.current = 'characterBoard';
+        }
+    }, [state.phase]);
+
+    useEffect(() => {
+        const wasLocked = wasInteractionLockedRef.current;
+        if (!wasLocked && isInteractionLocked) {
+            previousFocusSectionRef.current = focusSection;
+            canActBeforeBlockingRef.current = canAct;
+        }
+        if (wasLocked && !isInteractionLocked) {
+            const becameActionable = !canActBeforeBlockingRef.current && canAct;
+            setFocusSection(becameActionable ? 'handActions' : previousFocusSectionRef.current);
+        }
+        wasInteractionLockedRef.current = isInteractionLocked;
+    }, [canAct, focusSection, isInteractionLocked]);
+
+    useEffect(() => {
+        const wasCanAct = previousCanActRef.current;
+        if (!wasCanAct && canAct && !isInteractionLocked) {
+            setFocusSection('handActions');
+        }
+        previousCanActRef.current = canAct;
+    }, [canAct, isInteractionLocked]);
+
     if (!isConnected) {
         return (
             <div className="game-background d-flex align-items-center justify-content-center">
@@ -277,25 +331,6 @@ const GameRoom: React.FC = () => {
             </div>
         );
     }
-
-    const isGameEnded = state.phase === 'ended';
-
-    const isWaiting = state.phase === 'waiting' || state.players.length < 2;
-
-    const pendingInteraction = state.pendingInteraction;
-    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
-    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
-    const isInteractionLocked = Boolean(pendingInteraction)
-        || isDrawModalOpen
-        || state.orderDecision.isOpen
-        || Boolean(readyStatus)
-        || isGameEnded;
-    const canAct =
-        state.phase === 'playing'
-        && state.players[state.currentPlayer]?.id === currentPlayerId
-        && !pendingInteraction
-        && !isDrawModalOpen
-        && !state.orderDecision.isOpen;
 
     if (isWaiting) {
         return (
@@ -420,7 +455,7 @@ const GameRoom: React.FC = () => {
     return (
         <div className="game-background p-3">
             <div className="container-fluid">
-                <div className={`card game-card game-room-surface p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
+                <div className={`card game-card game-room-surface p-3 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}>
                     <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
                         <div className="d-flex align-items-center gap-2">
                             {displayAvatar && (
@@ -434,54 +469,69 @@ const GameRoom: React.FC = () => {
                         </div>
                         <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
                     </div>
-                    {/* 遊戲資訊欄 */}
-                    <div className="row align-items-center mb-4">
-                        <div className="col-md-4 text-center">
-                            <h5 className="mb-0">第 {state.round} 回合</h5>
-                            <small className="text-muted">階段: {state.phase}</small>
-                        </div>
-                        <div className="col-md-4 text-end">
-                            <span className="badge bg-primary fs-6">
-                                當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* 玩家資訊 */}
-                    <div className="row mb-3">
-                        {state.players.map((player, index) => {
-                            const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
-                            return (
-                                <div key={player.id} className="col-md-6 mb-2">
-                                    <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
-                                        <div className="card-body py-2">
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <span className="d-inline-flex align-items-center gap-2">
-                                                    {getPlayerAvatar(player.id) && (
-                                                        <img
-                                                            className="player-avatar"
-                                                            src={getPlayerAvatar(player.id)}
-                                                            alt={`${getPlayerDisplayName(player.id)} 頭像`}
-                                                        />
-                                                    )}
-                                                    <strong>{getPlayerDisplayName(player.id)}</strong>
-                                                    {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
-                                                    {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
-                                                </span>
-                                                <small className="text-muted">
-                                                    手牌: {player.hand.length}
-                                                    <br />
-                                                    魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
-                                                </small>
-                                            </div>
-                                        </div>
+                    <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
+                        {focusSection !== 'info' && (
+                            <button
+                                type="button"
+                                className="game-focus-summary"
+                                onClick={() => setFocusSection('info')}
+                                aria-label="展開資訊區塊"
+                            >
+                                <span className="game-focus-summary__title">資訊區</span>
+                                <span className="game-focus-summary__meta">
+                                    第 {state.round} 回合 | 當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)} | 手牌 {currentPlayer?.hand.length ?? 0} | 可行動 {safeAvailableActionCount}
+                                </span>
+                            </button>
+                        )}
+                        {focusSection === 'info' && (
+                            <div className="game-focus-content">
+                                <div className="row align-items-center mb-4">
+                                    <div className="col-md-4 text-center">
+                                        <h5 className="mb-0">第 {state.round} 回合</h5>
+                                        <small className="text-muted">階段: {state.phase}</small>
+                                    </div>
+                                    <div className="col-md-4 text-end">
+                                        <span className="badge bg-primary fs-6">
+                                            當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)}
+                                        </span>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
+                                <div className="row mb-3">
+                                    {state.players.map((player, index) => {
+                                        const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
+                                        return (
+                                            <div key={player.id} className="col-md-6 mb-2">
+                                                <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
+                                                    <div className="card-body py-2">
+                                                        <div className="d-flex justify-content-between align-items-center">
+                                                            <span className="d-inline-flex align-items-center gap-2">
+                                                                {getPlayerAvatar(player.id) && (
+                                                                    <img
+                                                                        className="player-avatar"
+                                                                        src={getPlayerAvatar(player.id)}
+                                                                        alt={`${getPlayerDisplayName(player.id)} 頭像`}
+                                                                    />
+                                                                )}
+                                                                <strong>{getPlayerDisplayName(player.id)}</strong>
+                                                                {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
+                                                                {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
+                                                            </span>
+                                                            <small className="text-muted">
+                                                                手牌: {player.hand.length}
+                                                                <br />
+                                                                魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </section>
 
-                    {/* 遊戲主要區域 */}
                     <GameBoard
                         state={state}
                         playerId={currentPlayerId}
@@ -492,6 +542,8 @@ const GameRoom: React.FC = () => {
                         highlightActive={isDrawHighlightActive}
                         motionCues={activeMotionCues}
                         prefersReducedMotion={prefersReducedMotion}
+                        focusSection={focusSection}
+                        onFocusSectionChange={setFocusSection}
                     />
 
                     {/* 離開遊戲按鈕 */}

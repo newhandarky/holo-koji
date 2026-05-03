@@ -149,6 +149,103 @@ code {
   color: var(--ginza-muted-text) !important;
 }
 
+.game-room-focus-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: calc(100dvh - 28px);
+  max-height: calc(100dvh - 28px);
+  overflow: hidden;
+}
+
+.game-focus-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.game-focus-section {
+  border: 1px solid rgba(255, 238, 215, 0.2);
+  border-radius: 14px;
+  background: rgba(20, 10, 14, 0.36);
+  min-height: 0;
+  overflow: hidden;
+  transition: flex-basis 0.2s ease, max-height 0.2s ease, opacity 0.2s ease;
+}
+
+.game-focus-section.is-expanded {
+  flex: 1 1 auto;
+}
+
+.game-focus-section.is-collapsed {
+  flex: 0 0 auto;
+}
+
+.game-focus-content {
+  height: 100%;
+  padding: 12px;
+  overflow: auto;
+}
+
+.game-focus-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  background: rgba(255, 245, 232, 0.92);
+  color: #3a1d14;
+  text-align: left;
+}
+
+.game-focus-summary__title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.game-focus-summary__meta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(58, 29, 20, 0.82);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-focus-summary:focus-visible {
+  outline: 2px solid rgba(219, 55, 27, 0.72);
+  outline-offset: -2px;
+}
+
+.game-focus-section.is-expanded .geisha-coverflow {
+  height: 100%;
+  min-height: 0;
+  margin-bottom: 0 !important;
+}
+
+.game-focus-section.is-expanded .geisha-coverflow__stage,
+.game-focus-section.is-expanded .geisha-coverflow__viewport,
+.game-focus-section.is-expanded .geisha-coverflow__track {
+  min-height: 0;
+}
+
+.game-focus-section.is-expanded .player-hand-row {
+  overflow-x: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-focus-summary,
+  .game-focus-section,
+  .geisha-coverflow__slide {
+    transition: none !important;
+  }
+}
+
 /* 藝妓卡片樣式 */
 .geisha-coverflow {
   display: flex;

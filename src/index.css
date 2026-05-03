@@ -462,6 +462,11 @@ code {
   height: 100%;
   object-fit: cover;
   object-position: center;
+  background: radial-gradient(circle at 20% 16%, rgba(97, 45, 44, 0.35), rgba(21, 12, 13, 0.88));
+}
+
+.geisha-card--focused .geisha-card__artwork {
+  object-fit: contain;
 }
 
 .geisha-card__fallback {
@@ -507,7 +512,7 @@ code {
 
 .geisha-card__overlay {
   inset: 0 auto auto 0;
-  width: 78%;
+  width: 47%;
   height: 40%;
   background: linear-gradient(135deg, rgba(18, 10, 12, 0.88) 0%, rgba(18, 10, 12, 0.84) 48%, rgba(18, 10, 12, 0.14) 48.5%, rgba(18, 10, 12, 0) 100%);
   padding: 16px 18px;
@@ -519,14 +524,14 @@ code {
 .geisha-card__overlay-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: min(68%, 150px);
+  gap: 12px;
+  max-width: min(70%, 136px);
 }
 
 .geisha-card__name {
   color: #fff8ef;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   line-height: 1.28;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   overflow-wrap: anywhere;
@@ -534,32 +539,26 @@ code {
 
 .geisha-card__overlay-meta {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
 }
 
-.geisha-card__score-badge {
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(245, 237, 224, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff4ea;
-  font-size: 0.74rem;
-  font-weight: 700;
-  white-space: nowrap;
-  backdrop-filter: blur(8px);
+.geisha-card__slot-icon-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
 }
 
 .geisha-card__slot-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(249, 242, 233, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 16px rgba(0, 0, 0, 0.24);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   overflow: hidden;
   flex: 0 0 auto;
 }
@@ -579,8 +578,39 @@ code {
   align-items: center;
   justify-content: center;
   color: #fff9f2;
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 700;
+  border-radius: 0;
+}
+
+.geisha-card__slot-icon-fallback {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff9f2;
+  font-size: 1rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.geisha-card__charm-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #d31f3a;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.32);
 }
 
 .geisha-card__footer {
@@ -1298,43 +1328,6 @@ code {
   font-weight: 600;
 }
 
-.interaction-opponent-actions {
-  display: flex;
-  gap: 8px;
-  margin: 0 auto 12px;
-}
-
-.interaction-action-item {
-  flex: 0 0 22%;
-  max-width: 22%;
-}
-
-.interaction-action-icon {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: contain;
-}
-
-.interaction-action-icon.is-used {
-  filter: grayscale(1);
-  opacity: 0.45;
-}
-
-/* 場上對手行動提示列 */
-.opponent-actions-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  max-height: 100px;
-}
-
-.opponent-actions-bar__label {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 /* 互動視窗顯示玩家手牌 */
 .interaction-hand-row {
   display: flex;
@@ -2014,7 +2007,7 @@ code {
   }
 
   .geisha-card__overlay {
-    width: 84%;
+    width: 52%;
     height: 42%;
     padding: 14px 14px;
   }
@@ -2025,22 +2018,30 @@ code {
   }
 
   .geisha-card__name {
-    font-size: 0.88rem;
+    font-size: 16px;
   }
 
-  .geisha-card__overlay-meta {
-    gap: 8px;
-  }
-
-  .geisha-card__score-badge {
-    padding: 4px 8px;
-    font-size: 0.64rem;
+  .geisha-card__slot-icon-wrap {
+    width: 42px;
+    height: 42px;
   }
 
   .geisha-card__slot-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .geisha-card__slot-icon-fallback {
+    width: 42px;
+    height: 42px;
+  }
+
+  .geisha-card__charm-badge {
+    width: 20px;
+    height: 20px;
+    top: -5px;
+    right: -5px;
+    font-size: 0.66rem;
   }
 
   .geisha-card__count {

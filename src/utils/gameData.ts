@@ -76,6 +76,8 @@ const ginzaItemDefinitions: Record<string, ItemIconDefinition> = {
     }
 };
 
+const ginzaPositionItemTypes = Object.keys(ginzaItemDefinitions).sort();
+
 const charmPointsDistribution = [2, 2, 2, 3, 3, 4, 5];
 
 export function createRandomizedGeishas(_geishaSet?: GeishaSet): Geisha[] {
@@ -90,6 +92,17 @@ export function createRandomizedGeishas(_geishaSet?: GeishaSet): Geisha[] {
 
 export function getItemIconDefinitionByType(itemType: string, _geishaSet?: GeishaSet): ItemIconDefinition {
     return ginzaItemDefinitions[itemType] ?? buildUnknownItemIconDefinition(itemType);
+}
+
+export function getItemIconDefinitionByPosition(positionIndex: number, geishaSet?: GeishaSet): ItemIconDefinition {
+    const normalizedIndex = Math.max(1, Math.floor(positionIndex));
+    const mappedType = ginzaPositionItemTypes[normalizedIndex - 1];
+
+    if (!mappedType) {
+        return buildUnknownItemIconDefinition(`position-${normalizedIndex}`);
+    }
+
+    return getItemIconDefinitionByType(mappedType, geishaSet);
 }
 
 export function getGeishaNameById(geishaId: number, _geishaSet?: GeishaSet): string {

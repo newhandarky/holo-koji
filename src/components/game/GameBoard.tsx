@@ -7,13 +7,12 @@ import CompetitionGroupModal from './CompetitionGroupModal';
 import { MotionCue } from './gameMotion';
 import {
     ItemCard,
-    ActionToken,
     ActionType,
     Geisha,
     GameAction,
     GameState
 } from 'game-shared-types';
-import { ItemIconDefinition, getItemIconDefinitionForCard } from '../../utils/gameData';
+import { ItemIconDefinition, getItemIconDefinitionByPosition } from '../../utils/gameData';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -67,16 +66,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const isCharacterExpanded = focusSection === 'characterBoard';
     const isHandExpanded = focusSection === 'handActions';
 
-    // 靜態資源基底路徑（支援 GitHub Pages）
-    const publicBaseUrl = process.env.PUBLIC_URL ?? '';
-    // 行動圖示對照表
-    const actionIconMap: Record<ActionToken['type'], string> = {
-        secret: `${publicBaseUrl}/images/actions/Secret.png`,
-        'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
-        gift: `${publicBaseUrl}/images/actions/Gift.png`,
-        competition: `${publicBaseUrl}/images/actions/Competition.png`
-    };
-
     // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
 
@@ -115,53 +104,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
         [motionCues]
     );
 
-    const allKnownItemCards = useMemo(() => {
-        const cards: ItemCard[] = [];
-        const appendCards = (cardGroup: ItemCard[] | undefined | null) => {
-            if (cardGroup?.length) {
-                cards.push(...cardGroup);
-            }
-        };
-
-        state.players.forEach((player) => {
-            appendCards(player.hand);
-            appendCards(player.playedCards);
-            appendCards(player.secretCards);
-            appendCards(player.discardedCards);
-        });
-
-        appendCards(state.drawPile);
-        appendCards(state.discardPile);
-
-        if (state.removedCard) {
-            cards.push(state.removedCard);
-        }
-
-        if (state.pendingInteraction?.type === 'GIFT_SELECTION') {
-            appendCards(state.pendingInteraction.offeredCards);
-        }
-
-        if (state.pendingInteraction?.type === 'COMPETITION_SELECTION') {
-            state.pendingInteraction.groups.forEach((group) => appendCards(group));
-        }
-
-        return cards;
-    }, [state]);
-
-    const geishaItemIconMap = useMemo(() => {
-        const map = new Map<number, ItemIconDefinition>();
-
-        allKnownItemCards.forEach((card) => {
-            if (map.has(card.geishaId)) {
-                return;
-            }
-
-            map.set(card.geishaId, getItemIconDefinitionForCard(card, activeGeishaSet));
-        });
-
-        return map;
-    }, [allKnownItemCards, activeGeishaSet]);
-
     const orderedGeishas = useMemo(() => (
         [...state.geishas].sort((left, right) => {
             if (left.charmPoints !== right.charmPoints) {
@@ -173,6 +115,18 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return leftSlotOrder - rightSlotOrder;
         })
     ), [state.geishas]);
+
+    const geishaItemIconMap = useMemo(() => {
+        // 014 clarifications require position-bound icons even when no player owns the item card.
+        const map = new Map<number, ItemIconDefinition>();
+
+        orderedGeishas.forEach((geisha, index) => {
+            const positionIndex = geisha.boardSlotId ?? index + 1;
+            map.set(geisha.id, getItemIconDefinitionByPosition(positionIndex, activeGeishaSet));
+        });
+
+        return map;
+    }, [orderedGeishas, activeGeishaSet]);
 
     const charmMap = useMemo(() => {
         const map = new Map<number, number>();
@@ -349,31 +303,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
         return null;
     }
 
-    const renderOpponentActions = () => {
-        const tokens = opponentState?.actionTokens ?? [];
-        return (
-            <div className="opponent-actions-bar">
-                <div className="interaction-opponent-actions">
-                    {tokens.map((token, index) => (
-                        <div key={`${token.type}-${index}`} className="interaction-action-item">
-                            <img
-                                className={`interaction-action-icon ${token.used ? 'is-used' : ''}`}
-                                src={actionIconMap[token.type]}
-                                alt={token.type}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
     return (
         <div className="game-focus-column">
             <section className={`game-focus-section ${isCharacterExpanded ? 'is-expanded' : 'is-collapsed'}`}>
                 {isCharacterExpanded && (
                     <>
-                        {renderOpponentActions()}
                         <section className="geisha-coverflow mt-2 mb-4" aria-label="人物卡 coverflow">
                             <div className="geisha-coverflow__header">
                                 <div className="geisha-coverflow__summary">
@@ -419,6 +353,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                                                         myCount={myCountMap.get(geisha.id) ?? 0}
                                                         opponentCount={opponentCountMap.get(geisha.id) ?? 0}
                                                         currentPlayerId={playerId}
+                                                        isFocused={index === activeGeishaIndex}
                                                         itemIcon={geishaItemIconMap.get(geisha.id) ?? null}
                                                         motionCues={boardMotionCues.filter((cue) => cue.targetGeishaId === geisha.id)}
                                                         prefersReducedMotion={prefersReducedMotion}

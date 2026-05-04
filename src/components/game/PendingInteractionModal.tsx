@@ -74,7 +74,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
             <>
                 <p>對手提供了下列卡片，請挑選 1 張：</p>
                 <div className={`gift-selection-grid gift-selection-grid--surface ${activeMotionKind === 'gift-result' ? 'gift-selection-grid--motion-source' : ''}`}>
-                    {interaction.offeredCards.map((card) => (
+                    {(interaction.offeredCards ?? []).map((card) => (
                         <button
                             key={card.id}
                             className="gift-selection-card"
@@ -95,7 +95,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
         : (
             <>
                 <p>對手分成兩組，請挑選其中一組：</p>
-                {interaction.groups.map((group, index) => (
+                {(interaction.groups ?? []).map((group, index) => (
                     <div
                         role="button"
                         tabIndex={0}

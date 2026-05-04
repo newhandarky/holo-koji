@@ -4,6 +4,18 @@ import GameRoom from './index';
 
 const mockNavigate = jest.fn();
 const mockSendGameAction = jest.fn();
+const mockHookState = {
+    isConnected: true,
+    error: null as string | null,
+    roundSummary: null,
+    readyStatus: null,
+    confirmOrder: jest.fn(),
+    sendGameAction: mockSendGameAction,
+    requestRematch: jest.fn(),
+    confirmReady: jest.fn(),
+    drawQueue: [],
+    consumeDrawEvent: jest.fn()
+};
 const mockState = {
     phase: 'playing',
     geishaSet: 'hololive',
@@ -56,18 +68,7 @@ jest.mock('../../contexts/GameContext', () => ({
 }));
 
 jest.mock('../../hooks/useWebSocket', () => ({
-    useWebSocket: () => ({
-        isConnected: true,
-        error: null,
-        roundSummary: null,
-        readyStatus: null,
-        confirmOrder: jest.fn(),
-        sendGameAction: mockSendGameAction,
-        requestRematch: jest.fn(),
-        confirmReady: jest.fn(),
-        drawQueue: [],
-        consumeDrawEvent: jest.fn()
-    })
+    useWebSocket: () => ({ ...mockHookState })
 }));
 
 jest.mock('../../components/game/GameBoard', () => (props: any) => (
@@ -94,6 +95,8 @@ describe('GameRoom character set room surface', () => {
     beforeEach(() => {
         localStorage.setItem('currentPlayerId', 'p1');
         mockState.geishaSet = 'hololive';
+        mockHookState.isConnected = true;
+        mockHookState.error = null;
         mockNavigate.mockReset();
         mockSendGameAction.mockReset();
     });
@@ -120,5 +123,15 @@ describe('GameRoom character set room surface', () => {
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-geisha-set', 'hololive');
         expect(screen.queryByRole('combobox', { name: '藝妓組合' })).not.toBeInTheDocument();
         expect(screen.queryByText('Hololive')).not.toBeInTheDocument();
+    });
+
+    test('restore failure shows a simple recovery message and returns to lobby', () => {
+        mockHookState.error = '房間資料無效，請重新建立對戰。';
+
+        render(<GameRoom />);
+
+        expect(screen.getByText('無法進入對戰')).toBeInTheDocument();
+        expect(screen.getByText('房間資料無效，請重新建立對戰。')).toBeInTheDocument();
+        expect(screen.queryByText(/snapshot|schema|geishaSet/i)).not.toBeInTheDocument();
     });
 });

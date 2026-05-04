@@ -55,14 +55,14 @@ export interface PendingGiftInteraction {
     type: 'GIFT_SELECTION';
     initiatorId: string;
     targetPlayerId: string;
-    offeredCards: ItemCard[];
+    offeredCards?: ItemCard[];
 }
 
 export interface PendingCompetitionInteraction {
     type: 'COMPETITION_SELECTION';
     initiatorId: string;
     targetPlayerId: string;
-    groups: ItemCard[][];
+    groups?: ItemCard[][];
 }
 
 export type PendingInteraction = PendingGiftInteraction | PendingCompetitionInteraction;

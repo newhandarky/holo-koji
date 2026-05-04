@@ -347,6 +347,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         return () => {
             isActive = false;
             cleanupHandlers();
+            gameWebSocket.disconnect();
             setDrawQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);

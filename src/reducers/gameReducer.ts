@@ -1,15 +1,11 @@
 // src/contexts/gameReducer.ts - 添加順序決定狀態管理
-import { createRandomizedGeishas } from '../utils/gameData';
-import { GameState, Geisha, GameAction } from "game-shared-types"
-
-// 初始藝妓資料（隨機順序）
-const initialGeishas: Geisha[] = createRandomizedGeishas();
+import { GameState, GameAction } from "game-shared-types"
 
 // 初始遊戲狀態
 export const initialState: GameState = {
     gameId: '',
     players: [],
-    geishas: initialGeishas,
+    geishas: [],
     geishaSet: 'default',
     currentPlayer: 0,
     phase: 'waiting',
@@ -34,17 +30,8 @@ export const initialState: GameState = {
 
 // 遊戲狀態 reducer（負責所有 action 狀態更新）
 export const gameReducer = (state: GameState, action: GameAction): GameState => {
-    console.log('🔄 [Reducer] ===== 收到動作 =====');
-    console.log('🔄 [Reducer] 動作類型:', action.type);
-    console.log('🔄 [Reducer] 動作內容:', action);
-    console.log('🔄 [Reducer] 當前狀態:', state);
-
     switch (action.type) {
         case 'INIT_GAME':
-            console.log('🚨 [Reducer] ===== 處理 INIT_GAME =====');
-            console.log('🚨 [Reducer] payload.gameId:', action.payload.gameId);
-            console.log('🚨 [Reducer] payload.players:', action.payload.players);
-
             const newState = {
                 ...state,
                 gameId: action.payload.gameId,
@@ -54,16 +41,10 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
                     'waiting' as const
             };
 
-            console.log('✅ [Reducer] INIT_GAME 處理完成');
-            console.log('✅ [Reducer] 新狀態 gameId:', newState.gameId);
-            console.log('✅ [Reducer] 新狀態 players:', newState.players);
-            console.log('✅ [Reducer] 新狀態 phase:', newState.phase);
-
             return newState;
 
         // 新增：開始順序決定
         case 'START_ORDER_DECISION':
-            console.log('🎲 [Reducer] ===== 處理 START_ORDER_DECISION =====');
             return {
                 ...state,
                 phase: 'deciding_order',
@@ -80,7 +61,6 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
         // 新增：順序決定結果
         case 'ORDER_DECISION_RESULT':
-            console.log('🎯 [Reducer] ===== 處理 ORDER_DECISION_RESULT =====');
             return {
                 ...state,
                 orderDecision: {
@@ -93,7 +73,6 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
 
         // 新增：更新確認狀態
         case 'UPDATE_ORDER_CONFIRMATIONS':
-            console.log('✅ [Reducer] ===== 處理 UPDATE_ORDER_CONFIRMATIONS =====');
             const updatedOrderDecision = {
                 ...state,
                 orderDecision: {
@@ -118,7 +97,6 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             return updatedOrderDecision;
 
         case 'SYNC_SERVER_STATE':
-            console.log('🌐 [Reducer] ===== 處理 SYNC_SERVER_STATE =====');
             return {
                 ...state,
                 ...action.payload,
@@ -129,41 +107,23 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             };
 
         case 'PLAY_ACTION':
-            console.log('🎯 [Reducer] ===== 處理 PLAY_ACTION =====');
             return {
                 ...state,
                 // 這裡可以添加具體的遊戲動作處理邏輯
             };
 
         case 'END_TURN':
-            console.log('⏭️ [Reducer] ===== 處理 END_TURN =====');
             return {
                 ...state,
                 currentPlayer: (state.currentPlayer + 1) % state.players.length
             };
 
         case 'END_GAME':
-            console.log('🏆 [Reducer] ===== 處理 END_GAME =====');
             return {
                 ...state,
                 phase: 'ended',
                 winner: action.payload.winner
             };
-
-        // !
-        // case 'RESET_GAME':
-        //     return {
-        //         ...state,
-        //         geishas: initialGeishas, // 重置時重新隨機
-        //         phase: 'waiting',
-        //         currentPlayer: 0,
-        //     };
-
-        // case 'START_NEW_ROUND':
-        //     return {
-        //         ...state,
-        //         geishas: createRandomizedGeishas(), // 新回合重新隨機
-        //     };
 
         default:
             console.warn('⚠️ [Reducer] 未知動作類型:', action);

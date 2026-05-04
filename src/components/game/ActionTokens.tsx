@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ActionToken, ItemCard, GeishaSet } from "game-shared-types"
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
+import { actionIconMap } from '../../utils/actionAssets';
 
 /**
  * ActionTokens 組件：顯示並觸發行動標誌
@@ -14,20 +15,6 @@ interface Props {
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
     geishaSet?: GeishaSet;                            // 藝妓組合
 }
-
-// 靜態資源基底路徑（支援 GitHub Pages）
-// const publicBaseUrl = process.env.PUBLIC_URL ?? '';
-// 行動圖示對照表
-const actionIconMap: Record<ActionToken['type'], string> = {
-    secret: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-320a8d17-6c9e-4575-9a40-aec696061ef3-ChatGPT-Image-2026-5-3-05_39_56.png`,
-    'trade-off': `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-8df4d047-16de-431b-9f0c-3072164b917e-ChatGPT-Image-2026-5-3-05_46_10.png`,
-    gift: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-5a7552fd-ecad-4af7-8d8c-3867e1c998a1-ChatGPT-Image-2026-5-3-06_07_13.png`,
-    competition: `https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-ed742264-8f13-4685-90ef-02da57f2918b-ChatGPT-Image-2026-5-3-06_02_38.png`
-    // secret: `${publicBaseUrl}/images/actions/Secret.png`,
-    // 'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
-    // gift: `${publicBaseUrl}/images/actions/Gift.png`,
-    // competition: `${publicBaseUrl}/images/actions/Competition.png`
-};
 
 const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, getCharmByGeishaId, geishaSet }) => {
     const [openToken, setOpenToken] = useState<ActionToken['type'] | null>(null);

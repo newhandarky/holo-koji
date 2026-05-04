@@ -10,7 +10,8 @@ import {
     ActionType,
     Geisha,
     GameAction,
-    GameState
+    GameState,
+    GeishaSet
 } from 'game-shared-types';
 import { ItemIconDefinition, getItemIconDefinitionByPosition } from '../../utils/gameData';
 
@@ -51,7 +52,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     prefersReducedMotion = false,
     focusSection
 }) => {
-    const activeGeishaSet: 'default' = 'default';
+    const activeGeishaSet: GeishaSet = state.geishaSet ?? 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);

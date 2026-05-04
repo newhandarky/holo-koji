@@ -65,7 +65,7 @@ export interface OrderDecision {
     waitingFor: string[];
     currentPlayer: string;
 }
-export type GeishaSet = 'default';
+export type GeishaSet = 'default' | 'collaboration' | 'hololive';
 export interface GameState {
     gameId: string;
     players: Player[];

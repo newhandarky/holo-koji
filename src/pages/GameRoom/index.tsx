@@ -15,7 +15,7 @@ import {
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
-import { Player, ActionToken, ItemCard } from "game-shared-types"
+import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
 import { getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';
@@ -97,7 +97,7 @@ const GameRoom: React.FC = () => {
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
-    const activeGeishaSet: 'default' = 'default';
+    const activeGeishaSet: GeishaSet = state.geishaSet ?? 'default';
     // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
     // 抽牌文字提示

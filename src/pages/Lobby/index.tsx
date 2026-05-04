@@ -1,9 +1,11 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
+import { GeishaSet } from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
+import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -15,6 +17,8 @@ const Lobby: React.FC = () => {
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
     const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
+    // 藝妓組合選擇（online / npc 共用）
+    const [selectedGeishaSet, setSelectedGeishaSet] = useState<GeishaSet>('default');
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -160,9 +164,9 @@ const Lobby: React.FC = () => {
 
     // 建立房間請求
     const createRoom = () => {
-        if (!playerName.trim() || connectionStatus !== 'connected') return;
+        if (!canCreateRoom) return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet: 'default' });
+        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet: selectedGeishaSet });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
             displayName: lineProfile?.displayName ?? playerName,
@@ -170,7 +174,7 @@ const Lobby: React.FC = () => {
             avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
-            geishaSet: 'default'
+            geishaSet: selectedGeishaSet
         });
     };
 
@@ -210,6 +214,15 @@ const Lobby: React.FC = () => {
     const shouldUseHash = () => {
         return window.location.host.includes('github.io');
     };
+
+    const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
+    const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
+    const canCreateRoom = Boolean(
+        playerName.trim()
+        && !isConnecting
+        && connectionStatus === 'connected'
+        && selectedGeishaSetOption?.available
+    );
 
     return (
         <div className="lobby-background d-flex align-items-center justify-content-center">
@@ -278,7 +291,22 @@ const Lobby: React.FC = () => {
                     )}
                     <div className="mb-3">
                         <label className="form-label">藝妓組合</label>
-                        <input className="form-control" value="預設（Ginza）" disabled />
+                        <select
+                            className="form-select"
+                            value={selectedGeishaSet}
+                            onChange={(event) => setSelectedGeishaSet(event.target.value as GeishaSet)}
+                            disabled={isConnecting}
+                            aria-label="藝妓組合"
+                        >
+                            {CHARACTER_SET_OPTIONS.map((option) => (
+                                <option key={option.key} value={option.key} disabled={!option.available}>
+                                    {option.available ? option.displayName : `${option.displayName}（目前不可用）`}
+                                </option>
+                            ))}
+                        </select>
+                        {hasUnavailableCharacterSet && (
+                            <div className="form-text">不可用的藝妓組合會保留顯示，但目前無法建立房間。</div>
+                        )}
                     </div>
                     <label className="form-label">玩家名稱</label>
                     <input
@@ -293,7 +321,7 @@ const Lobby: React.FC = () => {
                     <button
                         className="btn btn-primary w-100"
                         onClick={createRoom}
-                        disabled={!playerName.trim() || isConnecting || connectionStatus !== 'connected'}
+                        disabled={!canCreateRoom}
                     >
                         {isConnecting ? (
                             <>

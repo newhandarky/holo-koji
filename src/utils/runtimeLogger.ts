@@ -67,6 +67,10 @@ export const summarizeSocketMessage = (message: { type?: string; payload?: any }
         roomId: typeof payload?.roomId === 'string' ? payload.roomId : undefined,
         gameId: typeof payload?.gameId === 'string' ? payload.gameId : undefined,
         playerId: typeof payload?.playerId === 'string' ? payload.playerId : undefined,
+        accountStatus: typeof payload?.status === 'string' ? payload.status : undefined,
+        accountPersistenceMode: payload?.persistenceStatus?.mode === 'durable' || payload?.persistenceStatus?.mode === 'temporary'
+            ? payload.persistenceStatus.mode
+            : undefined,
         mode: payload?.mode === 'npc' || payload?.mode === 'online' ? payload.mode : undefined,
         geishaSet: typeof payload?.geishaSet === 'string' ? payload.geishaSet : undefined,
         setupMode: payload?.setupMode === 'random' || payload?.setupMode === 'custom' ? payload.setupMode : undefined,
@@ -87,6 +91,9 @@ export const summarizeGameState = (state: any) => {
         phase: typeof state.phase === 'string' ? state.phase : undefined,
         round: typeof state.round === 'number' ? state.round : undefined,
         playerCount: Array.isArray(state.players) ? state.players.length : undefined,
+        accountPersistenceMode: state.accountPersistenceStatus?.mode === 'durable' || state.accountPersistenceStatus?.mode === 'temporary'
+            ? state.accountPersistenceStatus.mode
+            : undefined,
         hasPendingInteraction: Boolean(state.pendingInteraction)
     });
 };

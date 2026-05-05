@@ -5,6 +5,7 @@ import DiagnosticsPage from './index';
 import config from '../../config/environment';
 import { gameWebSocket } from '../../services/websocket';
 import { getLiffDiagnosticsSnapshot } from '../../utils/lineLiff';
+import { getAccountDiagnosticsSnapshot } from '../../utils/lineAccount';
 
 const mockNavigate = jest.fn();
 
@@ -45,9 +46,20 @@ jest.mock('../../utils/lineLiff', () => ({
     }))
 }));
 
+jest.mock('../../utils/lineAccount', () => ({
+    __esModule: true,
+    getAccountDiagnosticsSnapshot: jest.fn(() => ({
+        accountSyncStatus: 'guest',
+        accountPersistenceMode: 'temporary',
+        accountPersistenceAvailable: true,
+        accountPersistenceMessage: 'Account profiles are temporary in this environment.'
+    }))
+}));
+
 const mockConfig = config as jest.Mocked<typeof config>;
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockGetLiffDiagnosticsSnapshot = getLiffDiagnosticsSnapshot as jest.MockedFunction<typeof getLiffDiagnosticsSnapshot>;
+const mockGetAccountDiagnosticsSnapshot = getAccountDiagnosticsSnapshot as jest.MockedFunction<typeof getAccountDiagnosticsSnapshot>;
 
 describe('DiagnosticsPage', () => {
     beforeEach(() => {
@@ -66,6 +78,12 @@ describe('DiagnosticsPage', () => {
             hasSdk: false,
             ready: false,
             loggedIn: 'unknown'
+        });
+        mockGetAccountDiagnosticsSnapshot.mockReturnValue({
+            accountSyncStatus: 'guest',
+            accountPersistenceMode: 'temporary',
+            accountPersistenceAvailable: true,
+            accountPersistenceMessage: 'Account profiles are temporary in this environment.'
         });
     });
 
@@ -89,6 +107,42 @@ describe('DiagnosticsPage', () => {
         expect(screen.queryByText(/competition groups/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/raw payload/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/game state/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/lineUserId/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/raw profile/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/token/i)).not.toBeInTheDocument();
+    });
+
+    test('renders account sync and temporary persistence status without private account fields', () => {
+        mockGetAccountDiagnosticsSnapshot.mockReturnValue({
+            accountSyncStatus: 'sync-failed',
+            accountPersistenceMode: 'temporary',
+            accountPersistenceAvailable: true,
+            accountPersistenceMessage: 'Account profiles are temporary in this environment.'
+        });
+
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByText('帳號同步狀態')).toBeInTheDocument();
+        expect(screen.getByText('sync-failed')).toBeInTheDocument();
+        expect(screen.getByText('帳號持久化狀態')).toBeInTheDocument();
+        expect(screen.getByText('temporary')).toBeInTheDocument();
+        expect(screen.getByText('Temporary mode is non-durable and not suitable for persistent achievements.')).toBeInTheDocument();
+        expect(screen.queryByText('U1234567890')).not.toBeInTheDocument();
+    });
+
+    test('renders durable account persistence status', () => {
+        mockGetAccountDiagnosticsSnapshot.mockReturnValue({
+            accountSyncStatus: 'bound',
+            accountPersistenceMode: 'durable',
+            accountPersistenceAvailable: true,
+            accountPersistenceMessage: 'Account profiles are persistent.'
+        });
+
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByText('bound')).toBeInTheDocument();
+        expect(screen.getByText('durable')).toBeInTheDocument();
+        expect(screen.getByText('Account profiles are persistent.')).toBeInTheDocument();
     });
 
     test('navigates back to lobby', async () => {

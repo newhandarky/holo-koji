@@ -16,6 +16,7 @@ interface LobbyPlayControlsProps {
     canCreateRoom: boolean;
     canJoinRoom: boolean;
     hasUnavailableCharacterSet: boolean;
+    accountGuestNotice?: string;
     onPlayerNameChange: (value: string) => void;
     onRoomIdChange: (value: string) => void;
     onMatchModeChange: (value: 'online' | 'npc') => void;
@@ -41,6 +42,7 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     canCreateRoom,
     canJoinRoom,
     hasUnavailableCharacterSet,
+    accountGuestNotice,
     onPlayerNameChange,
     onRoomIdChange,
     onMatchModeChange,
@@ -60,6 +62,12 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
         </div>
 
         <div className="lobby-form-block">
+            {accountGuestNotice && (
+                <div className="lobby-account-notice" role="status">
+                    {accountGuestNotice}
+                </div>
+            )}
+
             <label className="form-label">對戰模式</label>
             <div className="lobby-mode-toggle mb-3" role="radiogroup" aria-label="對戰模式">
                 <label className={`lobby-mode-toggle__option ${matchMode === 'online' ? 'is-active' : ''}`}>

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { gameWebSocket } from '../../services/websocket';
 import Lobby from './index';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import { getLineProfile } from '../../utils/lineLiff';
+import { syncLineAccount } from '../../utils/lineAccount';
 
 const mockNavigate = jest.fn();
 
@@ -37,8 +39,22 @@ jest.mock('../../utils/lineLiff', () => ({
     getLineProfile: jest.fn().mockResolvedValue(null)
 }));
 
+jest.mock('../../utils/lineAccount', () => ({
+    getBoundAccountProfile: (result: any) => (result?.status === 'bound' ? result.profile : null),
+    syncLineAccount: jest.fn().mockResolvedValue({
+        status: 'guest',
+        persistenceStatus: {
+            mode: 'temporary',
+            available: true,
+            message: 'Account profiles are temporary in this environment.'
+        }
+    })
+}));
+
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
+const mockGetLineProfile = getLineProfile as jest.MockedFunction<typeof getLineProfile>;
+const mockSyncLineAccount = syncLineAccount as jest.MockedFunction<typeof syncLineAccount>;
 
 describe('Lobby character set selection', () => {
     beforeEach(() => {
@@ -50,6 +66,17 @@ describe('Lobby character set selection', () => {
         mockGameWebSocket.on.mockClear();
         mockGameWebSocket.off.mockClear();
         mockGameWebSocket.send.mockClear();
+        mockGetLineProfile.mockReset();
+        mockGetLineProfile.mockResolvedValue(null);
+        mockSyncLineAccount.mockReset();
+        mockSyncLineAccount.mockResolvedValue({
+            status: 'guest',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
         window.localStorage.clear();
         jest.spyOn(window, 'alert').mockImplementation(() => undefined);
         CHARACTER_SET_OPTIONS.forEach((option) => {
@@ -300,5 +327,108 @@ describe('Lobby character set selection', () => {
         await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(debugSpy).not.toHaveBeenCalled();
+    });
+
+    test('successful LINE profile sync pre-fills name and sends bound account presentation only', async () => {
+        mockGetLineProfile.mockResolvedValue({
+            userId: 'U1234567890',
+            displayName: 'LINE 玩家',
+            pictureUrl: 'https://example.test/avatar.png'
+        });
+        mockSyncLineAccount.mockResolvedValue({
+            status: 'bound',
+            profile: {
+                lineUserId: 'U1234567890',
+                displayName: 'LINE 玩家',
+                avatarUrl: 'https://example.test/avatar.png',
+                createdAt: '2026-05-05T12:00:00.000Z',
+                updatedAt: '2026-05-05T12:00:00.000Z',
+                counters: {
+                    gamesPlayed: 0,
+                    wins: 0,
+                    lastPlayedAt: null
+                }
+            },
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            }
+        });
+
+        renderLobby();
+
+        await waitFor(() => expect(screen.getByPlaceholderText('輸入你的名稱')).toHaveValue('LINE 玩家'));
+        await waitFor(() => expect(mockSyncLineAccount).toHaveBeenCalledTimes(1));
+        await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), '房間暱稱');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockSyncLineAccount).toHaveBeenCalledWith({
+            userId: 'U1234567890',
+            displayName: 'LINE 玩家',
+            pictureUrl: 'https://example.test/avatar.png'
+        });
+        await waitFor(() =>
+            expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+                'CREATE_ROOM',
+                expect.objectContaining({
+                    playerId: '房間暱稱',
+                    displayName: '房間暱稱',
+                    lineUserId: 'U1234567890',
+                    avatarUrl: 'https://example.test/avatar.png'
+                })
+            )
+        );
+    });
+
+    test('missing LINE profile keeps guest room creation independent from account proof', async () => {
+        renderLobby();
+
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-host');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockSyncLineAccount).not.toHaveBeenCalled();
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.not.objectContaining({
+                lineUserId: expect.anything(),
+                avatarUrl: expect.anything()
+            })
+        );
+    });
+
+    test('account sync failure shows non-blocking guest notice and still allows room creation', async () => {
+        mockGetLineProfile.mockResolvedValue({
+            userId: 'U1234567890',
+            displayName: 'LINE 玩家'
+        });
+        mockSyncLineAccount.mockResolvedValue({
+            status: 'sync-failed',
+            guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
+
+        renderLobby();
+
+        expect(await screen.findByText('目前以訪客模式繼續，帳號進度暫時不會保存。')).toBeInTheDocument();
+        await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-after-fail');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.objectContaining({
+                playerId: 'guest-after-fail',
+                displayName: 'guest-after-fail'
+            })
+        );
     });
 });

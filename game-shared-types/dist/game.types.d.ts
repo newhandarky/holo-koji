@@ -76,6 +76,44 @@ export declare const characterProfilesBySet: Record<GeishaSet, CharacterProfile[
 export interface CustomCharacterSelection {
     characterIds: string[];
 }
+export interface VerifiedLineIdentity {
+    provider: 'line';
+    lineUserId: string;
+    verifiedAt: string;
+    source: string;
+}
+export interface MinimalAccountCounters {
+    gamesPlayed: number;
+    wins: number;
+    lastPlayedAt: string | null;
+}
+export interface LineAccountProfile {
+    lineUserId: string;
+    displayName: string;
+    avatarUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+    counters: MinimalAccountCounters;
+}
+export interface AccountPersistenceStatus {
+    mode: 'durable' | 'temporary';
+    available: boolean;
+    message: string;
+}
+export type AccountSyncStatus = 'bound' | 'guest' | 'sync-failed' | 'unverified';
+export interface AccountSyncResult {
+    status: AccountSyncStatus;
+    profile?: LineAccountProfile;
+    persistenceStatus: AccountPersistenceStatus;
+    guestNotice?: string;
+}
+export interface AccountSyncRequest {
+    verifiedIdentity?: VerifiedLineIdentity;
+    profile?: {
+        displayName?: string;
+        avatarUrl?: string;
+    };
+}
 export interface CreateRoomPayload {
     playerId: string;
     displayName?: string;

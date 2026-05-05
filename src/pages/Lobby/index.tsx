@@ -1,10 +1,11 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
-import { GeishaSet, RoomSetupMode } from 'game-shared-types';
+import { AccountSyncResult, GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
+import { getBoundAccountProfile, syncLineAccount } from '../../utils/lineAccount';
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
@@ -31,10 +32,12 @@ const Lobby: React.FC = () => {
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     // LINE 使用者資料（若在 LIFF 內）
     const [lineProfile, setLineProfile] = useState<LineProfile | null>(null);
+    const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
+    const accountSyncStartedRef = useRef(false);
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
@@ -97,9 +100,19 @@ const Lobby: React.FC = () => {
                 if (!playerNameRef.current) {
                     setPlayerName(profile.displayName);
                 }
+
             } catch (error) {
                 frontendLogger.warn('⚠️ 讀取 LINE 使用者資料失敗', {
                     error: error instanceof Error ? error.message : 'unknown'
+                });
+                setAccountSyncResult({
+                    status: 'sync-failed',
+                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
+                    persistenceStatus: {
+                        mode: 'temporary',
+                        available: true,
+                        message: 'Account profiles are temporary in this environment.'
+                    }
                 });
             }
         };
@@ -110,6 +123,40 @@ const Lobby: React.FC = () => {
             isActive = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!lineProfile || connectionStatus !== 'connected' || accountSyncStartedRef.current) {
+            return;
+        }
+
+        let isActive = true;
+        accountSyncStartedRef.current = true;
+
+        syncLineAccount(lineProfile)
+            .then((syncResult) => {
+                if (!isActive) return;
+                setAccountSyncResult(syncResult);
+            })
+            .catch((error) => {
+                if (!isActive) return;
+                frontendLogger.warn('⚠️ LINE 帳號同步失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+                setAccountSyncResult({
+                    status: 'sync-failed',
+                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
+                    persistenceStatus: {
+                        mode: 'temporary',
+                        available: true,
+                        message: 'Account profiles are temporary in this environment.'
+                    }
+                });
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [connectionStatus, lineProfile]);
 
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
@@ -203,9 +250,9 @@ const Lobby: React.FC = () => {
         });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
-            displayName: lineProfile?.displayName ?? playerName,
-            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
-            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
+            displayName: playerName,
+            lineUserId: boundAccountProfile?.lineUserId,
+            avatarUrl: boundAccountProfile?.avatarUrl,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
             geishaSet: selectedGeishaSet,
@@ -225,12 +272,17 @@ const Lobby: React.FC = () => {
         gameWebSocket.send('JOIN_ROOM', {
             roomId,
             playerId: playerName,
-            displayName: lineProfile?.displayName ?? playerName,
-            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
-            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined
+            displayName: playerName,
+            lineUserId: boundAccountProfile?.lineUserId,
+            avatarUrl: boundAccountProfile?.avatarUrl
         });
     };
 
+    const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
+    const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
+        ? accountSyncResult.guestNotice
+        : undefined;
+    const isAccountSyncPending = Boolean(lineProfile && !accountSyncResult);
     const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
     const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
     const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
@@ -239,6 +291,7 @@ const Lobby: React.FC = () => {
     const canCreateRoom = Boolean(
         playerName.trim()
         && !isConnecting
+        && !isAccountSyncPending
         && connectionStatus === 'connected'
         && selectedGeishaSetOption?.available
         && isCustomSelectionReady
@@ -247,6 +300,7 @@ const Lobby: React.FC = () => {
         playerName.trim()
         && roomId.trim()
         && !isConnecting
+        && !isAccountSyncPending
         && connectionStatus === 'connected'
     );
 
@@ -285,6 +339,7 @@ const Lobby: React.FC = () => {
                         canCreateRoom={canCreateRoom}
                         canJoinRoom={canJoinRoom}
                         hasUnavailableCharacterSet={hasUnavailableCharacterSet}
+                        accountGuestNotice={accountGuestNotice}
                         onPlayerNameChange={setPlayerName}
                         onRoomIdChange={setRoomId}
                         onMatchModeChange={setMatchMode}

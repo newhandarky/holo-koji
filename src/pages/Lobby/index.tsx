@@ -7,6 +7,8 @@ import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import LobbyBrandSurface from './LobbyBrandSurface';
+import LobbyPlayControls from './LobbyPlayControls';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -203,29 +205,6 @@ const Lobby: React.FC = () => {
         });
     };
 
-    // 依連線狀態回傳文字顏色
-    const getStatusColor = () => {
-        switch (connectionStatus) {
-            case 'connected': return 'text-success';
-            case 'connecting': return 'text-warning';
-            default: return 'text-danger';
-        }
-    };
-
-    // 依連線狀態回傳顯示文字
-    const getStatusText = () => {
-        switch (connectionStatus) {
-            case 'connected': return '🟢 已連接到伺服器';
-            case 'connecting': return '🟡 連接中...';
-            default: return '🔴 未連接到伺服器';
-        }
-    };
-
-    // 檢查當前網域，決定是否使用 Hash Router
-    const shouldUseHash = () => {
-        return window.location.host.includes('github.io');
-    };
-
     const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
     const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
     const canCreateRoom = Boolean(
@@ -234,162 +213,36 @@ const Lobby: React.FC = () => {
         && connectionStatus === 'connected'
         && selectedGeishaSetOption?.available
     );
+    const canJoinRoom = Boolean(
+        playerName.trim()
+        && roomId.trim()
+        && !isConnecting
+        && connectionStatus === 'connected'
+    );
 
     return (
-        <div className="lobby-background d-flex align-items-center justify-content-center">
-            <div className="card p-4" style={{ minWidth: 350, maxWidth: 400 }}>
-                <div className="text-center mb-4">
-                    <h2 className="mb-3">花見小路</h2>
-                    <p className="text-secondary">線上對戰版</p>
-                    <small className={getStatusColor()}>
-                        {getStatusText()}
-                    </small>
-                    {config.isDevelopment && (
-                        <div className="mt-2">
-                            <small className="text-muted">
-                                環境: {process.env.NODE_ENV}<br />
-                                WebSocket: {config.websocketUrl}<br />
-                                Router: {shouldUseHash() ? 'HashRouter' : 'BrowserRouter'}
-                            </small>
-                        </div>
-                    )}
-                </div>
-
-                <div className="mb-3">
-                    <label className="form-label">對戰模式</label>
-                    <div className="d-flex gap-3 mb-3">
-                        <label className="form-check-label">
-                            <input
-                                type="radio"
-                                className="form-check-input me-2"
-                                name="matchMode"
-                                value="online"
-                                checked={matchMode === 'online'}
-                                onChange={() => setMatchMode('online')}
-                                disabled={isConnecting}
-                            />
-                            線上玩家
-                        </label>
-                        <label className="form-check-label">
-                            <input
-                                type="radio"
-                                className="form-check-input me-2"
-                                name="matchMode"
-                                value="npc"
-                                checked={matchMode === 'npc'}
-                                onChange={() => setMatchMode('npc')}
-                                disabled={isConnecting}
-                            />
-                            對戰 NPC
-                        </label>
-                    </div>
-                    {matchMode === 'npc' && (
-                        <div className="mb-3">
-                            <label className="form-label">AI 強度</label>
-                            <select
-                                className="form-select"
-                                value={aiDifficulty}
-                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
-                                disabled={isConnecting}
-                            >
-                                <option value="easy">しぐれうい</option>
-                                <option value="medium">大空スバル</option>
-                                <option value="hard">兎田ぺこら</option>
-                                <option value="expert">猫又おかゆ</option>
-                                <option value="hell">ときのそら</option>
-                            </select>
-                        </div>
-                    )}
-                    <div className="mb-3">
-                        <label className="form-label">藝妓組合</label>
-                        <select
-                            className="form-select"
-                            value={selectedGeishaSet}
-                            onChange={(event) => setSelectedGeishaSet(event.target.value as GeishaSet)}
-                            disabled={isConnecting}
-                            aria-label="藝妓組合"
-                        >
-                            {CHARACTER_SET_OPTIONS.map((option) => (
-                                <option key={option.key} value={option.key} disabled={!option.available}>
-                                    {option.available ? option.displayName : `${option.displayName}（目前不可用）`}
-                                </option>
-                            ))}
-                        </select>
-                        {hasUnavailableCharacterSet && (
-                            <div className="form-text">不可用的藝妓組合會保留顯示，但目前無法建立房間。</div>
-                        )}
-                    </div>
-                    <label className="form-label">玩家名稱</label>
-                    <input
-                        type="text"
-                        className="form-control mb-3"
-                        placeholder="輸入你的名稱"
-                        value={playerName}
-                        onChange={e => setPlayerName(e.target.value)}
-                        disabled={isConnecting}
-                        maxLength={20}
+        <div className="lobby-background">
+            <div className="container-fluid px-3 px-md-4 py-4 py-md-5">
+                <LobbyBrandSurface onOpenDiagnostics={() => navigate('/diagnostics')}>
+                    <LobbyPlayControls
+                        playerName={playerName}
+                        roomId={roomId}
+                        matchMode={matchMode}
+                        aiDifficulty={aiDifficulty}
+                        selectedGeishaSet={selectedGeishaSet}
+                        isConnecting={isConnecting}
+                        canCreateRoom={canCreateRoom}
+                        canJoinRoom={canJoinRoom}
+                        hasUnavailableCharacterSet={hasUnavailableCharacterSet}
+                        onPlayerNameChange={setPlayerName}
+                        onRoomIdChange={setRoomId}
+                        onMatchModeChange={setMatchMode}
+                        onAiDifficultyChange={setAiDifficulty}
+                        onGeishaSetChange={setSelectedGeishaSet}
+                        onCreateRoom={createRoom}
+                        onJoinRoom={joinRoom}
                     />
-                    <button
-                        className="btn btn-primary w-100"
-                        onClick={createRoom}
-                        disabled={!canCreateRoom}
-                    >
-                        {isConnecting ? (
-                            <>
-                                <span className="spinner-border spinner-border-sm me-2"></span>
-                                建立中...
-                            </>
-                        ) : '🏠 建立房間'}
-                    </button>
-                </div>
-
-                {matchMode === 'online' && (
-                    <>
-                        <hr className="my-4" />
-                        <div>
-                            <label className="form-label">加入房間</label>
-                            <input
-                                type="text"
-                                className="form-control mb-2"
-                                placeholder="輸入房間代碼"
-                                value={roomId}
-                                onChange={e => setRoomId(e.target.value.toUpperCase())}
-                                disabled={isConnecting}
-                                maxLength={6}
-                            />
-                            <button
-                                className="btn btn-success w-100"
-                                onClick={joinRoom}
-                                disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected'}
-                            >
-                                {isConnecting ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2"></span>
-                                        加入中...
-                                    </>
-                                ) : '🚪 加入房間'}
-                            </button>
-                        </div>
-                    </>
-                )}
-
-                <div className="mt-4 pt-3 border-top">
-                    <small className="text-muted">
-                        <strong>遊戲說明：</strong><br />
-                        透過四種行動收集物品卡，獲得藝妓的好感。<br />
-                        控制四位以上藝妓或累積11點魅力值即可獲勝！
-                    </small>
-                </div>
-
-                {config.isDevelopment && (
-                    <div className="mt-3 p-2 bg-light rounded">
-                        <small className="text-muted">
-                            <strong>開發資訊：</strong><br />
-                            連線狀態: {connectionStatus}<br />
-                            已註冊事件: {gameWebSocket.messageHandlers?.size || 0}
-                        </small>
-                    </div>
-                )}
+                </LobbyBrandSurface>
             </div>
         </div>
     );

@@ -64,6 +64,18 @@ describe('Lobby character set selection', () => {
 
     const renderLobby = () => render(<Lobby />);
 
+    test('renders Ginza-branded homepage without homepage diagnostics block', () => {
+        renderLobby();
+
+        expect(screen.getByRole('heading', { name: '銀座十字路' })).toBeInTheDocument();
+        expect(screen.getByText('Ginza Crossroads')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '系統診斷' })).toBeInTheDocument();
+        expect(screen.queryByText(/環境:/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/WebSocket:/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Router:/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/已註冊事件:/)).not.toBeInTheDocument();
+    });
+
     test('untouched room creation uses default Ginza set', async () => {
         renderLobby();
 
@@ -159,6 +171,14 @@ describe('Lobby character set selection', () => {
                 geishaSet: expect.anything()
             })
         );
+    });
+
+    test('diagnostics entry stays available without replacing primary room actions', () => {
+        renderLobby();
+
+        expect(screen.getByRole('button', { name: '系統診斷' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeInTheDocument();
     });
 
     test('temporarily unavailable sets stay visible but disabled', () => {

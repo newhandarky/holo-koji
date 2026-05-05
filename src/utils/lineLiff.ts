@@ -7,6 +7,7 @@ declare global {
 }
 
 let liffInitPromise: Promise<void> | null = null;
+let liffReady = false;
 
 const isLikelyLineClient = () => /Line\//i.test(navigator.userAgent);
 
@@ -47,11 +48,13 @@ const ensureLiffReady = async () => {
     if (!liffInitPromise) {
         liffInitPromise = window.liff.init({ liffId: config.liffId }).catch((error: unknown) => {
             liffInitPromise = null;
+            liffReady = false;
             throw error;
         });
     }
 
     await liffInitPromise;
+    liffReady = true;
 };
 
 export const initLiffIfPossible = async () => {
@@ -72,6 +75,28 @@ export const initLiffIfPossible = async () => {
 };
 
 export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || (!!window.liff && isSupportedLiffOrigin());
+
+export const getLiffDiagnosticsSnapshot = () => {
+    const supportedOrigin = isSupportedLiffOrigin();
+    const hasSdk = Boolean(window.liff);
+
+    let loggedIn: boolean | 'unknown' = 'unknown';
+
+    if (hasSdk && config.liffId && supportedOrigin && typeof window.liff?.isLoggedIn === 'function') {
+        try {
+            loggedIn = window.liff.isLoggedIn();
+        } catch {
+            loggedIn = 'unknown';
+        }
+    }
+
+    return {
+        supportedOrigin,
+        hasSdk,
+        ready: liffReady,
+        loggedIn
+    };
+};
 
 export const getLineProfile = async (): Promise<LineProfile | null> => {
     if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {

@@ -67,10 +67,14 @@ export const summarizeSocketMessage = (message: { type?: string; payload?: any }
         roomId: typeof payload?.roomId === 'string' ? payload.roomId : undefined,
         gameId: typeof payload?.gameId === 'string' ? payload.gameId : undefined,
         playerId: typeof payload?.playerId === 'string' ? payload.playerId : undefined,
-        accountStatus: typeof payload?.status === 'string' ? payload.status : undefined,
+        accountStatus: message.type === 'ACCOUNT_SYNC_RESULT' && typeof payload?.status === 'string' ? payload.status : undefined,
         accountPersistenceMode: payload?.persistenceStatus?.mode === 'durable' || payload?.persistenceStatus?.mode === 'temporary'
             ? payload.persistenceStatus.mode
             : undefined,
+        achievementStatus: payload?.status === 'available' || payload?.status === 'guest' || payload?.status === 'unavailable'
+            ? payload.status
+            : undefined,
+        achievementNewUnlockCount: typeof payload?.newUnlockCount === 'number' ? payload.newUnlockCount : undefined,
         mode: payload?.mode === 'npc' || payload?.mode === 'online' ? payload.mode : undefined,
         geishaSet: typeof payload?.geishaSet === 'string' ? payload.geishaSet : undefined,
         setupMode: payload?.setupMode === 'random' || payload?.setupMode === 'custom' ? payload.setupMode : undefined,

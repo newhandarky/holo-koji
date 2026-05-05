@@ -1287,6 +1287,14 @@ code {
     font-size: 0.68rem;
     padding: 3px 6px;
   }
+
+  .player-hand-deal-lane--self {
+    bottom: 48px;
+  }
+
+  .player-hand-deal-card {
+    left: calc(4% + (var(--deal-slot-index, 0) * 14%));
+  }
 }
 
 @media (min-width: 768px) {
@@ -1351,9 +1359,11 @@ code {
   align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .player-hand-stage__content {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -1361,6 +1371,113 @@ code {
   min-height: 0;
   width: 100%;
   padding-inline: 0;
+}
+
+.player-hand-stage--deal-active .player-hand-row {
+  opacity: 0.18;
+  transition: opacity 0.16s ease;
+}
+
+.player-hand-deal-lanes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.player-hand-deal-lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(var(--hand-card-width) * 16 / 9);
+}
+
+.player-hand-deal-lane--opponent {
+  top: 0;
+}
+
+.player-hand-deal-lane--self {
+  bottom: 52px;
+}
+
+.player-hand-deal-card {
+  position: absolute;
+  width: calc(var(--hand-card-width) * 0.86);
+  height: calc(var(--hand-card-width) * 16 / 9 * 0.86);
+  left: calc(8% + (var(--deal-slot-index, 0) * 12%));
+  border-radius: 14px;
+  border: 1px solid rgba(255, 232, 213, 0.52);
+  background:
+    linear-gradient(165deg, rgba(24, 11, 16, 0.9), rgba(77, 33, 41, 0.7));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 12px 24px rgba(8, 5, 10, 0.35);
+  opacity: 0;
+}
+
+.player-hand-deal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+}
+
+.player-hand-deal-card.is-masked {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 230, 193, 0.12), transparent 55%),
+    linear-gradient(155deg, rgba(57, 28, 41, 0.96), rgba(18, 11, 19, 0.96));
+}
+
+.player-hand-deal-card--opponent {
+  top: 0;
+  animation: opponentDealEntry var(--motion-duration, 260ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.player-hand-deal-card--self {
+  bottom: 0;
+  animation: selfDealEntry var(--motion-duration, 260ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.player-hand-deal-card--reduced.player-hand-deal-card--opponent,
+.player-hand-deal-card--reduced.player-hand-deal-card--self {
+  animation-name: reducedDealEntry;
+}
+
+.player-hand-removal-cues {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.player-hand-removal-cue {
+  position: absolute;
+  width: calc(var(--hand-card-width) * 0.72);
+  height: calc(var(--hand-card-width) * 16 / 9 * 0.72);
+  left: calc(50% + ((var(--removal-index, 0) - 0.5) * 18px));
+  border-radius: 14px;
+  border: 1px solid rgba(255, 232, 213, 0.44);
+  background:
+    linear-gradient(155deg, rgba(255, 232, 196, 0.14), rgba(255, 232, 196, 0.03)),
+    linear-gradient(160deg, rgba(36, 17, 26, 0.86), rgba(80, 35, 45, 0.68));
+  box-shadow: 0 10px 22px rgba(8, 5, 10, 0.26);
+  opacity: 0;
+}
+
+.player-hand-removal-cue--self {
+  bottom: 48px;
+  animation: handRemovalSelf var(--motion-duration, 520ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.player-hand-removal-cue--opponent {
+  top: 0;
+  animation: handRemovalOpponent var(--motion-duration, 520ms) ease-out var(--motion-delay, 0ms) both;
+}
+
+.player-hand-removal-cue--reduced {
+  animation-name: handRemovalReduced;
 }
 
 .player-hand-controls {
@@ -1477,19 +1594,19 @@ code {
 
 /* 抽牌卡片滑入動畫 */
 .item-card--new {
-  animation: cardSlideIn 0.5s ease;
+  animation: cardSlideIn 0.28s ease;
 }
 
 .item-card--motion-draw {
   animation:
-    cardSlideIn 0.5s ease,
-    cardDrawGlow var(--motion-duration, 960ms) ease-out var(--motion-delay, 0ms) both;
+    cardSlideIn 0.28s ease,
+    cardDrawGlow var(--motion-duration, 360ms) ease-out var(--motion-delay, 0ms) both;
 }
 
 .item-card--motion-reduced {
   animation:
-    cardSlideIn 0.5s ease,
-    cardDrawReduced var(--motion-duration, 520ms) ease-out var(--motion-delay, 0ms) both;
+    cardSlideIn 0.22s ease,
+    cardDrawReduced var(--motion-duration, 240ms) ease-out var(--motion-delay, 0ms) both;
 }
 
 .item-card__motion-glow {
@@ -1500,12 +1617,12 @@ code {
   box-shadow: 0 0 18px rgba(255, 214, 122, 0.52);
   z-index: 3;
   pointer-events: none;
-  animation: cardMotionGlow var(--motion-duration, 960ms) ease-out var(--motion-delay, 0ms) both;
+  animation: cardMotionGlow var(--motion-duration, 360ms) ease-out var(--motion-delay, 0ms) both;
 }
 
 @keyframes cardSlideIn {
   0% {
-    transform: translateY(-120%);
+    transform: translateY(-28px);
     opacity: 0;
   }
   100% {
@@ -1517,7 +1634,7 @@ code {
 @keyframes cardDrawGlow {
   0% {
     box-shadow: 0 0 0 rgba(255, 210, 99, 0);
-    transform: translateY(-8px) scale(0.96);
+    transform: translateY(-6px) scale(0.98);
   }
   35% {
     box-shadow: 0 0 20px rgba(255, 210, 99, 0.4);
@@ -1552,6 +1669,72 @@ code {
     opacity: 1;
   }
   100% {
+    opacity: 0;
+  }
+}
+
+@keyframes opponentDealEntry {
+  0% {
+    transform: translateY(-22px) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.92;
+  }
+}
+
+@keyframes selfDealEntry {
+  0% {
+    transform: translateY(22px) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.98;
+  }
+}
+
+@keyframes reducedDealEntry {
+  0% {
+    opacity: 0;
+    filter: brightness(1.16);
+  }
+  100% {
+    opacity: 0.88;
+    filter: brightness(1);
+  }
+}
+
+@keyframes handRemovalSelf {
+  0% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 0.76;
+  }
+  100% {
+    transform: translate(-50%, 22px) scale(0.92);
+    opacity: 0;
+  }
+}
+
+@keyframes handRemovalOpponent {
+  0% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 0.66;
+  }
+  100% {
+    transform: translate(-50%, -18px) scale(0.92);
+    opacity: 0;
+  }
+}
+
+@keyframes handRemovalReduced {
+  0% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.58;
+  }
+  100% {
+    transform: translateX(-50%) scale(0.98);
     opacity: 0;
   }
 }

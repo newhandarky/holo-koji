@@ -27,6 +27,14 @@ export interface CardDrawEvent {
     card: ItemCard;
 }
 
+export interface DealAnimationEvent {
+    sequence: Array<{
+        order: number;
+        playerId: string;
+        card: ItemCard;
+    }>;
+}
+
 interface RoundCompletePayload {
     // 結算回合數
     round?: number;
@@ -139,6 +147,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
     const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
+    const [dealQueue, setDealQueue] = useState<DealAnimationEvent[]>([]);
     const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
     const roundSummaryTimerRef = useRef<number | null>(null);
     const [readyStatus, setReadyStatus] = useState<ReadyStatusPayload | null>(null);
@@ -234,6 +243,32 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
                 };
                 setDrawQueue(prev => [...prev, drawEvent]);
             }
+        };
+
+        const handleDealAnimation = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as Partial<DealAnimationEvent>;
+            if (!Array.isArray(candidate.sequence)) {
+                return;
+            }
+
+            const sequence = candidate.sequence.filter((step): step is DealAnimationEvent['sequence'][number] => (
+                Boolean(step)
+                && typeof step === 'object'
+                && typeof step.order === 'number'
+                && typeof step.playerId === 'string'
+                && Boolean(step.card)
+                && typeof step.card === 'object'
+            ));
+
+            if (sequence.length === 0) {
+                return;
+            }
+
+            setDealQueue((previous) => [...previous, { sequence }]);
         };
 
         const handleRoundComplete = (payload: unknown) => {
@@ -335,7 +370,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('ERROR', handleErrorMessage);
         registerEventHandler('GAME_ENDED', syncGameState);
         registerEventHandler('CARD_DRAWN', handleCardDrawn);
-        registerEventHandler('DEAL_ANIMATION', ignoreLifecycleEvent);
+        registerEventHandler('DEAL_ANIMATION', handleDealAnimation);
         registerEventHandler('ACTION_EXECUTED', ignoreLifecycleEvent);
 
         gameWebSocket.on(CONNECTION_OPEN, handleOpen);
@@ -356,6 +391,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             isActive = false;
             cleanupHandlers();
             setDrawQueue([]);
+            setDealQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);
 
@@ -462,6 +498,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         setDrawQueue(prev => prev.slice(1));
     }, []);
 
+    const consumeDealEvent = useCallback(() => {
+        setDealQueue(prev => prev.slice(1));
+    }, []);
+
     const leaveRoom = useCallback(() => {
         gameWebSocket.disconnect();
     }, []);
@@ -481,6 +521,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         startOrderDecision,
         clearError,
         leaveRoom,
+        dealQueue,
+        consumeDealEvent,
         drawQueue,
         consumeDrawEvent
     };

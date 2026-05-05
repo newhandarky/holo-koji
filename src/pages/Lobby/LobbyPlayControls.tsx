@@ -45,7 +45,6 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
                 <div className="lobby-controls__kicker">Lobby</div>
                 <h2 className="lobby-controls__title">選擇你的入場方式</h2>
             </div>
-            <p className="lobby-controls__hint">保留原有流程，只把第一印象換成更像銀座夜色的入口。</p>
         </div>
 
         <div className="lobby-form-block">
@@ -96,13 +95,13 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
             )}
 
             <div className="mb-3">
-                <label className="form-label">藝妓組合</label>
+                <label className="form-label">女公關組合</label>
                 <select
                     className="form-select"
                     value={selectedGeishaSet}
                     onChange={(event) => onGeishaSetChange(event.target.value as GeishaSet)}
                     disabled={isConnecting}
-                    aria-label="藝妓組合"
+                    aria-label="女公關組合"
                 >
                     {CHARACTER_SET_OPTIONS.map((option) => (
                         <option key={option.key} value={option.key} disabled={!option.available}>
@@ -111,7 +110,7 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
                     ))}
                 </select>
                 {hasUnavailableCharacterSet && (
-                    <div className="form-text">不可用的藝妓組合會保留顯示，但目前無法建立房間。</div>
+                    <div className="form-text">不可用的女公關組合會保留顯示，但目前無法建立房間。</div>
                 )}
             </div>
 
@@ -164,7 +163,7 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
 
         <div className="lobby-copy-note">
             <strong>遊戲說明：</strong>
-            <span>透過四種行動收集物品卡，獲得藝妓的好感。控制四位以上藝妓或累積 11 點魅力值即可獲勝。</span>
+            <span>透過四種行動收集物品卡，獲得女公關的好感。控制四位以上女公關或累積 11 點魅力值即可獲勝。</span>
         </div>
     </div>
 );

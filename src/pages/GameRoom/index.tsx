@@ -9,9 +9,12 @@ import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import {
     buildMotionSnapshot,
+    createOpeningDealCueSteps,
     createDrawMotionCue,
     deriveMotionCues,
+    getOpeningDealCueDuration,
     MotionCue,
+    OpeningDealCueStep,
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
@@ -71,19 +74,19 @@ const GameRoom: React.FC = () => {
         ? (currentPlayer ?? createPlayerProfile(currentPlayerId))
         : null;
     const playersById = useMemo(() => new Map(state.players.map((player) => [player.id, player])), [state.players]);
-    const getPlayerDisplayName = (playerId?: string) => {
+    const getPlayerDisplayName = useCallback((playerId?: string) => {
         if (!playerId) return '未知玩家';
         const player = playersById.get(playerId);
         return player?.name
             || (playerId === currentPlayerId ? localLineName : '')
             || playerId
             || '未知玩家';
-    };
-    const getPlayerAvatar = (playerId?: string) => {
+    }, [currentPlayerId, localLineName, playersById]);
+    const getPlayerAvatar = useCallback((playerId?: string) => {
         if (!playerId) return '';
         const player = playersById.get(playerId);
         return player?.avatarUrl || (playerId === currentPlayerId ? localLineAvatar : '') || '';
-    };
+    }, [currentPlayerId, localLineAvatar, playersById]);
     const displayName = getPlayerDisplayName(currentPlayerId);
     const displayAvatar = getPlayerAvatar(currentPlayerId);
     const {
@@ -96,6 +99,8 @@ const GameRoom: React.FC = () => {
         requestRematch,
         confirmReady,
         leaveRoom,
+        dealQueue,
+        consumeDealEvent,
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
@@ -104,12 +109,11 @@ const GameRoom: React.FC = () => {
     const [showRoomCode, setShowRoomCode] = useState(false);
     // 抽牌文字提示
     const [recentDraw, setRecentDraw] = useState<string | null>(null);
-    // 抽牌視窗開關
-    const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
     // 抽牌動畫目標卡片
     const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
     // 抽牌動畫是否顯示
     const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
+    const [activeOpeningDealSteps, setActiveOpeningDealSteps] = useState<OpeningDealCueStep[]>([]);
     // 再來一場送出狀態
     const [isRematchRequested, setIsRematchRequested] = useState(false);
     // 結算底部視窗是否收合
@@ -181,42 +185,57 @@ const GameRoom: React.FC = () => {
 
         const { playerId, card } = drawQueue[0];
         if (playerId === currentPlayerId && card.type !== 'hidden') {
-            setIsDrawModalOpen(true);
+            setRecentDraw(null);
             setDrawHighlightCardId(card.id);
-            setIsDrawHighlightActive(false);
+            setIsDrawHighlightActive(true);
+            enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
 
-            const revealTimer = window.setTimeout(() => {
-                setIsDrawHighlightActive(true);
-                enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
-            }, 1000);
-
-            const highlightTimer = window.setTimeout(() => {
-                setIsDrawHighlightActive(false);
-            }, 1500);
-
-            const closeTimer = window.setTimeout(() => {
-                setIsDrawModalOpen(false);
+            const highlightDuration = prefersReducedMotion ? 240 : 360;
+            const clearTimer = window.setTimeout(() => {
                 setIsDrawHighlightActive(false);
                 setDrawHighlightCardId(null);
                 consumeDrawEvent();
-            }, 5000);
+            }, highlightDuration + 60);
 
             return () => {
-                window.clearTimeout(revealTimer);
-                window.clearTimeout(highlightTimer);
-                window.clearTimeout(closeTimer);
+                window.clearTimeout(clearTimer);
             };
         }
 
-        const label = `${playerId} 抽到了新卡`;
+        const label = `${getPlayerDisplayName(playerId)} 抽到了新卡`;
         setRecentDraw(label);
 
         const timer = window.setTimeout(() => {
+            setRecentDraw(null);
             consumeDrawEvent();
-        }, 1200);
+        }, prefersReducedMotion ? 520 : 700);
 
         return () => window.clearTimeout(timer);
-    }, [drawQueue, currentPlayerId, consumeDrawEvent, enqueueMotionCues, prefersReducedMotion]);
+    }, [drawQueue, currentPlayerId, consumeDrawEvent, enqueueMotionCues, prefersReducedMotion, getPlayerDisplayName]);
+
+    useEffect(() => {
+        if (!currentPlayerId || dealQueue.length === 0) {
+            return;
+        }
+
+        const nextEvent = dealQueue[0];
+        const steps = createOpeningDealCueSteps(nextEvent.sequence, currentPlayerId, prefersReducedMotion);
+        if (steps.length === 0) {
+            consumeDealEvent();
+            return;
+        }
+
+        setActiveOpeningDealSteps(steps);
+        const totalDuration = getOpeningDealCueDuration(steps);
+        const clearTimer = window.setTimeout(() => {
+            setActiveOpeningDealSteps([]);
+            consumeDealEvent();
+        }, totalDuration + 120);
+
+        return () => {
+            window.clearTimeout(clearTimer);
+        };
+    }, [consumeDealEvent, currentPlayerId, dealQueue, prefersReducedMotion]);
 
     useEffect(() => {
         if (!currentPlayerId || state.phase !== 'playing') {
@@ -276,12 +295,13 @@ const GameRoom: React.FC = () => {
     const isGameEnded = state.phase === 'ended';
 
     const isWaiting = state.phase === 'waiting' || state.players.length < 2;
+    const isOpeningDealActive = activeOpeningDealSteps.length > 0;
 
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
     const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
     const isInteractionLocked = Boolean(pendingInteraction)
-        || isDrawModalOpen
+        || isOpeningDealActive
         || state.orderDecision.isOpen
         || Boolean(readyStatus)
         || isGameEnded;
@@ -289,7 +309,7 @@ const GameRoom: React.FC = () => {
         state.phase === 'playing'
         && state.players[state.currentPlayer]?.id === currentPlayerId
         && !pendingInteraction
-        && !isDrawModalOpen
+        && !isOpeningDealActive
         && !state.orderDecision.isOpen;
     const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
     const localActionTokenMap = useMemo(
@@ -629,6 +649,7 @@ const GameRoom: React.FC = () => {
                         motionCues={activeMotionCues}
                         prefersReducedMotion={prefersReducedMotion}
                         focusSection={focusSection}
+                        openingDealSteps={activeOpeningDealSteps}
                     />
                 </div>
             </div>
@@ -651,14 +672,6 @@ const GameRoom: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {isDrawModalOpen && (
-                <div className="top-sheet">
-                    <div className="top-sheet__panel">
-                        <div className="top-sheet__title">你抽到一張新牌</div>
                     </div>
                 </div>
             )}

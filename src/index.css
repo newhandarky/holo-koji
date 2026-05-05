@@ -274,6 +274,112 @@ code {
   line-height: 1.5;
 }
 
+.lobby-achievements {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: var(--ginza-readable-text);
+}
+
+.lobby-achievements__entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 236, 208, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ginza-readable-text);
+  text-align: left;
+}
+
+.lobby-achievements__kicker,
+.lobby-achievements__title {
+  display: block;
+}
+
+.lobby-achievements__kicker {
+  color: var(--ginza-muted-text);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.lobby-achievements__title {
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.lobby-achievements__badge,
+.lobby-achievement-item__new {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(255, 210, 128, 0.18);
+  border: 1px solid rgba(255, 210, 128, 0.38);
+  color: rgba(255, 246, 224, 0.96);
+  font-size: 0.78rem;
+}
+
+.lobby-achievements__badge {
+  padding: 5px 8px;
+}
+
+.lobby-achievements__panel {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 236, 208, 0.12);
+  background: rgba(16, 8, 10, 0.58);
+}
+
+.lobby-achievements__list {
+  display: grid;
+  gap: 8px;
+}
+
+.lobby-achievement-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 236, 208, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lobby-achievement-item--unlocked {
+  border-color: rgba(255, 210, 128, 0.32);
+  background: rgba(255, 210, 128, 0.1);
+}
+
+.lobby-achievement-item__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.lobby-achievement-item__new {
+  padding: 2px 6px;
+}
+
+.lobby-achievement-item__description,
+.lobby-achievements__empty {
+  color: var(--ginza-muted-text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.lobby-achievement-item__progress {
+  min-width: 44px;
+  color: rgba(255, 247, 236, 0.9);
+  font-weight: 700;
+  text-align: right;
+}
+
 .lobby-controls .form-label,
 .lobby-controls .form-text {
   color: var(--ginza-muted-text);

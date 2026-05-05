@@ -61,6 +61,48 @@ declare module 'game-shared-types' {
         };
     }
 
+    export type AchievementId =
+        | 'first_completed_match'
+        | 'first_win'
+        | 'complete_3_matches'
+        | 'win_3_matches';
+
+    export type AchievementConditionType = 'completed_games' | 'wins';
+    export type AchievementItemState = 'locked' | 'in_progress' | 'unlocked';
+    export type AchievementStatus = 'available' | 'guest' | 'unavailable';
+
+    export interface AchievementCatalogItem {
+        achievementId: AchievementId;
+        title: string;
+        description: string;
+        conditionType: AchievementConditionType;
+        target: number;
+    }
+
+    export interface AchievementSummaryItem {
+        achievementId: AchievementId;
+        title: string;
+        description: string;
+        state: AchievementItemState;
+        currentValue: number;
+        target: number;
+        unlockedAt?: string;
+        isNew: boolean;
+    }
+
+    export interface AchievementStatusResult {
+        status: AchievementStatus;
+        persistenceStatus: AccountPersistenceStatus;
+        message?: string;
+        newUnlockCount?: number;
+        items?: AchievementSummaryItem[];
+        generatedAt?: string;
+    }
+
+    export interface AchievementAcknowledgeRequest {
+        achievementIds?: AchievementId[];
+    }
+
     export interface CreateRoomPayload {
         playerId: string;
         displayName?: string;

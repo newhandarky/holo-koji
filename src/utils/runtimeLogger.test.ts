@@ -129,6 +129,50 @@ describe('runtimeLogger summaries', () => {
         expect(summary).not.toHaveProperty('token');
     });
 
+    test('summarizeSocketMessage reports achievement status without progress or account details', async () => {
+        const { summarizeSocketMessage } = await import('./runtimeLogger');
+
+        const summary = summarizeSocketMessage({
+            type: 'ACHIEVEMENT_STATUS_RESULT',
+            payload: {
+                status: 'available',
+                newUnlockCount: 1,
+                items: [
+                    {
+                        achievementId: 'first_completed_match',
+                        title: '初次花見',
+                        currentValue: 1,
+                        target: 1,
+                        unlockedAt: '2026-05-05T12:34:56.000Z',
+                        isNew: true
+                    }
+                ],
+                profile: {
+                    lineUserId: 'U1234567890'
+                },
+                token: 'secret',
+                hiddenCards: [{ id: 'hidden-card' }],
+                persistenceStatus: {
+                    mode: 'durable',
+                    available: true,
+                    message: 'Account profiles are persistent.'
+                }
+            }
+        });
+
+        expect(summary).toEqual({
+            type: 'ACHIEVEMENT_STATUS_RESULT',
+            achievementStatus: 'available',
+            achievementNewUnlockCount: 1,
+            accountPersistenceMode: 'durable',
+            hasPayload: true
+        });
+        expect(summary).not.toHaveProperty('items');
+        expect(summary).not.toHaveProperty('lineUserId');
+        expect(summary).not.toHaveProperty('token');
+        expect(summary).not.toHaveProperty('hiddenCards');
+    });
+
     test('summarizeGameState reports account persistence mode only', async () => {
         const { summarizeGameState } = await import('./runtimeLogger');
 

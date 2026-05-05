@@ -1,11 +1,12 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
-import { AccountSyncResult, GeishaSet, RoomSetupMode } from 'game-shared-types';
+import { AccountSyncResult, AchievementStatusResult, GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
 import { getBoundAccountProfile, syncLineAccount } from '../../utils/lineAccount';
+import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
@@ -33,11 +34,18 @@ const Lobby: React.FC = () => {
     // LINE 使用者資料（若在 LIFF 內）
     const [lineProfile, setLineProfile] = useState<LineProfile | null>(null);
     const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
+    const [achievementStatus, setAchievementStatus] = useState<AchievementStatusResult | null>(null);
+    const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
     const accountSyncStartedRef = useRef(false);
+    const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
+    const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
+        ? accountSyncResult.guestNotice
+        : undefined;
+    const isAccountSyncPending = Boolean(lineProfile && !accountSyncResult);
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
@@ -157,6 +165,29 @@ const Lobby: React.FC = () => {
             isActive = false;
         };
     }, [connectionStatus, lineProfile]);
+
+    useEffect(() => {
+        if (connectionStatus !== 'connected' || isAccountSyncPending) {
+            return;
+        }
+
+        let isActive = true;
+        requestAchievementStatus()
+            .then((result) => {
+                if (!isActive) return;
+                setAchievementStatus(result);
+            })
+            .catch((error) => {
+                if (!isActive) return;
+                frontendLogger.warn('⚠️ 成就狀態讀取失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [accountSyncResult, connectionStatus, isAccountSyncPending]);
 
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
@@ -278,11 +309,6 @@ const Lobby: React.FC = () => {
         });
     };
 
-    const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
-    const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
-        ? accountSyncResult.guestNotice
-        : undefined;
-    const isAccountSyncPending = Boolean(lineProfile && !accountSyncResult);
     const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
     const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
     const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
@@ -321,10 +347,74 @@ const Lobby: React.FC = () => {
         });
     };
 
+    const achievementItems = achievementStatus?.items ?? [];
+    const achievementNewUnlockCount = achievementStatus?.newUnlockCount ?? 0;
+    const achievementMessage = achievementStatus?.message;
+
+    const openAchievements = () => {
+        setIsAchievementPanelOpen((current) => !current);
+        if (achievementNewUnlockCount <= 0 || !achievementItems.some((item) => item.isNew)) {
+            return;
+        }
+
+        acknowledgeAchievementUnlocks({
+            achievementIds: achievementItems.filter((item) => item.isNew).map((item) => item.achievementId)
+        })
+            .then(setAchievementStatus)
+            .catch((error) => {
+                frontendLogger.warn('⚠️ 成就提示清除失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+            });
+    };
+
     return (
         <div className="lobby-background">
             <div className="container-fluid px-3 px-md-4 py-4 py-md-5">
                 <LobbyBrandSurface onOpenDiagnostics={() => navigate('/diagnostics')}>
+                    <section className="lobby-achievements" aria-label="成就">
+                        <button
+                            type="button"
+                            className="lobby-achievements__entry"
+                            onClick={openAchievements}
+                            aria-expanded={isAchievementPanelOpen}
+                        >
+                            <span>
+                                <span className="lobby-achievements__kicker">Achievements</span>
+                                <span className="lobby-achievements__title">成就</span>
+                            </span>
+                            {achievementNewUnlockCount > 0 && (
+                                <span className="lobby-achievements__badge">新解鎖 {achievementNewUnlockCount}</span>
+                            )}
+                        </button>
+
+                        {isAchievementPanelOpen && (
+                            <div className="lobby-achievements__panel">
+                                {achievementStatus?.status === 'available' && achievementItems.length > 0 ? (
+                                    <div className="lobby-achievements__list">
+                                        {achievementItems.map((item) => (
+                                            <div key={item.achievementId} className={`lobby-achievement-item lobby-achievement-item--${item.state}`}>
+                                                <div>
+                                                    <div className="lobby-achievement-item__title">
+                                                        {item.title}
+                                                        {item.isNew && <span className="lobby-achievement-item__new">新</span>}
+                                                    </div>
+                                                    <div className="lobby-achievement-item__description">{item.description}</div>
+                                                </div>
+                                                <div className="lobby-achievement-item__progress">
+                                                    {item.currentValue} / {item.target}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="lobby-achievements__empty" role="status">
+                                        {achievementMessage ?? '成就狀態讀取中。'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
                     <LobbyPlayControls
                         playerName={playerName}
                         roomId={roomId}

@@ -6,6 +6,7 @@ import Lobby from './index';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { getLineProfile } from '../../utils/lineLiff';
 import { syncLineAccount } from '../../utils/lineAccount';
+import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 
 const mockNavigate = jest.fn();
 
@@ -51,10 +52,25 @@ jest.mock('../../utils/lineAccount', () => ({
     })
 }));
 
+jest.mock('../../utils/achievementAccount', () => ({
+    requestAchievementStatus: jest.fn().mockResolvedValue({
+        status: 'guest',
+        message: '成就需要綁定帳號後才會保存。',
+        persistenceStatus: {
+            mode: 'temporary',
+            available: true,
+            message: 'Account profiles are temporary in this environment.'
+        }
+    }),
+    acknowledgeAchievementUnlocks: jest.fn()
+}));
+
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
 const mockGetLineProfile = getLineProfile as jest.MockedFunction<typeof getLineProfile>;
 const mockSyncLineAccount = syncLineAccount as jest.MockedFunction<typeof syncLineAccount>;
+const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
+const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
 
 describe('Lobby character set selection', () => {
     beforeEach(() => {
@@ -76,6 +92,28 @@ describe('Lobby character set selection', () => {
                 available: true,
                 message: 'Account profiles are temporary in this environment.'
             }
+        });
+        mockRequestAchievementStatus.mockReset();
+        mockRequestAchievementStatus.mockResolvedValue({
+            status: 'guest',
+            message: '成就需要綁定帳號後才會保存。',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
+        mockAcknowledgeAchievementUnlocks.mockReset();
+        mockAcknowledgeAchievementUnlocks.mockResolvedValue({
+            status: 'available',
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            },
+            newUnlockCount: 0,
+            items: [],
+            generatedAt: '2026-05-05T12:00:00.000Z'
         });
         window.localStorage.clear();
         jest.spyOn(window, 'alert').mockImplementation(() => undefined);
@@ -430,5 +468,142 @@ describe('Lobby character set selection', () => {
                 displayName: 'guest-after-fail'
             })
         );
+    });
+
+    test('guest achievement entry shows non-persistent message', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+
+        expect(await screen.findByText('成就需要綁定帳號後才會保存。')).toBeInTheDocument();
+    });
+
+    test('unavailable achievement state shows temporary unavailable message', async () => {
+        mockRequestAchievementStatus.mockResolvedValue({
+            status: 'unavailable',
+            message: '成就暫時不可用，進度目前無法保存。',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: false,
+                message: 'Account profiles are unavailable; durable persistence is not connected.'
+            }
+        });
+
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+
+        expect(await screen.findByText('成就暫時不可用，進度目前無法保存。')).toBeInTheDocument();
+    });
+
+    test('bound achievement view shows locked in-progress and unlocked starter achievements', async () => {
+        mockRequestAchievementStatus.mockResolvedValue({
+            status: 'available',
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            },
+            newUnlockCount: 0,
+            generatedAt: '2026-05-05T12:00:00.000Z',
+            items: [
+                {
+                    achievementId: 'first_completed_match',
+                    title: '初次花見',
+                    description: '完成第一場對局。',
+                    state: 'unlocked',
+                    currentValue: 1,
+                    target: 1,
+                    unlockedAt: '2026-05-05T12:00:00.000Z',
+                    isNew: false
+                },
+                {
+                    achievementId: 'complete_3_matches',
+                    title: '三度赴約',
+                    description: '完成 3 場對局。',
+                    state: 'in_progress',
+                    currentValue: 1,
+                    target: 3,
+                    isNew: false
+                },
+                {
+                    achievementId: 'win_3_matches',
+                    title: '三勝之姿',
+                    description: '贏得 3 場對局。',
+                    state: 'locked',
+                    currentValue: 0,
+                    target: 3,
+                    isNew: false
+                }
+            ]
+        });
+
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+
+        expect(await screen.findByText('初次花見')).toBeInTheDocument();
+        expect(screen.getByText('1 / 1')).toBeInTheDocument();
+        expect(screen.getByText('三度赴約')).toBeInTheDocument();
+        expect(screen.getByText('1 / 3')).toBeInTheDocument();
+        expect(screen.getByText('三勝之姿')).toBeInTheDocument();
+        expect(screen.getByText('0 / 3')).toBeInTheDocument();
+    });
+
+    test('new unlock marker clears when opening achievements', async () => {
+        mockRequestAchievementStatus.mockResolvedValue({
+            status: 'available',
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            },
+            newUnlockCount: 1,
+            generatedAt: '2026-05-05T12:00:00.000Z',
+            items: [
+                {
+                    achievementId: 'first_completed_match',
+                    title: '初次花見',
+                    description: '完成第一場對局。',
+                    state: 'unlocked',
+                    currentValue: 1,
+                    target: 1,
+                    unlockedAt: '2026-05-05T12:00:00.000Z',
+                    isNew: true
+                }
+            ]
+        });
+        mockAcknowledgeAchievementUnlocks.mockResolvedValue({
+            status: 'available',
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            },
+            newUnlockCount: 0,
+            generatedAt: '2026-05-05T12:01:00.000Z',
+            items: [
+                {
+                    achievementId: 'first_completed_match',
+                    title: '初次花見',
+                    description: '完成第一場對局。',
+                    state: 'unlocked',
+                    currentValue: 1,
+                    target: 1,
+                    unlockedAt: '2026-05-05T12:00:00.000Z',
+                    isNew: false
+                }
+            ]
+        });
+
+        renderLobby();
+
+        expect(await screen.findByText('新解鎖 1')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+
+        await waitFor(() => expect(mockAcknowledgeAchievementUnlocks).toHaveBeenCalledWith({
+            achievementIds: ['first_completed_match']
+        }));
+        await waitFor(() => expect(screen.queryByText('新解鎖 1')).not.toBeInTheDocument());
     });
 });

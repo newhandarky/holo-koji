@@ -66,6 +66,27 @@ export interface OrderDecision {
     currentPlayer: string;
 }
 export type GeishaSet = 'default' | 'collaboration' | 'hololive';
+export type RoomSetupMode = 'random' | 'custom';
+export interface CharacterProfile {
+    characterId: string;
+    name: string;
+    imageUrl: string;
+}
+export declare const characterProfilesBySet: Record<GeishaSet, CharacterProfile[]>;
+export interface CustomCharacterSelection {
+    characterIds: string[];
+}
+export interface CreateRoomPayload {
+    playerId: string;
+    displayName?: string;
+    lineUserId?: string;
+    avatarUrl?: string;
+    mode?: 'online' | 'npc';
+    aiDifficulty?: 'easy' | 'medium' | 'hard' | 'expert' | 'hell';
+    geishaSet?: GeishaSet;
+    setupMode?: RoomSetupMode;
+    customSelection?: CustomCharacterSelection;
+}
 export interface GameState {
     gameId: string;
     players: Player[];
@@ -185,7 +206,7 @@ export interface RoomInfo {
     maxPlayers: number;
     gameState: 'waiting' | 'playing' | 'ended';
 }
-export type WebSocketEventType = 'GAME_STATE_SYNC' | 'ORDER_DECISION_STARTED' | 'ORDER_DECISION_COMPLETED' | 'TURN_CHANGED' | 'PLAYER_JOINED' | 'ERROR' | 'ORDER_DECISION_START' | 'GAME_STARTED' | 'GAME_STATE_UPDATED' | 'GAME_STATE_UPDATE' | 'ORDER_CONFIRMATION_UPDATE' | 'ORDER_CONFIRMATIONS_UPDATED' | 'PLAYER_LEFT' | 'ORDER_DECISION_RESULT' | 'TURN_ENDED' | 'GAME_ENDED' | 'ROOM_CREATED' | 'ORDER_CONFIRMED' | 'STATE_CHANGED';
+export type WebSocketEventType = 'GAME_STATE_SYNC' | 'ORDER_DECISION_STARTED' | 'ORDER_DECISION_COMPLETED' | 'TURN_CHANGED' | 'PLAYER_JOINED' | 'ERROR' | 'ORDER_DECISION_START' | 'GAME_STARTED' | 'GAME_STATE_UPDATED' | 'GAME_STATE_UPDATE' | 'ORDER_CONFIRMATION_UPDATE' | 'ORDER_CONFIRMATIONS_UPDATED' | 'PLAYER_LEFT' | 'ORDER_DECISION_RESULT' | 'TURN_ENDED' | 'GAME_ENDED' | 'ROOM_CREATED' | 'ORDER_CONFIRMED' | 'STATE_CHANGED' | 'DEAL_ANIMATION' | 'CARD_DRAWN' | 'ACTION_EXECUTED' | 'PENDING_INTERACTION' | 'INTERACTION_RESOLVED' | 'ROUND_COMPLETE';
 export interface WebSocketMessage<T = any> {
     type: WebSocketEventType | string;
     payload: T;

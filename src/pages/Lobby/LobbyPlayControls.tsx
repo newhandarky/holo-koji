@@ -1,5 +1,5 @@
 import React from 'react';
-import { GeishaSet } from 'game-shared-types';
+import { CharacterProfile, GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 
 interface LobbyPlayControlsProps {
@@ -8,6 +8,10 @@ interface LobbyPlayControlsProps {
     matchMode: 'online' | 'npc';
     aiDifficulty: 'easy' | 'medium' | 'hard' | 'expert' | 'hell';
     selectedGeishaSet: GeishaSet;
+    setupMode: RoomSetupMode;
+    availableCharacterProfiles: CharacterProfile[];
+    selectedCharacterIds: string[];
+    customSelectionCount: number;
     isConnecting: boolean;
     canCreateRoom: boolean;
     canJoinRoom: boolean;
@@ -17,6 +21,8 @@ interface LobbyPlayControlsProps {
     onMatchModeChange: (value: 'online' | 'npc') => void;
     onAiDifficultyChange: (value: 'easy' | 'medium' | 'hard' | 'expert' | 'hell') => void;
     onGeishaSetChange: (value: GeishaSet) => void;
+    onSetupModeChange: (value: RoomSetupMode) => void;
+    onCharacterSelectionToggle: (characterId: string) => void;
     onCreateRoom: () => void;
     onJoinRoom: () => void;
 }
@@ -27,6 +33,10 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     matchMode,
     aiDifficulty,
     selectedGeishaSet,
+    setupMode,
+    availableCharacterProfiles,
+    selectedCharacterIds,
+    customSelectionCount,
     isConnecting,
     canCreateRoom,
     canJoinRoom,
@@ -36,6 +46,8 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     onMatchModeChange,
     onAiDifficultyChange,
     onGeishaSetChange,
+    onSetupModeChange,
+    onCharacterSelectionToggle,
     onCreateRoom,
     onJoinRoom
 }) => (
@@ -111,6 +123,67 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
                 </select>
                 {hasUnavailableCharacterSet && (
                     <div className="form-text">不可用的女公關組合會保留顯示，但目前無法建立房間。</div>
+                )}
+            </div>
+
+            <div className="mb-3">
+                <label className="form-label">角色設定</label>
+                <div className="lobby-mode-toggle mb-2" role="radiogroup" aria-label="角色設定">
+                    <label className={`lobby-mode-toggle__option ${setupMode === 'random' ? 'is-active' : ''}`}>
+                        <input
+                            type="radio"
+                            className="form-check-input me-2"
+                            name="setupMode"
+                            value="random"
+                            checked={setupMode === 'random'}
+                            onChange={() => onSetupModeChange('random')}
+                            disabled={isConnecting}
+                        />
+                        隨機
+                    </label>
+                    <label className={`lobby-mode-toggle__option ${setupMode === 'custom' ? 'is-active' : ''}`}>
+                        <input
+                            type="radio"
+                            className="form-check-input me-2"
+                            name="setupMode"
+                            value="custom"
+                            checked={setupMode === 'custom'}
+                            onChange={() => onSetupModeChange('custom')}
+                            disabled={isConnecting}
+                        />
+                        自選七位
+                    </label>
+                </div>
+
+                {setupMode === 'custom' && (
+                    <div className="lobby-character-selection">
+                        <div className="lobby-character-selection__summary" aria-live="polite">
+                            已選 {customSelectionCount} / 7
+                            {customSelectionCount === 7 ? '，可以建立房間' : '，請選滿七位'}
+                        </div>
+                        <div className="lobby-character-grid">
+                            {availableCharacterProfiles.map((profile) => {
+                                const isSelected = selectedCharacterIds.includes(profile.characterId);
+                                return (
+                                    <button
+                                        key={profile.characterId}
+                                        type="button"
+                                        className={`lobby-character-card ${isSelected ? 'is-selected' : ''}`}
+                                        onClick={() => onCharacterSelectionToggle(profile.characterId)}
+                                        disabled={isConnecting}
+                                        aria-pressed={isSelected}
+                                    >
+                                        <span
+                                            className="lobby-character-card__image"
+                                            style={{ backgroundImage: `url(${profile.imageUrl})` }}
+                                            aria-hidden="true"
+                                        />
+                                        <span className="lobby-character-card__name">{profile.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 )}
             </div>
 

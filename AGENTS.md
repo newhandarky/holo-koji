@@ -3,6 +3,7 @@
 ## Communication
 
 - Reply in Traditional Chinese (zh-TW) unless the user explicitly requests another language.
+- Analysis reports, review findings, validation summaries, plans, tables, and generated handoff notes MUST also be written in Traditional Chinese (zh-TW) unless the user explicitly requests another language.
 - Keep explanations concise and focused on concrete actions, risks, and verification.
 - For code review, list findings and risks before summaries or suggestions.
 
@@ -37,6 +38,7 @@
 - Use a clear title line followed by a body when the change is more than trivial.
 - Keep the title concise and outcome-focused.
 - Prefer a bullet list in the body that separates what changed, verification, and residual risks when applicable.
+- If changes include the nested `server/` repository, provide a separate server commit message in addition to the parent project commit message.
 - Example:
 
 ```text

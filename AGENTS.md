@@ -54,6 +54,9 @@
 - Keep long-term project rules in `AGENTS.md` or `.specify/memory/constitution.md`.
 - Keep feature-specific requirements, acceptance criteria, and task lists inside the relevant `specs/<feature>/` directory.
 - Do not change package versions, release notes, or release scope before the active spec records the intended versioning strategy.
+- For each new spec, create and **switch to** the dedicated feature branch before editing code or spec artifacts.
+- Do not continue implementation for a new spec on the current branch just because the branch name was created elsewhere; verify the active branch explicitly first.
+- If the working tree still contains uncommitted changes from a previous spec, stop and resolve that branch hygiene issue before creating or switching to the next spec branch.
 
 ## Implementation Rules
 

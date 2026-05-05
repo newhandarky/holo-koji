@@ -16,6 +16,10 @@ const shouldUseHashRouter = () => {
 function App() {
   // 動態選擇路由器
   const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
+  const routerFuture = {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  } as const;
   const [liffError, setLiffError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,7 +98,7 @@ function App() {
           </div>
         </div>
       )}
-      <Router>
+      <Router future={routerFuture}>
         <Routes>
           {/* 大廳頁面 */}
           <Route path="/" element={<Lobby />} />

@@ -185,4 +185,17 @@ describe('Lobby character set selection', () => {
 
         expect(selector).toHaveValue('hololive');
     });
+
+    test('default runtime does not emit diagnostic request summaries during room creation', async () => {
+        const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+
+        renderLobby();
+
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'quiet-host');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(debugSpy).not.toHaveBeenCalled();
+    });
 });

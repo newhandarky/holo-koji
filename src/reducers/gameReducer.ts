@@ -1,5 +1,6 @@
 // src/contexts/gameReducer.ts - 添加順序決定狀態管理
 import { GameState, GameAction } from "game-shared-types"
+import { frontendLogger } from '../utils/runtimeLogger';
 
 // 初始遊戲狀態
 export const initialState: GameState = {
@@ -126,7 +127,10 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
             };
 
         default:
-            console.warn('⚠️ [Reducer] 未知動作類型:', action);
+            frontendLogger.warn('⚠️ [Reducer] 未知動作類型', {
+                gameId: state.gameId || undefined,
+                actionType: action.type
+            });
             return state;
     }
 };

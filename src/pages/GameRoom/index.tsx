@@ -15,6 +15,7 @@ import {
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
+import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
 import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
 import { getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
@@ -94,6 +95,7 @@ const GameRoom: React.FC = () => {
         sendGameAction,
         requestRematch,
         confirmReady,
+        leaveRoom,
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
@@ -148,14 +150,12 @@ const GameRoom: React.FC = () => {
         });
     }, []);
 
-    // 當前狀態除錯紀錄（開發用）
     useEffect(() => {
-        console.log('🎮 [GameRoom] 狀態更新:');
-        console.log('  - roomId:', roomId);
-        console.log('  - 玩家數量:', state.players.length);
-        console.log('  - 遊戲階段:', state.phase);
-        console.log('  - 順序決定狀態:', state.orderDecision);
-        console.log('  - 當前玩家ID:', currentPlayerId);
+        frontendLogger.diagnostic('🐞 [GameRoom] 狀態摘要', {
+            roomId,
+            currentPlayerId,
+            ...summarizeGameState(state)
+        });
     }, [state, roomId, isConnected, currentPlayerId]);
 
     // 進入新局時重置再來一場狀態
@@ -265,9 +265,13 @@ const GameRoom: React.FC = () => {
 
     // 玩家確認順序
     const handleConfirmOrder = () => {
-        console.log('🎯 [GameRoom] 玩家確認順序:', currentPlayerId);
         confirmOrder();
     };
+
+    const handleReturnToLobby = useCallback(() => {
+        leaveRoom();
+        navigate('/');
+    }, [leaveRoom, navigate]);
 
     const isGameEnded = state.phase === 'ended';
 
@@ -361,7 +365,7 @@ const GameRoom: React.FC = () => {
                 <div className="card p-4 text-center" style={{ minWidth: 360, maxWidth: 520 }}>
                     <h4 className="text-danger mb-3">無法進入對戰</h4>
                     <p className="mb-4">{error}</p>
-                    <button className="btn btn-primary" onClick={() => navigate('/')}>返回大廳</button>
+                    <button className="btn btn-primary" onClick={handleReturnToLobby}>返回大廳</button>
                 </div>
             </div>
         );
@@ -414,7 +418,9 @@ const GameRoom: React.FC = () => {
                                                 alert('已複製邀請連結，請貼給好友！');
                                             }
                                         } catch (error) {
-                                            console.error('❌ LINE 邀請失敗:', error);
+                                            frontendLogger.error('❌ LINE 邀請失敗', {
+                                                error: error instanceof Error ? error.message : 'unknown'
+                                            });
                                             const message = error instanceof Error ? error.message : 'LINE 邀請失敗，請改用複製連結分享。';
                                             alert(message);
                                         }
@@ -478,7 +484,7 @@ const GameRoom: React.FC = () => {
 
                     <button
                         className="btn btn-outline-secondary btn-sm"
-                        onClick={() => navigate('/')}
+                        onClick={handleReturnToLobby}
                     >
                         返回大廳
                     </button>
@@ -519,7 +525,7 @@ const GameRoom: React.FC = () => {
                                         className="btn btn-outline-danger btn-sm game-info-status-row__leave"
                                         onClick={() => {
                                             if (window.confirm('確定要離開遊戲嗎？')) {
-                                                navigate('/');
+                                                handleReturnToLobby();
                                             }
                                         }}
                                     >
@@ -725,7 +731,7 @@ const GameRoom: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="d-flex justify-content-center gap-2">
-                                        <button className="btn btn-primary" onClick={() => navigate('/')}>
+                                        <button className="btn btn-primary" onClick={handleReturnToLobby}>
                                             返回大廳
                                         </button>
                                         <button

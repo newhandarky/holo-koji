@@ -1,4 +1,6 @@
 // src/services/websocket.ts - 強化版本
+import { frontendLogger, summarizeSocketMessage } from '../utils/runtimeLogger';
+
 // WebSocket 訊息格式
 interface WebSocketMessage {
     type: string;
@@ -18,6 +20,7 @@ export class GameWebSocket {
     private reconnectDelay = 1000;
     private reconnectTimerId: ReturnType<typeof setTimeout> | null = null;
     private shouldReconnect = false;
+    private connectPromise: Promise<void> | null = null;
 
     // 建立 WebSocket 連線
     connect(url: string): Promise<void> {
@@ -28,12 +31,17 @@ export class GameWebSocket {
             return Promise.resolve();
         }
 
-        return new Promise((resolve, reject) => {
+        if (this.connectPromise) {
+            return this.connectPromise;
+        }
+
+        this.connectPromise = new Promise((resolve, reject) => {
             try {
                 this.ws = new WebSocket(url);
 
                 // 連線成功
                 this.ws.onopen = () => {
+                    this.connectPromise = null;
                     this.reconnectAttempts = 0;
                     const openHandler = this.messageHandlers.get('__OPEN__'); // 通知使用端連線事件
                     if (openHandler) {
@@ -44,6 +52,7 @@ export class GameWebSocket {
 
                 // 連線錯誤
                 this.ws.onerror = (error) => {
+                    this.connectPromise = null;
                     reject(error);
                 };
 
@@ -58,15 +67,18 @@ export class GameWebSocket {
                         if (handler) {
                             handler(message.payload);
                         } else {
-                            console.warn('⚠️ [WebSocket] 找不到處理器:', message.type);
+                            frontendLogger.warn('⚠️ [WebSocket] 找不到處理器', summarizeSocketMessage(message) ?? undefined);
                         }
 
                     } catch (error) {
-                        console.error('❌ [WebSocket] 訊息解析錯誤:', error);
+                        frontendLogger.error('❌ [WebSocket] 訊息解析錯誤', {
+                            error: error instanceof Error ? error.message : 'unknown'
+                        });
                     }
                 };
 
                 this.ws.onclose = (event) => {
+                    this.connectPromise = null;
                     const closeHandler = this.messageHandlers.get('__CLOSE__'); // 通知使用端關閉事件
                     if (closeHandler) {
                         closeHandler({ code: event.code, reason: event.reason });
@@ -78,9 +90,12 @@ export class GameWebSocket {
                 };
 
             } catch (error) {
+                this.connectPromise = null;
                 reject(error);
             }
         });
+
+        return this.connectPromise;
     }
 
     private clearReconnectTimer() {
@@ -107,7 +122,9 @@ export class GameWebSocket {
 
             this.connect(url).catch(() => {
                 if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                    console.error('❌ [WebSocket] 重連失敗，已達最大重試次數');
+                    frontendLogger.error('❌ [WebSocket] 重連失敗，已達最大重試次數', {
+                        attempts: this.reconnectAttempts
+                    });
                 }
             });
         }, this.reconnectDelay * this.reconnectAttempts);
@@ -118,8 +135,12 @@ export class GameWebSocket {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const message: WebSocketMessage = { type, payload };
             this.ws.send(JSON.stringify(message));
+            frontendLogger.diagnostic('🐞 [WebSocket] 傳送事件摘要', summarizeSocketMessage(message) ?? undefined);
         } else {
-            console.error('❌ [WebSocket] 無法發送訊息，連線狀態:', this.getConnectionState());
+            frontendLogger.error('❌ [WebSocket] 無法發送訊息', {
+                type,
+                connectionState: this.getConnectionState()
+            });
             throw new Error('WebSocket 連線不可用');
         }
     }
@@ -138,6 +159,7 @@ export class GameWebSocket {
     disconnect(): void {
         this.shouldReconnect = false;
         this.clearReconnectTimer();
+        this.connectPromise = null;
         if (this.ws) {
             this.ws.close(1000, '正常關閉');
             this.ws = null;

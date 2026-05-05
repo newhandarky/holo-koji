@@ -10,6 +10,22 @@ let liffInitPromise: Promise<void> | null = null;
 
 const isLikelyLineClient = () => /Line\//i.test(navigator.userAgent);
 
+const isSupportedLiffOrigin = () => {
+    if (isLikelyLineClient()) {
+        return true;
+    }
+
+    if (!config.webAppUrl) {
+        return false;
+    }
+
+    try {
+        return window.location.origin === new URL(config.webAppUrl).origin;
+    } catch {
+        return false;
+    }
+};
+
 export const isLineClient = () => {
     if (window.liff && typeof window.liff.isInClient === 'function') {
         return window.liff.isInClient();
@@ -24,7 +40,7 @@ export interface LineProfile {
 }
 
 const ensureLiffReady = async () => {
-    if (!window.liff || !config.liffId) {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         return;
     }
 
@@ -43,6 +59,10 @@ export const initLiffIfPossible = async () => {
         return { ready: false as const, reason: 'missing' as const };
     }
 
+    if (!isSupportedLiffOrigin()) {
+        return { ready: false as const, reason: 'unsupported-origin' as const };
+    }
+
     try {
         await ensureLiffReady();
         return { ready: true as const };
@@ -51,10 +71,10 @@ export const initLiffIfPossible = async () => {
     }
 };
 
-export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || !!window.liff;
+export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || (!!window.liff && isSupportedLiffOrigin());
 
 export const getLineProfile = async (): Promise<LineProfile | null> => {
-    if (!window.liff || !config.liffId) {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         return null;
     }
 
@@ -123,7 +143,7 @@ export const shareRoomInvite = async (roomId: string) => {
     const inviteUrl = resolveInviteUrl(roomId);
     const message = `一起玩花見小路！點此加入房間`;
 
-    if (!window.liff || !config.liffId) {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         await navigator.clipboard.writeText(inviteUrl);
         return { mode: 'copy' as const, url: inviteUrl };
     }

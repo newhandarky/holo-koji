@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
+import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 
 // Lobby 入口主畫面
@@ -75,7 +76,9 @@ const Lobby: React.FC = () => {
                     setPlayerName(profile.displayName);
                 }
             } catch (error) {
-                console.warn('⚠️ 讀取 LINE 使用者資料失敗:', error);
+                frontendLogger.warn('⚠️ 讀取 LINE 使用者資料失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
             }
         };
 
@@ -97,11 +100,13 @@ const Lobby: React.FC = () => {
                 await gameWebSocket.connect(config.websocketUrl);
                 if (!isActive) return;
                 setConnectionStatus('connected');
-                console.log('✅ [Lobby] WebSocket 連線成功');
+                frontendLogger.info('✅ [Lobby] WebSocket 連線成功');
             } catch (error) {
                 if (!isActive) return;
                 setConnectionStatus('disconnected');
-                console.error('❌ [Lobby] WebSocket 連線失敗:', error);
+                frontendLogger.error('❌ [Lobby] WebSocket 連線失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
             }
         };
 
@@ -113,7 +118,6 @@ const Lobby: React.FC = () => {
 
         // 房間建立成功後處理
         const handleRoomCreated = (payload: any) => {
-            console.log('🏠 [Lobby] 房間建立成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -128,7 +132,6 @@ const Lobby: React.FC = () => {
 
         // 加入房間成功後處理
         const handlePlayerJoined = (payload: any) => {
-            console.log('👤 [Lobby] 玩家加入成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -143,19 +146,19 @@ const Lobby: React.FC = () => {
 
         // 收到伺服器錯誤時提示使用者
         const handleError = (payload: any) => {
-            console.error('❌ [Lobby] 伺服器錯誤:', payload);
+            frontendLogger.error('❌ [Lobby] 伺服器錯誤', {
+                message: typeof payload?.message === 'string' ? payload.message : 'unknown'
+            });
             setIsConnecting(false);
             alert(`錯誤: ${payload.message}`);
         };
 
-        console.log('📋 [Lobby] 註冊事件監聽器');
         gameWebSocket.on('ROOM_CREATED', handleRoomCreated);
         gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined);
         gameWebSocket.on('ERROR', handleError);
 
         return () => {
             isActive = false;
-            console.log('🧹 [Lobby] 組件卸載，清理事件監聽器');
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
@@ -166,7 +169,12 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!canCreateRoom) return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet: selectedGeishaSet });
+        frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
+            playerId: playerName,
+            mode: matchMode,
+            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
+            geishaSet: selectedGeishaSet
+        });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
             displayName: lineProfile?.displayName ?? playerName,
@@ -182,7 +190,10 @@ const Lobby: React.FC = () => {
     const joinRoom = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送加入房間請求:', { roomId, playerId: playerName });
+        frontendLogger.diagnostic('🐞 [Lobby] 加入房間摘要', {
+            roomId,
+            playerId: playerName
+        });
         gameWebSocket.send('JOIN_ROOM', {
             roomId,
             playerId: playerName,

@@ -1,13 +1,34 @@
 import { useEffect, useState } from 'react';
 import { GameState, ItemCard, PendingInteraction } from 'game-shared-types';
 
-export type MotionCueKind = 'draw' | 'placement' | 'gift-result' | 'competition-result';
+export type MotionCueKind = 'draw' | 'removal' | 'placement' | 'gift-result' | 'competition-result';
 export type MotionOwner = 'self' | 'opponent';
 export type MotionSourceZone = 'hand' | 'gift-modal' | 'competition-modal' | 'opponent-side';
+export type DealCueOwner = 'self' | 'opponent';
+
+export interface DealAnimationStep {
+    order: number;
+    playerId: string;
+    card: ItemCard;
+}
+
+export interface OpeningDealCueStep {
+    id: string;
+    owner: DealCueOwner;
+    card: ItemCard;
+    slotIndex: number;
+    slotCount: number;
+    delayMs: number;
+    durationMs: number;
+    reducedMotion: boolean;
+    isMasked: boolean;
+}
 
 export interface MotionSnapshot {
     currentPlayerId: string;
     myHandCardIds: string[];
+    myHandCount: number;
+    opponentHandCount: number;
     myPlayedByGeisha: Record<number, string[]>;
     opponentPlayedByGeisha: Record<number, string[]>;
     pendingInteraction: PendingInteraction | null;
@@ -30,9 +51,25 @@ export interface MotionCue {
 
 const CUE_PRIORITY: Record<MotionCueKind, number> = {
     draw: 0,
-    placement: 1,
-    'gift-result': 2,
-    'competition-result': 3
+    removal: 1,
+    placement: 2,
+    'gift-result': 3,
+    'competition-result': 4
+};
+
+const OPENING_DEAL_STEP_DELAY_MS = {
+    normal: 95,
+    reduced: 70
+};
+
+const OPENING_DEAL_STEP_DURATION_MS = {
+    normal: 260,
+    reduced: 180
+};
+
+const DRAW_CUE_DURATION_MS = {
+    normal: 360,
+    reduced: 240
 };
 
 const getOpponent = (state: GameState, currentPlayerId: string) =>
@@ -53,6 +90,8 @@ export const buildMotionSnapshot = (state: GameState, currentPlayerId: string): 
     return {
         currentPlayerId,
         myHandCardIds: currentPlayer?.hand.map((card) => card.id) ?? [],
+        myHandCount: currentPlayer?.hand.length ?? 0,
+        opponentHandCount: opponent?.hand.length ?? 0,
         myPlayedByGeisha: toPlayedByGeisha(currentPlayer?.playedCards),
         opponentPlayedByGeisha: toPlayedByGeisha(opponent?.playedCards),
         pendingInteraction: state.pendingInteraction
@@ -164,7 +203,23 @@ export const deriveMotionCues = (
         buildCue(resolutionKind ?? 'placement', 'opponent', geishaId, cardId)
     );
 
-    return prepareMotionQueue([...selfPlacements, ...opponentPlacements], now);
+    const buildRemovalCue = (owner: MotionOwner, index: number): MotionCue => ({
+        id: `removal:${owner}:${index}:${now}`,
+        kind: 'removal',
+        owner,
+        sourceZone: owner === 'self' ? 'hand' : 'opponent-side',
+        targetZone: 'hand',
+        createdAt: now,
+        durationMs: prefersReducedMotion ? 360 : 520,
+        delayMs: 0,
+        reducedMotion: prefersReducedMotion
+    });
+    const selfRemovalCount = Math.max(previous.myHandCount - current.myHandCount, 0);
+    const opponentRemovalCount = Math.max(previous.opponentHandCount - current.opponentHandCount, 0);
+    const selfRemovals = Array.from({ length: selfRemovalCount }, (_, index) => buildRemovalCue('self', index));
+    const opponentRemovals = Array.from({ length: opponentRemovalCount }, (_, index) => buildRemovalCue('opponent', index));
+
+    return prepareMotionQueue([...selfRemovals, ...opponentRemovals, ...selfPlacements, ...opponentPlacements], now);
 };
 
 export const createDrawMotionCue = (
@@ -178,10 +233,50 @@ export const createDrawMotionCue = (
     sourceZone: 'hand',
     targetZone: 'hand',
     createdAt: Date.now(),
-    durationMs: prefersReducedMotion ? 520 : 960,
+    durationMs: prefersReducedMotion ? DRAW_CUE_DURATION_MS.reduced : DRAW_CUE_DURATION_MS.normal,
     delayMs: 0,
     reducedMotion: prefersReducedMotion
 }])[0];
+
+export const createOpeningDealCueSteps = (
+    sequence: DealAnimationStep[],
+    viewerId: string,
+    prefersReducedMotion: boolean
+): OpeningDealCueStep[] => {
+    const orderedSequence = [...sequence].sort((a, b) => a.order - b.order);
+    const ownerCounts: Record<DealCueOwner, number> = {
+        self: 0,
+        opponent: 0
+    };
+    const totals: Record<DealCueOwner, number> = orderedSequence.reduce((acc, step) => {
+        const owner: DealCueOwner = step.playerId === viewerId ? 'self' : 'opponent';
+        acc[owner] += 1;
+        return acc;
+    }, { self: 0, opponent: 0 });
+    const stepDelayMs = prefersReducedMotion ? OPENING_DEAL_STEP_DELAY_MS.reduced : OPENING_DEAL_STEP_DELAY_MS.normal;
+    const durationMs = prefersReducedMotion ? OPENING_DEAL_STEP_DURATION_MS.reduced : OPENING_DEAL_STEP_DURATION_MS.normal;
+
+    return orderedSequence.map((step) => {
+        const owner: DealCueOwner = step.playerId === viewerId ? 'self' : 'opponent';
+        const slotIndex = ownerCounts[owner];
+        ownerCounts[owner] += 1;
+
+        return {
+            id: `deal:${owner}:${step.order}:${step.card.id}`,
+            owner,
+            card: step.card,
+            slotIndex,
+            slotCount: totals[owner],
+            delayMs: step.order * stepDelayMs,
+            durationMs,
+            reducedMotion: prefersReducedMotion,
+            isMasked: step.card.type === 'hidden'
+        };
+    });
+};
+
+export const getOpeningDealCueDuration = (steps: OpeningDealCueStep[]): number =>
+    steps.reduce((maxDuration, step) => Math.max(maxDuration, step.delayMs + step.durationMs), 0);
 
 export const usePrefersReducedMotion = () => {
     const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);

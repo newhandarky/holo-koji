@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ItemCard, GeishaSet } from "game-shared-types"
 import { getItemCardImage, getItemCardLabel, getGeishaCharmById } from '../../utils/gameData';
-import { MotionCue } from './gameMotion';
+import { MotionCue, OpeningDealCueStep } from './gameMotion';
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌
@@ -16,6 +16,7 @@ interface Props {
     geishaSet?: GeishaSet; // 藝妓組合
     motionCues?: MotionCue[];
     prefersReducedMotion?: boolean;
+    openingDealSteps?: OpeningDealCueStep[];
 }
 
 // 玩家手牌區顯示與選牌
@@ -27,7 +28,8 @@ const PlayerHand: React.FC<Props> = ({
     getCharmByGeishaId,
     geishaSet,
     motionCues = [],
-    prefersReducedMotion = false
+    prefersReducedMotion = false,
+    openingDealSteps = []
 }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
@@ -45,6 +47,10 @@ const PlayerHand: React.FC<Props> = ({
             .forEach((cue) => map.set(cue.cardId!, cue));
         return map;
     }, [motionCues]);
+    const removalCues = useMemo(() => motionCues.filter((cue) => cue.kind === 'removal'), [motionCues]);
+    const selfDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'self'), [openingDealSteps]);
+    const opponentDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'opponent'), [openingDealSteps]);
+    const isOpeningDealActive = openingDealSteps.length > 0;
 
     // 當手牌變更時重置選牌狀態，避免選到舊牌
     useEffect(() => {
@@ -123,8 +129,67 @@ const PlayerHand: React.FC<Props> = ({
 
     return (
         <div className="player-hand-panel">
-            <div className="player-hand-stage" role="group" aria-label="手牌焦點切換">
+            <div
+                className={`player-hand-stage ${isOpeningDealActive ? 'player-hand-stage--deal-active' : ''}`}
+                role="group"
+                aria-label="手牌焦點切換"
+            >
                 <div className="player-hand-stage__content">
+                    {isOpeningDealActive && (
+                        <div className="player-hand-deal-lanes" aria-hidden="true">
+                            <div className="player-hand-deal-lane player-hand-deal-lane--opponent">
+                                {opponentDealSteps.map((step) => {
+                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
+                                    return (
+                                        <div
+                                            key={step.id}
+                                            className={`player-hand-deal-card player-hand-deal-card--opponent ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
+                                            style={{
+                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
+                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
+                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
+                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
+                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="player-hand-deal-lane player-hand-deal-lane--self">
+                                {selfDealSteps.map((step) => {
+                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
+                                    return (
+                                        <div
+                                            key={step.id}
+                                            className={`player-hand-deal-card player-hand-deal-card--self ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
+                                            style={{
+                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
+                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
+                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
+                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
+                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    {removalCues.length > 0 && (
+                        <div className="player-hand-removal-cues" aria-hidden="true">
+                            {removalCues.map((cue, index) => (
+                                <div
+                                    key={cue.id}
+                                    className={`player-hand-removal-cue player-hand-removal-cue--${cue.owner} ${cue.reducedMotion ? 'player-hand-removal-cue--reduced' : ''}`}
+                                    style={{
+                                        ['--removal-index' as string]: `${index}`,
+                                        ['--motion-delay' as string]: `${cue.delayMs}ms`,
+                                        ['--motion-duration' as string]: `${cue.durationMs}ms`
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
                     <div className="player-hand-row">
                         {cards.map((card, index) => {
                             const center = (cards.length - 1) / 2;

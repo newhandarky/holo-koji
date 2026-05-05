@@ -4,7 +4,7 @@ import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
-import { MotionCue } from './gameMotion';
+import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import {
     ItemCard,
     ActionType,
@@ -32,6 +32,7 @@ interface GameBoardProps {
     highlightActive?: boolean;
     // 主棋盤目前啟用中的動態提示
     motionCues?: MotionCue[];
+    openingDealSteps?: OpeningDealCueStep[];
     // 是否偏好低動作模式
     prefersReducedMotion?: boolean;
     // 目前房間聚焦區塊
@@ -49,6 +50,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     highlightCardId,
     highlightActive,
     motionCues = [],
+    openingDealSteps = [],
     prefersReducedMotion = false,
     focusSection
 }) => {
@@ -395,6 +397,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                                 geishaSet={activeGeishaSet}
                                 motionCues={handMotionCues}
                                 prefersReducedMotion={prefersReducedMotion}
+                                openingDealSteps={openingDealSteps}
                             />
                         </div>
                         <div className="game-hand-actions-panel__footer">

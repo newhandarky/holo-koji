@@ -1,5 +1,6 @@
 import config from '../../config/environment';
 import { gameWebSocket } from '../../services/websocket';
+import { getAccountDiagnosticsSnapshot } from '../../utils/lineAccount';
 import { getLiffDiagnosticsSnapshot } from '../../utils/lineLiff';
 import { resolveRouterMode } from '../../utils/routerMode';
 import { DiagnosticsSnapshot, DiagnosticsSummaryItem } from './types';
@@ -22,6 +23,7 @@ const formatLineLoginStatus = (value: DiagnosticsSnapshot['lineLoggedIn']) => {
 
 export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
     const liff = getLiffDiagnosticsSnapshot();
+    const account = getAccountDiagnosticsSnapshot();
 
     return {
         connectionState: normalizeConnectionState(gameWebSocket.getConnectionState()),
@@ -33,7 +35,11 @@ export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
         handlerCount: gameWebSocket.messageHandlers.size,
         liffSupportedOrigin: liff.supportedOrigin,
         liffReady: liff.ready,
-        lineLoggedIn: liff.loggedIn
+        lineLoggedIn: liff.loggedIn,
+        accountSyncStatus: account.accountSyncStatus,
+        accountPersistenceMode: account.accountPersistenceMode,
+        accountPersistenceAvailable: account.accountPersistenceAvailable,
+        accountPersistenceMessage: account.accountPersistenceMessage
     };
 };
 
@@ -86,5 +92,22 @@ export const buildDiagnosticsSummaryItems = (snapshot: DiagnosticsSnapshot): Dia
         label: 'LINE 登入狀態',
         value: formatLineLoginStatus(snapshot.lineLoggedIn),
         statusTone: snapshot.lineLoggedIn === true ? 'success' : snapshot.lineLoggedIn === false ? 'warning' : 'neutral'
+    },
+    {
+        label: '帳號同步狀態',
+        value: snapshot.accountSyncStatus,
+        statusTone: snapshot.accountSyncStatus === 'bound'
+            ? 'success'
+            : snapshot.accountSyncStatus === 'guest'
+                ? 'neutral'
+                : 'warning'
+    },
+    {
+        label: '帳號持久化狀態',
+        value: snapshot.accountPersistenceMode === 'durable' ? 'durable' : 'temporary',
+        statusTone: snapshot.accountPersistenceMode === 'durable' ? 'success' : 'warning',
+        helpText: snapshot.accountPersistenceMode === 'temporary'
+            ? 'Temporary mode is non-durable and not suitable for persistent achievements.'
+            : snapshot.accountPersistenceMessage
     }
 ];

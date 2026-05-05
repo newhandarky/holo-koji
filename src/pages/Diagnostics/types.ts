@@ -9,6 +9,10 @@ export interface DiagnosticsSnapshot {
     liffSupportedOrigin: boolean;
     liffReady: boolean;
     lineLoggedIn: boolean | 'unknown';
+    accountSyncStatus: 'bound' | 'guest' | 'sync-failed' | 'unverified';
+    accountPersistenceMode: 'durable' | 'temporary';
+    accountPersistenceAvailable: boolean;
+    accountPersistenceMessage: string;
 }
 
 export interface DiagnosticsSummaryItem {

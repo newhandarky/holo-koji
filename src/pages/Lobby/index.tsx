@@ -1,10 +1,11 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
-import { GeishaSet } from 'game-shared-types';
+import { GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
+import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import LobbyBrandSurface from './LobbyBrandSurface';
@@ -22,6 +23,8 @@ const Lobby: React.FC = () => {
     const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
     // 藝妓組合選擇（online / npc 共用）
     const [selectedGeishaSet, setSelectedGeishaSet] = useState<GeishaSet>('default');
+    const [setupMode, setSetupMode] = useState<RoomSetupMode>('random');
+    const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -55,6 +58,23 @@ const Lobby: React.FC = () => {
             window.history.replaceState(null, '', nextUrl);
         }
     }, []);
+
+    useEffect(() => {
+        if (setupMode !== 'custom') {
+            setSelectedCharacterIds([]);
+            return;
+        }
+
+        const profiles = getCharacterProfilesForSet(selectedGeishaSet);
+        setSelectedCharacterIds((currentIds) => {
+            if (profiles.length === 7) {
+                return profiles.map((profile) => profile.characterId);
+            }
+
+            const validIds = new Set(profiles.map((profile) => profile.characterId));
+            return currentIds.filter((characterId) => validIds.has(characterId));
+        });
+    }, [selectedGeishaSet, setupMode]);
 
     // 取得 LINE 使用者資料（若在 LIFF 內）
     useEffect(() => {
@@ -171,11 +191,15 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!canCreateRoom) return;
         setIsConnecting(true);
+        const customSelection = setupMode === 'custom'
+            ? { characterIds: selectedCharacterIds }
+            : undefined;
         frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
             playerId: playerName,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
-            geishaSet: selectedGeishaSet
+            geishaSet: selectedGeishaSet,
+            setupMode
         });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
@@ -184,7 +208,9 @@ const Lobby: React.FC = () => {
             avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
             mode: matchMode,
             aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
-            geishaSet: selectedGeishaSet
+            geishaSet: selectedGeishaSet,
+            setupMode,
+            ...(customSelection ? { customSelection } : {})
         });
     };
 
@@ -207,11 +233,15 @@ const Lobby: React.FC = () => {
 
     const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
     const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
+    const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
+    const customSelectionCount = selectedCharacterIds.length;
+    const isCustomSelectionReady = setupMode !== 'custom' || customSelectionCount === 7;
     const canCreateRoom = Boolean(
         playerName.trim()
         && !isConnecting
         && connectionStatus === 'connected'
         && selectedGeishaSetOption?.available
+        && isCustomSelectionReady
     );
     const canJoinRoom = Boolean(
         playerName.trim()
@@ -219,6 +249,23 @@ const Lobby: React.FC = () => {
         && !isConnecting
         && connectionStatus === 'connected'
     );
+
+    const handleGeishaSetChange = (value: GeishaSet) => {
+        setSelectedGeishaSet(value);
+    };
+
+    const handleSetupModeChange = (value: RoomSetupMode) => {
+        setSetupMode(value);
+    };
+
+    const toggleCharacterSelection = (characterId: string) => {
+        setSelectedCharacterIds((currentIds) => {
+            if (currentIds.includes(characterId)) {
+                return currentIds.filter((id) => id !== characterId);
+            }
+            return [...currentIds, characterId];
+        });
+    };
 
     return (
         <div className="lobby-background">
@@ -230,6 +277,10 @@ const Lobby: React.FC = () => {
                         matchMode={matchMode}
                         aiDifficulty={aiDifficulty}
                         selectedGeishaSet={selectedGeishaSet}
+                        setupMode={setupMode}
+                        availableCharacterProfiles={availableCharacterProfiles}
+                        selectedCharacterIds={selectedCharacterIds}
+                        customSelectionCount={customSelectionCount}
                         isConnecting={isConnecting}
                         canCreateRoom={canCreateRoom}
                         canJoinRoom={canJoinRoom}
@@ -238,7 +289,9 @@ const Lobby: React.FC = () => {
                         onRoomIdChange={setRoomId}
                         onMatchModeChange={setMatchMode}
                         onAiDifficultyChange={setAiDifficulty}
-                        onGeishaSetChange={setSelectedGeishaSet}
+                        onGeishaSetChange={handleGeishaSetChange}
+                        onSetupModeChange={handleSetupModeChange}
+                        onCharacterSelectionToggle={toggleCharacterSelection}
                         onCreateRoom={createRoom}
                         onJoinRoom={joinRoom}
                     />

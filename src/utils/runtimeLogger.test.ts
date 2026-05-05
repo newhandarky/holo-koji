@@ -26,15 +26,42 @@ describe('runtimeLogger summaries', () => {
         expect(summary).toEqual({
             type: 'GAME_ACTION',
             roomId: 'ROOM01',
-            gameId: undefined,
             playerId: 'p1',
-            mode: undefined,
-            geishaSet: undefined,
             actionType: 'INITIATE_GIFT',
             hasPayload: true
         });
         expect(summary).not.toHaveProperty('offeredCards');
         expect(summary).not.toHaveProperty('cardIds');
+    });
+
+    test('summarizeSocketMessage includes setup mode without selected IDs', async () => {
+        const { summarizeSocketMessage } = await import('./runtimeLogger');
+
+        const summary = summarizeSocketMessage({
+            type: 'CREATE_ROOM',
+            payload: {
+                roomId: 'ROOM01',
+                playerId: 'p1',
+                mode: 'online',
+                geishaSet: 'hololive',
+                setupMode: 'custom',
+                customSelection: {
+                    characterIds: ['hidden-for-log-safety']
+                }
+            }
+        });
+
+        expect(summary).toEqual({
+            type: 'CREATE_ROOM',
+            roomId: 'ROOM01',
+            playerId: 'p1',
+            mode: 'online',
+            geishaSet: 'hololive',
+            setupMode: 'custom',
+            hasPayload: true
+        });
+        expect(summary).not.toHaveProperty('customSelection');
+        expect(summary).not.toHaveProperty('characterIds');
     });
 
     test('summarizeGameState emits redacted state summary only', async () => {

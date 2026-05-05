@@ -89,7 +89,14 @@ describe('Lobby character set selection', () => {
             expect.objectContaining({
                 playerId: 'host',
                 mode: 'online',
-                geishaSet: 'default'
+                geishaSet: 'default',
+                setupMode: 'random'
+            })
+        );
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.not.objectContaining({
+                customSelection: expect.anything()
             })
         );
     });
@@ -97,7 +104,7 @@ describe('Lobby character set selection', () => {
     test('selected character set is preserved when switching between online and npc', async () => {
         renderLobby();
 
-        const selector = screen.getByRole('combobox', { name: '藝妓組合' });
+        const selector = screen.getByRole('combobox', { name: '女公關組合' });
         await userEvent.selectOptions(selector, 'hololive');
         expect(selector).toHaveValue('hololive');
 
@@ -112,7 +119,7 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '藝妓組合' }), 'hololive');
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'npc-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
@@ -124,6 +131,7 @@ describe('Lobby character set selection', () => {
                 playerId: 'npc-host',
                 mode: 'npc',
                 geishaSet: 'hololive',
+                setupMode: 'random',
                 aiDifficulty: 'easy'
             })
         );
@@ -143,7 +151,8 @@ describe('Lobby character set selection', () => {
             expect.objectContaining({
                 playerId: 'npc-default',
                 mode: 'npc',
-                geishaSet: 'default'
+                geishaSet: 'default',
+                setupMode: 'random'
             })
         );
     });
@@ -151,7 +160,7 @@ describe('Lobby character set selection', () => {
     test('join room submission does not depend on selectedGeishaSet', async () => {
         renderLobby();
 
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '藝妓組合' }), 'collaboration');
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await userEvent.type(screen.getByPlaceholderText('輸入房間代碼'), 'abc123');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
@@ -189,13 +198,13 @@ describe('Lobby character set selection', () => {
 
         const unavailableOption = screen.getByRole('option', { name: '擅自合作系列（目前不可用）' });
         expect(unavailableOption).toBeDisabled();
-        expect(screen.getByText('不可用的藝妓組合會保留顯示，但目前無法建立房間。')).toBeInTheDocument();
+        expect(screen.getByText('不可用的女公關組合會保留顯示，但目前無法建立房間。')).toBeInTheDocument();
     });
 
     test('room creation error keeps the selected set for retry', async () => {
         renderLobby();
 
-        const selector = screen.getByRole('combobox', { name: '藝妓組合' });
+        const selector = screen.getByRole('combobox', { name: '女公關組合' });
         await userEvent.selectOptions(selector, 'hololive');
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-player');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
@@ -204,6 +213,80 @@ describe('Lobby character set selection', () => {
         mockRegisteredHandlers.get('ERROR')?.({ message: '建立失敗' });
 
         expect(selector).toHaveValue('hololive');
+    });
+
+    test('custom setup preselects exactly-seven sets and sends selected character IDs', async () => {
+        renderLobby();
+
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
+        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+
+        await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
+
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'custom-host');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.objectContaining({
+                playerId: 'custom-host',
+                mode: 'online',
+                geishaSet: 'hololive',
+                setupMode: 'custom',
+                customSelection: {
+                    characterIds: [
+                        'hololive-raden',
+                        'hololive-iroha',
+                        'hololive-miko',
+                        'hololive-fubuki',
+                        'hololive-ayame',
+                        'hololive-ina',
+                        'hololive-mio'
+                    ]
+                }
+            })
+        );
+    });
+
+    test('custom setup disables room creation until exactly seven characters are selected', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'needs-seven');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+
+        await userEvent.click(screen.getByRole('button', { name: 'エマ' }));
+
+        expect(screen.getByText('已選 6 / 7，請選滿七位')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeDisabled();
+    });
+
+    test('switching character sets revalidates custom preselection', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
+
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'ルミナス' })).toHaveAttribute('aria-pressed', 'true'));
+        expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument();
+    });
+
+    test('room creation error keeps custom setup available for correction', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-custom');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        mockRegisteredHandlers.get('ERROR')?.({ message: '自訂角色選擇無效，請重新選擇七位同組合角色。' });
+
+        expect(screen.getByRole('radio', { name: '自選七位' })).toBeChecked();
+        expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument();
     });
 
     test('default runtime does not emit diagnostic request summaries during room creation', async () => {

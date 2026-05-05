@@ -62,16 +62,17 @@ export const summarizeSocketMessage = (message: { type?: string; payload?: any }
     const payload = message.payload;
     const payloadType = payload?.action?.type ?? payload?.type ?? null;
 
-    return {
+    return sanitizeContext({
         type: typeof message.type === 'string' ? message.type : 'unknown',
         roomId: typeof payload?.roomId === 'string' ? payload.roomId : undefined,
         gameId: typeof payload?.gameId === 'string' ? payload.gameId : undefined,
         playerId: typeof payload?.playerId === 'string' ? payload.playerId : undefined,
         mode: payload?.mode === 'npc' || payload?.mode === 'online' ? payload.mode : undefined,
         geishaSet: typeof payload?.geishaSet === 'string' ? payload.geishaSet : undefined,
+        setupMode: payload?.setupMode === 'random' || payload?.setupMode === 'custom' ? payload.setupMode : undefined,
         actionType: typeof payloadType === 'string' ? payloadType : undefined,
         hasPayload: Boolean(payload)
-    };
+    });
 };
 
 export const summarizeGameState = (state: any) => {
@@ -79,12 +80,13 @@ export const summarizeGameState = (state: any) => {
         return null;
     }
 
-    return {
+    return sanitizeContext({
         gameId: typeof state.gameId === 'string' ? state.gameId : undefined,
         geishaSet: typeof state.geishaSet === 'string' ? state.geishaSet : undefined,
+        setupMode: state.setupMode === 'random' || state.setupMode === 'custom' ? state.setupMode : undefined,
         phase: typeof state.phase === 'string' ? state.phase : undefined,
         round: typeof state.round === 'number' ? state.round : undefined,
         playerCount: Array.isArray(state.players) ? state.players.length : undefined,
         hasPendingInteraction: Boolean(state.pendingInteraction)
-    };
+    });
 };

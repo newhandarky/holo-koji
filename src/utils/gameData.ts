@@ -1,4 +1,4 @@
-import { Geisha, GeishaSet, ItemCard } from "game-shared-types"
+import { characterProfilesBySet, CharacterProfile, Geisha, GeishaSet, ItemCard } from "game-shared-types"
 
 export interface ItemIconDefinition {
     key: string;
@@ -79,6 +79,10 @@ const ginzaItemDefinitions: Record<string, ItemIconDefinition> = {
 const ginzaPositionItemTypes = Object.keys(ginzaItemDefinitions).sort();
 
 const charmPointsDistribution = [2, 2, 2, 3, 3, 4, 5];
+
+export function getCharacterProfilesForSet(geishaSet: GeishaSet): CharacterProfile[] {
+    return characterProfilesBySet[geishaSet] ?? characterProfilesBySet.default;
+}
 
 export function createRandomizedGeishas(_geishaSet?: GeishaSet): Geisha[] {
     return charmPointsDistribution.map((charmPoints, index) => ({

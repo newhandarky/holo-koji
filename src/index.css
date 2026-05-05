@@ -302,6 +302,57 @@ code {
   border-color: rgba(255, 224, 180, 0.28);
 }
 
+.lobby-character-selection {
+  display: grid;
+  gap: 10px;
+}
+
+.lobby-character-selection__summary {
+  color: rgba(255, 241, 221, 0.86);
+  font-size: 0.92rem;
+}
+
+.lobby-character-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lobby-character-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 236, 208, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ginza-readable-text);
+  text-align: left;
+}
+
+.lobby-character-card.is-selected {
+  border-color: rgba(255, 224, 180, 0.38);
+  background: rgba(193, 58, 75, 0.22);
+}
+
+.lobby-character-card__image {
+  width: 42px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background-position: center;
+  background-size: cover;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.lobby-character-card__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+}
+
 .lobby-primary-button,
 .lobby-secondary-button,
 .diagnostics-shell__back {
@@ -431,6 +482,10 @@ code {
   }
 
   .lobby-mode-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-character-grid {
     grid-template-columns: 1fr;
   }
 

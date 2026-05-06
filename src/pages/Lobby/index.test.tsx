@@ -1,8 +1,9 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { gameWebSocket } from '../../services/websocket';
 import Lobby from './index';
+import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty } from './aiDifficultyOptions';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { getInviteRoomIdFromLocation, getLineProfile } from '../../utils/lineLiff';
 import { syncLineAccount } from '../../utils/lineAccount';
@@ -220,6 +221,41 @@ describe('Lobby character set selection', () => {
         );
     });
 
+    test('npc mode renders canonical AI difficulty labels and descriptions only', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+
+        const difficultyGroup = screen.getByRole('radiogroup', { name: 'AI 難度' });
+        const difficultyRadios = within(difficultyGroup).getAllByRole('radio');
+
+        expect(difficultyRadios).toHaveLength(AI_DIFFICULTY_OPTIONS.length);
+        expect(difficultyRadios.map((radio) => radio.getAttribute('value'))).toEqual(
+            AI_DIFFICULTY_OPTIONS.map((option) => option.value)
+        );
+
+        AI_DIFFICULTY_OPTIONS.forEach((option) => {
+            expect(within(difficultyGroup).getByText(option.label)).toBeInTheDocument();
+            expect(within(difficultyGroup).getByText(option.description)).toBeInTheDocument();
+        });
+
+        ['しぐれうい', '大空スバル', '兎田ぺこら', '猫又おかゆ', 'ときのそら'].forEach((personName) => {
+            expect(within(difficultyGroup).queryByText(personName)).not.toBeInTheDocument();
+        });
+    });
+
+    test('npc difficulty control supports keyboard selection', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+
+        const hardDifficulty = screen.getByRole('radio', { name: /偏強/ });
+        hardDifficulty.focus();
+        await userEvent.keyboard(' ');
+
+        expect(hardDifficulty).toBeChecked();
+    });
+
     test('untouched npc room creation still uses default Ginza set', async () => {
         renderLobby();
 
@@ -238,6 +274,80 @@ describe('Lobby character set selection', () => {
                 setupMode: 'random'
             })
         );
+    });
+
+    test('online mode does not render active AI difficulty content', async () => {
+        renderLobby();
+
+        expect(screen.queryByRole('radiogroup', { name: 'AI 難度' })).not.toBeInTheDocument();
+        expect(screen.queryByText('適合初次體驗')).not.toBeInTheDocument();
+    });
+
+    test('selected AI difficulty is preserved when switching between npc and online', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await userEvent.click(screen.getByRole('radio', { name: /地獄/ }));
+
+        expect(screen.getByRole('radio', { name: /地獄/ })).toBeChecked();
+
+        await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
+        expect(screen.queryByRole('radiogroup', { name: 'AI 難度' })).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        expect(screen.getByRole('radio', { name: /地獄/ })).toBeChecked();
+    });
+
+    test.each(AI_DIFFICULTY_OPTIONS)('npc room creation maps displayed $label difficulty to $value', async (option) => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await userEvent.click(screen.getByRole('radio', { name: new RegExp(option.label) }));
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), `npc-${option.value}`);
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.objectContaining({
+                playerId: `npc-${option.value}`,
+                mode: 'npc',
+                aiDifficulty: option.value
+            })
+        );
+    });
+
+    test('online room creation omits aiDifficulty after npc difficulty changes', async () => {
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await userEvent.click(screen.getByRole('radio', { name: /超強/ }));
+        await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'online-host');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
+
+        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.objectContaining({
+                playerId: 'online-host',
+                mode: 'online'
+            })
+        );
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'CREATE_ROOM',
+            expect.not.objectContaining({
+                aiDifficulty: expect.anything()
+            })
+        );
+    });
+
+    test('invalid AI difficulty values normalize to easy', () => {
+        expect(normalizeAiDifficulty('unknown')).toBe('easy');
+        expect(normalizeAiDifficulty(null)).toBe('easy');
+        expect(normalizeAiDifficulty('hell')).toBe('hell');
     });
 
     test('join room submission does not depend on selectedGeishaSet', async () => {

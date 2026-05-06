@@ -1,7 +1,8 @@
 // src/components/game/ActionTokens.tsx
 import React, { useState } from 'react';
-import { ActionToken, ItemCard, GeishaSetKey } from "game-shared-types"
-import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
+import { ActionToken, ItemCard, GeishaSet } from "game-shared-types"
+import { getItemCardImage } from '../../utils/gameData';
+import { actionIconMap } from '../../utils/actionAssets';
 
 /**
  * ActionTokens 組件：顯示並觸發行動標誌
@@ -12,18 +13,8 @@ interface Props {
     disabled?: boolean;                               // 是否暫時停用
     usedCards?: Partial<Record<ActionToken['type'], ItemCard[]>>; // 已使用行動的卡牌資訊
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
-    geishaSet?: GeishaSetKey;                         // 藝妓組合
+    geishaSet?: GeishaSet;                            // 藝妓組合
 }
-
-// 靜態資源基底路徑（支援 GitHub Pages）
-const publicBaseUrl = process.env.PUBLIC_URL ?? '';
-// 行動圖示對照表
-const actionIconMap: Record<ActionToken['type'], string> = {
-    secret: `${publicBaseUrl}/images/actions/Secret.png`,
-    'trade-off': `${publicBaseUrl}/images/actions/Discard.png`,
-    gift: `${publicBaseUrl}/images/actions/Gift.png`,
-    competition: `${publicBaseUrl}/images/actions/Competition.png`
-};
 
 const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, getCharmByGeishaId, geishaSet }) => {
     const [openToken, setOpenToken] = useState<ActionToken['type'] | null>(null);
@@ -50,10 +41,9 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                     <div
                         key={card.id}
                         className="item-card item-card--image item-card--mini"
-                        style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
+                        style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
                     >
                         <div className="item-card__overlay" />
-                        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                     </div>
                 ))}
             </div>

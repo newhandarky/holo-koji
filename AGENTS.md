@@ -3,6 +3,7 @@
 ## Communication
 
 - Reply in Traditional Chinese (zh-TW) unless the user explicitly requests another language.
+- Analysis reports, review findings, validation summaries, plans, tables, and generated handoff notes MUST also be written in Traditional Chinese (zh-TW) unless the user explicitly requests another language.
 - Keep explanations concise and focused on concrete actions, risks, and verification.
 - For code review, list findings and risks before summaries or suggestions.
 
@@ -37,6 +38,7 @@
 - Use a clear title line followed by a body when the change is more than trivial.
 - Keep the title concise and outcome-focused.
 - Prefer a bullet list in the body that separates what changed, verification, and residual risks when applicable.
+- If changes include the nested `server/` repository, provide a separate server commit message in addition to the parent project commit message.
 - Example:
 
 ```text
@@ -54,6 +56,16 @@
 - Keep long-term project rules in `AGENTS.md` or `.specify/memory/constitution.md`.
 - Keep feature-specific requirements, acceptance criteria, and task lists inside the relevant `specs/<feature>/` directory.
 - Do not change package versions, release notes, or release scope before the active spec records the intended versioning strategy.
+- For each new spec, create and **switch to** the dedicated feature branch before editing code or spec artifacts.
+- Do not continue implementation for a new spec on the current branch just because the branch name was created elsewhere; verify the active branch explicitly first.
+- If the working tree still contains uncommitted changes from a previous spec, stop and resolve that branch hygiene issue before creating or switching to the next spec branch.
+- When running `speckit-clarify`, every clarification prompt MUST visibly include the full question before any recommendation or options. Use this structure exactly:
+  - `## Clarification Question N`
+  - `**Question:** <complete question text>`
+  - `**Recommended:** Option X - <reason>`
+  - options table
+  - reply instruction
+- Do not accept or process a bare option letter, `yes`, `recommended`, or `suggested` unless the immediately preceding assistant message visibly contained `**Question:**` plus the full options. If the question line was omitted, re-render the same question instead of continuing.
 
 ## Implementation Rules
 
@@ -75,6 +87,13 @@ npm run build
 If a command cannot be run, report the reason and the residual risk.
 
 For backend-only changes, run the most relevant server command available in `server/package.json`; if no useful automated test exists, state that clearly.
+
+## UI Review Ownership
+
+- The user performs detailed UI visual review manually.
+- The agent should normally run automated checks and only perform minimal UI smoke tests when explicitly requested.
+- If the user reports that a UI screen has already been checked, record that result in the active spec/tasks instead of re-running browser inspection.
+- When UI verification remains unperformed by the user, report it as a residual manual review item rather than spending extra browser-inspection tokens by default.
 
 ## Release And Versioning
 

@@ -1,14 +1,44 @@
 // src/pages/GameRoom/index.tsx - 添加順序決定彈窗
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
+import type { FocusSection } from '../../components/game/GameBoard';
+import OpeningDealModal from '../../components/game/OpeningDealModal';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
+import {
+    buildMotionSnapshot,
+    createOpeningDealCueSteps,
+    createDrawMotionCue,
+    deriveMotionCues,
+    getOpeningDealCueDuration,
+    MotionCue,
+    OpeningDealCueStep,
+    usePrefersReducedMotion
+} from '../../components/game/gameMotion';
+import {
+    classifyDrawEvent,
+    getDrawEventId,
+    getDrawFlipDurationMs,
+    getDrawNotificationTimeoutMs,
+    routeDrawPresentation
+} from '../../components/game/drawNotificationModel';
+import { buildOpeningDealModalModel } from '../../components/game/openingDealModalModel';
+import {
+    buildOpeningHandRevealModel,
+    createOpeningHandRevealSteps,
+    getOpeningHandRevealTotalMs,
+    getOpeningHandTakeEligibility,
+    OpeningHandRevealStatus
+} from '../../components/game/openingHandRevealModel';
 import config from '../../config/environment';
-import { Player, ActionToken } from "game-shared-types"
-import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
+import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
+import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
+import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
+import { getItemCardImage } from '../../utils/gameData';
+import { actionStatusConfig } from '../../utils/actionAssets';
 
 // 建立玩家初始行動指示物
 const createInitialActionTokens = (): ActionToken[] => [
@@ -33,6 +63,14 @@ const createPlayerProfile = (id: string): Player => ({
     }
 });
 
+const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
+    { section: 'info', label: '資訊' },
+    { section: 'characterBoard', label: '角色' },
+    { section: 'handActions', label: '手牌&指令' }
+];
+
+type ReplayActionType = 'secret' | 'trade-off' | null;
+
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -52,55 +90,108 @@ const GameRoom: React.FC = () => {
         ? (currentPlayer ?? createPlayerProfile(currentPlayerId))
         : null;
     const playersById = useMemo(() => new Map(state.players.map((player) => [player.id, player])), [state.players]);
-    const getPlayerDisplayName = (playerId?: string) => {
+    const getPlayerDisplayName = useCallback((playerId?: string) => {
         if (!playerId) return '未知玩家';
         const player = playersById.get(playerId);
         return player?.name
             || (playerId === currentPlayerId ? localLineName : '')
             || playerId
             || '未知玩家';
-    };
-    const getPlayerAvatar = (playerId?: string) => {
+    }, [currentPlayerId, localLineName, playersById]);
+    const getPlayerAvatar = useCallback((playerId?: string) => {
         if (!playerId) return '';
         const player = playersById.get(playerId);
         return player?.avatarUrl || (playerId === currentPlayerId ? localLineAvatar : '') || '';
-    };
+    }, [currentPlayerId, localLineAvatar, playersById]);
     const displayName = getPlayerDisplayName(currentPlayerId);
     const displayAvatar = getPlayerAvatar(currentPlayerId);
     const {
         isConnected,
+        error,
         roundSummary,
         readyStatus,
         confirmOrder,
         sendGameAction,
         requestRematch,
         confirmReady,
+        leaveRoom,
+        dealQueue,
+        consumeDealEvent,
         drawQueue,
         consumeDrawEvent
     } = useWebSocket(roomId ?? null, playerProfile);
+    const activeGeishaSet: GeishaSet = state.geishaSet ?? 'default';
     // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
     // 抽牌文字提示
     const [recentDraw, setRecentDraw] = useState<string | null>(null);
-    // 抽牌視窗開關
-    const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
     // 抽牌動畫目標卡片
     const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
     // 抽牌動畫是否顯示
     const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
+    const [activeDrawNotificationEventId, setActiveDrawNotificationEventId] = useState<string | null>(null);
+    const [activeDrawAnimationEventId, setActiveDrawAnimationEventId] = useState<string | null>(null);
+    const [activeOpeningDealSteps, setActiveOpeningDealSteps] = useState<OpeningDealCueStep[]>([]);
     // 再來一場送出狀態
     const [isRematchRequested, setIsRematchRequested] = useState(false);
     // 結算底部視窗是否收合
     const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
+    const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
+    const [focusSection, setFocusSection] = useState<FocusSection>('characterBoard');
+    const [expandedInfoReplayAction, setExpandedInfoReplayAction] = useState<ReplayActionType>(null);
+    const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null);
+    const previousFocusSectionRef = useRef<FocusSection>('characterBoard');
+    const wasInteractionLockedRef = useRef(false);
+    const canActBeforeBlockingRef = useRef(false);
+    const previousCanActRef = useRef(false);
+    const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
+    const completedOpeningDealModalSequencesRef = useRef<Set<string>>(new Set());
+    const completedOpeningHandRevealSequencesRef = useRef<Set<string>>(new Set());
+    const completedDrawEventIdsRef = useRef<Set<string>>(new Set());
+    const openingHandRevealTimersRef = useRef<number[]>([]);
+    const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
+    const [activeOpeningDealModalSequenceId, setActiveOpeningDealModalSequenceId] = useState<string | null>(null);
+    const [openingHandRevealStatus, setOpeningHandRevealStatus] = useState<OpeningHandRevealStatus>('not_eligible');
+    const [openingHandRevealedCount, setOpeningHandRevealedCount] = useState(0);
+    const prefersReducedMotion = usePrefersReducedMotion();
 
-    // 當前狀態除錯紀錄（開發用）
+    const clearOpeningHandRevealTimers = useCallback(() => {
+        openingHandRevealTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+        openingHandRevealTimersRef.current = [];
+    }, []);
+
+    const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
+        if (cues.length === 0) {
+            return;
+        }
+
+        setActiveMotionCues((previous) => {
+            const next = [...previous, ...cues];
+            const seen = new Set<string>();
+
+            return next.filter((cue) => {
+                if (seen.has(cue.id)) {
+                    return false;
+                }
+
+                seen.add(cue.id);
+                return true;
+            });
+        });
+
+        cues.forEach((cue) => {
+            window.setTimeout(() => {
+                setActiveMotionCues((previous) => previous.filter((currentCue) => currentCue.id !== cue.id));
+            }, cue.durationMs + cue.delayMs + 160);
+        });
+    }, []);
+
     useEffect(() => {
-        console.log('🎮 [GameRoom] 狀態更新:');
-        console.log('  - roomId:', roomId);
-        console.log('  - 玩家數量:', state.players.length);
-        console.log('  - 遊戲階段:', state.phase);
-        console.log('  - 順序決定狀態:', state.orderDecision);
-        console.log('  - 當前玩家ID:', currentPlayerId);
+        frontendLogger.diagnostic('🐞 [GameRoom] 狀態摘要', {
+            roomId,
+            currentPlayerId,
+            ...summarizeGameState(state)
+        });
     }, [state, roomId, isConnected, currentPlayerId]);
 
     // 進入新局時重置再來一場狀態
@@ -117,50 +208,80 @@ const GameRoom: React.FC = () => {
         }
     }, [state.phase]);
 
-    // 抽牌提示顯示與消失
     useEffect(() => {
-        if (drawQueue.length === 0) {
-            setRecentDraw(null);
+        if (!currentPlayerId || dealQueue.length === 0) {
             return;
         }
 
-        const { playerId, card } = drawQueue[0];
-        if (playerId === currentPlayerId && card.type !== 'hidden') {
-            setIsDrawModalOpen(true);
-            setDrawHighlightCardId(card.id);
-            setIsDrawHighlightActive(false);
-
-            const revealTimer = window.setTimeout(() => {
-                setIsDrawHighlightActive(true);
-            }, 1000);
-
-            const highlightTimer = window.setTimeout(() => {
-                setIsDrawHighlightActive(false);
-            }, 1500);
-
-            const closeTimer = window.setTimeout(() => {
-                setIsDrawModalOpen(false);
-                setIsDrawHighlightActive(false);
-                setDrawHighlightCardId(null);
-                consumeDrawEvent();
-            }, 5000);
-
-            return () => {
-                window.clearTimeout(revealTimer);
-                window.clearTimeout(highlightTimer);
-                window.clearTimeout(closeTimer);
-            };
+        if (state.openingDeal?.replayable) {
+            consumeDealEvent();
+            return;
         }
 
-        const label = `${playerId} 抽到了新卡`;
-        setRecentDraw(label);
+        const nextEvent = dealQueue[0];
+        const steps = createOpeningDealCueSteps(nextEvent.sequence, currentPlayerId, prefersReducedMotion);
+        if (steps.length === 0) {
+            consumeDealEvent();
+            return;
+        }
 
-        const timer = window.setTimeout(() => {
-            consumeDrawEvent();
-        }, 1200);
+        setActiveOpeningDealSteps(steps);
+        const totalDuration = getOpeningDealCueDuration(steps);
+        const clearTimer = window.setTimeout(() => {
+            setActiveOpeningDealSteps([]);
+            consumeDealEvent();
+        }, totalDuration + 120);
 
-        return () => window.clearTimeout(timer);
-    }, [drawQueue, currentPlayerId, consumeDrawEvent]);
+        return () => {
+            window.clearTimeout(clearTimer);
+        };
+    }, [consumeDealEvent, currentPlayerId, dealQueue, prefersReducedMotion, state.openingDeal?.replayable]);
+
+    useEffect(() => {
+        const openingDeal = state.openingDeal;
+
+        if (
+            !currentPlayerId
+            || !openingDeal
+            || openingDeal.status === 'not_replayable'
+            || !openingDeal.replayable
+            || openingDeal.steps.length === 0
+        ) {
+            setActiveOpeningDealModalSequenceId(null);
+            return;
+        }
+
+        if (completedOpeningDealModalSequencesRef.current.has(openingDeal.sequenceId)) {
+            return;
+        }
+
+        setActiveOpeningDealModalSequenceId(openingDeal.sequenceId);
+    }, [currentPlayerId, state.openingDeal]);
+
+    useEffect(() => {
+        if (!currentPlayerId || state.phase !== 'playing') {
+            previousMotionSnapshotRef.current = buildMotionSnapshot(state, currentPlayerId);
+            return;
+        }
+
+        const currentSnapshot = buildMotionSnapshot(state, currentPlayerId);
+        const previousSnapshot = previousMotionSnapshotRef.current;
+
+        if (previousSnapshot) {
+            enqueueMotionCues(deriveMotionCues(previousSnapshot, currentSnapshot, prefersReducedMotion));
+        }
+
+        previousMotionSnapshotRef.current = currentSnapshot;
+    }, [currentPlayerId, enqueueMotionCues, prefersReducedMotion, state]);
+
+    const activePendingMotionKind = useMemo<'gift-result' | 'competition-result' | null>(() => {
+        const cue = activeMotionCues.find((item) => item.kind === 'gift-result' || item.kind === 'competition-result');
+        if (cue?.kind === 'gift-result' || cue?.kind === 'competition-result') {
+            return cue.kind;
+        }
+
+        return null;
+    }, [activeMotionCues]);
 
 
 
@@ -182,11 +303,418 @@ const GameRoom: React.FC = () => {
         }
     };
 
+    const getInviteOutcomeMessage = (outcome: InviteOutcome) => {
+        switch (outcome.mode) {
+            case 'share':
+                return 'LINE 邀請已送出。';
+            case 'copy':
+                return '已複製邀請連結，請貼給好友。';
+            case 'cancelled':
+                return '已取消 LINE 好友選擇，可以重試或改用連結分享。';
+            case 'unavailable':
+                return '目前無法自動複製邀請連結，請手動複製下方連結分享。';
+            case 'failed':
+                return 'LINE 邀請暫時失敗，請改用下方連結分享。';
+            default:
+                return '邀請狀態已更新。';
+        }
+    };
+
+    const getInviteOutcomeTone = (outcome: InviteOutcome) => {
+        if (outcome.mode === 'share' || outcome.mode === 'copy') return 'success';
+        if (outcome.mode === 'cancelled' || outcome.mode === 'unavailable') return 'warning';
+        return 'danger';
+    };
+
+    const handleShareRoomInvite = async () => {
+        if (!roomId) return;
+        const result = await shareRoomInvite(roomId);
+        setInviteOutcome(result);
+
+        if (result.mode === 'failed') {
+            frontendLogger.warn('⚠️ LINE 邀請失敗', {
+                roomId,
+                reason: result.reason
+            });
+        }
+    };
+
     // 玩家確認順序
     const handleConfirmOrder = () => {
-        console.log('🎯 [GameRoom] 玩家確認順序:', currentPlayerId);
         confirmOrder();
     };
+
+    const handleReturnToLobby = useCallback(() => {
+        leaveRoom();
+        navigate('/');
+    }, [leaveRoom, navigate]);
+
+    const isGameEnded = state.phase === 'ended';
+
+    const isWaiting = state.phase === 'waiting' || state.players.length < 2;
+    const openingDealModalModel = useMemo(() => {
+        const openingDeal = state.openingDeal;
+
+        if (
+            !openingDeal
+            || !activeOpeningDealModalSequenceId
+            || openingDeal.sequenceId !== activeOpeningDealModalSequenceId
+            || openingDeal.status === 'not_replayable'
+            || !openingDeal.replayable
+        ) {
+            return null;
+        }
+
+        return buildOpeningDealModalModel(openingDeal, state.players, currentPlayerId, prefersReducedMotion);
+    }, [activeOpeningDealModalSequenceId, currentPlayerId, prefersReducedMotion, state.openingDeal, state.players]);
+    const isOpeningDealModalActive = Boolean(openingDealModalModel);
+    const isOpeningDealActive = activeOpeningDealSteps.length > 0 || isOpeningDealModalActive;
+    const openingHandEligibility = useMemo(
+        () => getOpeningHandTakeEligibility(state, currentPlayerId),
+        [currentPlayerId, state]
+    );
+    const openingHandRevealSequenceId = openingHandEligibility.sequenceId
+        ?? (roomId && currentPlayerId ? `${roomId}-${state.round}-${currentPlayerId}` : null);
+    const openingHandRevealModel = useMemo(() => buildOpeningHandRevealModel({
+        eligibility: {
+            ...openingHandEligibility,
+            isEligible: openingHandEligibility.isEligible && !isOpeningDealActive,
+            sequenceId: openingHandRevealSequenceId
+        },
+        cards: currentPlayer?.hand ?? [],
+        status: openingHandRevealStatus,
+        reducedMotion: prefersReducedMotion,
+        revealedCount: openingHandRevealedCount
+    }), [
+        currentPlayer?.hand,
+        openingHandEligibility,
+        openingHandRevealSequenceId,
+        openingHandRevealStatus,
+        openingHandRevealedCount,
+        isOpeningDealActive,
+        prefersReducedMotion
+    ]);
+    const isOpeningHandRevealBlocking = openingHandRevealModel.isInteractionBlocked;
+
+    const pendingInteraction = state.pendingInteraction;
+    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
+    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
+    const isInteractionLocked = Boolean(pendingInteraction)
+        || isOpeningDealActive
+        || isOpeningHandRevealBlocking
+        || state.orderDecision.isOpen
+        || Boolean(roundSummary)
+        || Boolean(readyStatus)
+        || isGameEnded;
+    const canAct =
+        state.phase === 'playing'
+        && state.players[state.currentPlayer]?.id === currentPlayerId
+        && !pendingInteraction
+        && !isOpeningDealActive
+        && !isOpeningHandRevealBlocking
+        && !state.orderDecision.isOpen;
+    const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
+    const activeDrawQueueEvent = drawQueue[0] ?? null;
+    const activeDrawEventId = activeDrawQueueEvent ? getDrawEventId(activeDrawQueueEvent) : null;
+    const isActiveSelfDrawNotification = Boolean(
+        activeDrawEventId
+        && activeDrawNotificationEventId === activeDrawEventId
+        && activeDrawQueueEvent?.playerId === currentPlayerId
+        && activeDrawQueueEvent.card.type !== 'hidden'
+    );
+    const shouldHoldFocusForSelfDraw = Boolean(
+        activeDrawEventId
+        && !completedDrawEventIdsRef.current.has(activeDrawEventId)
+        && activeDrawQueueEvent?.playerId === currentPlayerId
+        && activeDrawQueueEvent.card.type !== 'hidden'
+        && focusSection !== 'handActions'
+    );
+    const localActionTokenMap = useMemo(
+        () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
+        [currentPlayer?.actionTokens]
+    );
+    const localReplayCardsByAction = useMemo<Record<'secret' | 'trade-off', ItemCard[]>>(() => ({
+        secret: currentPlayer?.secretCards ?? [],
+        'trade-off': currentPlayer?.discardedCards ?? []
+    }), [currentPlayer?.discardedCards, currentPlayer?.secretCards]);
+
+    const isReplayEligible = useCallback((playerId: string, actionType: ActionToken['type']) => {
+        if (playerId !== currentPlayerId || (actionType !== 'secret' && actionType !== 'trade-off')) {
+            return false;
+        }
+        const token = localActionTokenMap.get(actionType);
+        return Boolean(token?.used && localReplayCardsByAction[actionType].length > 0);
+    }, [currentPlayerId, localActionTokenMap, localReplayCardsByAction]);
+
+    const handleInfoActionIconClick = useCallback((playerId: string, actionType: ActionToken['type']) => {
+        if (!isReplayEligible(playerId, actionType)) {
+            return;
+        }
+        if (actionType === 'secret' || actionType === 'trade-off') {
+            setExpandedInfoReplayAction(actionType);
+        }
+    }, [isReplayEligible]);
+
+    const consumeActiveDrawEvent = useCallback((eventId: string) => {
+        completedDrawEventIdsRef.current.add(eventId);
+        setRecentDraw(null);
+        setActiveDrawNotificationEventId((currentId) => currentId === eventId ? null : currentId);
+        setActiveDrawAnimationEventId((currentId) => currentId === eventId ? null : currentId);
+        setIsDrawHighlightActive(false);
+        setDrawHighlightCardId(null);
+        consumeDrawEvent();
+    }, [consumeDrawEvent]);
+
+    const startDrawFlipPresentation = useCallback((eventId: string, card: ItemCard) => {
+        if (activeDrawAnimationEventId === eventId || completedDrawEventIdsRef.current.has(eventId)) {
+            return;
+        }
+
+        setRecentDraw(null);
+        setActiveDrawNotificationEventId(null);
+        setActiveDrawAnimationEventId(eventId);
+        setDrawHighlightCardId(card.id);
+        setIsDrawHighlightActive(true);
+        enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
+
+        window.setTimeout(() => {
+            consumeActiveDrawEvent(eventId);
+        }, getDrawFlipDurationMs(prefersReducedMotion) + 120);
+    }, [
+        activeDrawAnimationEventId,
+        consumeActiveDrawEvent,
+        enqueueMotionCues,
+        prefersReducedMotion
+    ]);
+
+    const handleDrawNotificationDismiss = useCallback(() => {
+        if (!activeDrawEventId) {
+            return;
+        }
+
+        consumeActiveDrawEvent(activeDrawEventId);
+    }, [activeDrawEventId, consumeActiveDrawEvent]);
+
+    const handleDrawNotificationViewNow = useCallback(() => {
+        if (!activeDrawQueueEvent || !activeDrawEventId || activeDrawQueueEvent.card.type === 'hidden') {
+            return;
+        }
+
+        setFocusSection('handActions');
+        startDrawFlipPresentation(activeDrawEventId, activeDrawQueueEvent.card);
+    }, [activeDrawEventId, activeDrawQueueEvent, startDrawFlipPresentation]);
+
+    const handleDrawNotificationKeyDown = useCallback((
+        event: React.KeyboardEvent<HTMLButtonElement>,
+        action: 'dismiss' | 'view_now'
+    ) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        if (action === 'dismiss') {
+            handleDrawNotificationDismiss();
+            return;
+        }
+
+        handleDrawNotificationViewNow();
+    }, [handleDrawNotificationDismiss, handleDrawNotificationViewNow]);
+
+    useEffect(() => {
+        if (!activeDrawQueueEvent || !activeDrawEventId) {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(null);
+            setActiveDrawAnimationEventId(null);
+            setIsDrawHighlightActive(false);
+            setDrawHighlightCardId(null);
+            completedDrawEventIdsRef.current.clear();
+            return;
+        }
+
+        if (completedDrawEventIdsRef.current.has(activeDrawEventId)) {
+            return;
+        }
+
+        const drawReviewEvent = classifyDrawEvent(activeDrawQueueEvent, currentPlayerId);
+        const route = routeDrawPresentation(drawReviewEvent, focusSection, isInteractionLocked);
+
+        if (route === 'defer') {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(null);
+            return;
+        }
+
+        if (route === 'opponent') {
+            const label = `${getPlayerDisplayName(activeDrawQueueEvent.playerId)} 抽到了新卡`;
+            setRecentDraw(label);
+            setActiveDrawNotificationEventId(null);
+
+            const timer = window.setTimeout(() => {
+                consumeActiveDrawEvent(activeDrawEventId);
+            }, prefersReducedMotion ? 520 : 700);
+
+            return () => window.clearTimeout(timer);
+        }
+
+        if (route === 'notify') {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(activeDrawEventId);
+
+            const timer = window.setTimeout(() => {
+                consumeActiveDrawEvent(activeDrawEventId);
+            }, getDrawNotificationTimeoutMs());
+
+            return () => window.clearTimeout(timer);
+        }
+
+        if (drawReviewEvent.cardReference) {
+            startDrawFlipPresentation(activeDrawEventId, drawReviewEvent.cardReference);
+        }
+    }, [
+        activeDrawEventId,
+        activeDrawQueueEvent,
+        consumeActiveDrawEvent,
+        currentPlayerId,
+        focusSection,
+        getPlayerDisplayName,
+        isInteractionLocked,
+        prefersReducedMotion,
+        startDrawFlipPresentation
+    ]);
+    const handleOpeningDealModalComplete = useCallback(() => {
+        if (activeOpeningDealModalSequenceId) {
+            completedOpeningDealModalSequencesRef.current.add(activeOpeningDealModalSequenceId);
+        }
+
+        setActiveOpeningDealModalSequenceId(null);
+    }, [activeOpeningDealModalSequenceId]);
+
+    useEffect(() => {
+        if (!openingHandRevealModel.isEligible || !openingHandRevealSequenceId) {
+            clearOpeningHandRevealTimers();
+            setOpeningHandRevealStatus('not_eligible');
+            setOpeningHandRevealedCount(0);
+            return;
+        }
+
+        if (completedOpeningHandRevealSequencesRef.current.has(openingHandRevealSequenceId)) {
+            setOpeningHandRevealStatus('revealed');
+            setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
+            return;
+        }
+
+        setOpeningHandRevealStatus((currentStatus) => {
+            if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
+                return currentStatus;
+            }
+
+            return 'pending_take';
+        });
+        setOpeningHandRevealedCount(0);
+        setFocusSection('handActions');
+    }, [
+        clearOpeningHandRevealTimers,
+        currentPlayer?.hand.length,
+        openingHandRevealModel.isEligible,
+        openingHandRevealSequenceId
+    ]);
+
+    useEffect(() => () => {
+        clearOpeningHandRevealTimers();
+    }, [clearOpeningHandRevealTimers]);
+
+    const completeOpeningHandReveal = useCallback(() => {
+        if (openingHandRevealSequenceId) {
+            completedOpeningHandRevealSequencesRef.current.add(openingHandRevealSequenceId);
+        }
+
+        clearOpeningHandRevealTimers();
+        setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
+        setOpeningHandRevealStatus('revealed');
+        setFocusSection('handActions');
+    }, [clearOpeningHandRevealTimers, currentPlayer?.hand.length, openingHandRevealSequenceId]);
+
+    const handleTakeOpeningHand = useCallback(() => {
+        if (
+            openingHandRevealStatus !== 'pending_take'
+            || !openingHandRevealModel.isEligible
+            || !currentPlayer
+        ) {
+            return;
+        }
+
+        clearOpeningHandRevealTimers();
+
+        if (prefersReducedMotion) {
+            completeOpeningHandReveal();
+            return;
+        }
+
+        const steps = createOpeningHandRevealSteps(currentPlayer.hand, false);
+        setOpeningHandRevealStatus('revealing');
+        setOpeningHandRevealedCount(0);
+
+        steps.forEach((step, index) => {
+            const timerId = window.setTimeout(() => {
+                setOpeningHandRevealedCount(index + 1);
+            }, step.delayMs + step.durationMs);
+            openingHandRevealTimersRef.current.push(timerId);
+        });
+
+        const completeTimerId = window.setTimeout(() => {
+            completeOpeningHandReveal();
+        }, getOpeningHandRevealTotalMs(steps, false));
+        openingHandRevealTimersRef.current.push(completeTimerId);
+    }, [
+        clearOpeningHandRevealTimers,
+        completeOpeningHandReveal,
+        currentPlayer,
+        openingHandRevealModel.isEligible,
+        openingHandRevealStatus,
+        prefersReducedMotion
+    ]);
+
+    useEffect(() => {
+        const surface = gameSurfaceRef.current;
+        if (!surface) {
+            return;
+        }
+
+        if (isOpeningDealModalActive) {
+            surface.setAttribute('inert', '');
+            return;
+        }
+
+        surface.removeAttribute('inert');
+    }, [isOpeningDealModalActive]);
+    useEffect(() => {
+        if (state.phase !== 'playing') {
+            setFocusSection('characterBoard');
+            previousFocusSectionRef.current = 'characterBoard';
+        }
+    }, [state.phase]);
+
+    useEffect(() => {
+        const wasLocked = wasInteractionLockedRef.current;
+        if (!wasLocked && isInteractionLocked) {
+            previousFocusSectionRef.current = focusSection;
+            canActBeforeBlockingRef.current = canAct;
+        }
+        if (wasLocked && !isInteractionLocked) {
+            const becameActionable = !canActBeforeBlockingRef.current && canAct;
+            setFocusSection(becameActionable && !shouldHoldFocusForSelfDraw ? 'handActions' : previousFocusSectionRef.current);
+        }
+        wasInteractionLockedRef.current = isInteractionLocked;
+    }, [canAct, focusSection, isInteractionLocked, shouldHoldFocusForSelfDraw]);
+
+    useEffect(() => {
+        const wasCanAct = previousCanActRef.current;
+        if (!wasCanAct && canAct && !isInteractionLocked && !shouldHoldFocusForSelfDraw) {
+            setFocusSection('handActions');
+        }
+        previousCanActRef.current = canAct;
+    }, [canAct, isInteractionLocked, shouldHoldFocusForSelfDraw]);
 
     if (!isConnected) {
         return (
@@ -202,24 +730,17 @@ const GameRoom: React.FC = () => {
         );
     }
 
-    const isGameEnded = state.phase === 'ended';
-
-    const isWaiting = state.phase === 'waiting' || state.players.length < 2;
-
-    const pendingInteraction = state.pendingInteraction;
-    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
-    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
-    const isInteractionLocked = Boolean(pendingInteraction)
-        || isDrawModalOpen
-        || state.orderDecision.isOpen
-        || Boolean(readyStatus)
-        || isGameEnded;
-    const canAct =
-        state.phase === 'playing'
-        && state.players[state.currentPlayer]?.id === currentPlayerId
-        && !pendingInteraction
-        && !isDrawModalOpen
-        && !state.orderDecision.isOpen;
+    if (error) {
+        return (
+            <div className="game-background d-flex align-items-center justify-content-center">
+                <div className="card p-4 text-center" style={{ minWidth: 360, maxWidth: 520 }}>
+                    <h4 className="text-danger mb-3">無法進入對戰</h4>
+                    <p className="mb-4">{error}</p>
+                    <button className="btn btn-primary" onClick={handleReturnToLobby}>返回大廳</button>
+                </div>
+            </div>
+        );
+    }
 
     if (isWaiting) {
         return (
@@ -260,19 +781,7 @@ const GameRoom: React.FC = () => {
                             <div className={`waiting-room-actions ${!isLineClient() && roomId ? '' : 'waiting-room-actions--single'}`}>
                                 <button
                                     className="btn btn-success btn-sm waiting-room-button"
-                                    onClick={async () => {
-                                        if (!roomId) return;
-                                        try {
-                                            const result = await shareRoomInvite(roomId);
-                                            if (result.mode === 'copy') {
-                                                alert('已複製邀請連結，請貼給好友！');
-                                            }
-                                        } catch (error) {
-                                            console.error('❌ LINE 邀請失敗:', error);
-                                            const message = error instanceof Error ? error.message : 'LINE 邀請失敗，請改用複製連結分享。';
-                                            alert(message);
-                                        }
-                                    }}
+                                    onClick={handleShareRoomInvite}
                                 >
                                     LINE 邀請好友
                                 </button>
@@ -292,6 +801,15 @@ const GameRoom: React.FC = () => {
                         {!isLineClient() && (
                             <div className="mt-2 text-muted">
                                 <small>提示：請在 LINE App 內開啟，才能使用選擇好友功能。</small>
+                            </div>
+                        )}
+
+                        {inviteOutcome && (
+                            <div className={`waiting-room-invite-feedback waiting-room-invite-feedback--${getInviteOutcomeTone(inviteOutcome)}`} role="status">
+                                <div>{getInviteOutcomeMessage(inviteOutcome)}</div>
+                                {inviteOutcome.url && (
+                                    <code className="waiting-room-invite-feedback__url">{inviteOutcome.url}</code>
+                                )}
                             </div>
                         )}
 
@@ -332,7 +850,7 @@ const GameRoom: React.FC = () => {
 
                     <button
                         className="btn btn-outline-secondary btn-sm"
-                        onClick={() => navigate('/')}
+                        onClick={handleReturnToLobby}
                     >
                         返回大廳
                     </button>
@@ -342,70 +860,133 @@ const GameRoom: React.FC = () => {
     }
 
     return (
-        <div className="game-background p-3">
+        <div className="game-background game-room-page p-3">
             <div className="container-fluid">
-                <div className={`card game-card p-3 ${isInteractionLocked ? 'game-card--locked' : ''}`}>
-                    <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
-                        <div className="d-flex align-items-center gap-2">
-                            {displayAvatar && (
-                                <img
-                                    className="player-avatar"
-                                    src={displayAvatar}
-                                    alt={`${displayName} 頭像`}
-                                />
-                            )}
-                            <div>你是：<strong>{displayName}</strong></div>
-                        </div>
-                        <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
-                    </div>
-                    {/* 遊戲資訊欄 */}
-                    <div className="row align-items-center mb-4">
-                        <div className="col-md-4 text-center">
-                            <h5 className="mb-0">第 {state.round} 回合</h5>
-                            <small className="text-muted">階段: {state.phase}</small>
-                        </div>
-                        <div className="col-md-4 text-end">
-                            <span className="badge bg-primary fs-6">
-                                當前玩家: {getPlayerDisplayName(state.players[state.currentPlayer]?.id)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* 玩家資訊 */}
-                    <div className="row mb-3">
-                        {state.players.map((player, index) => {
-                            const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
+                <div
+                    ref={gameSurfaceRef}
+                    className={`card game-card game-room-surface p-2 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}
+                    aria-hidden={isOpeningDealModalActive ? true : undefined}
+                >
+                    <nav className="game-room-tabs" aria-label="遊戲區塊切換">
+                        {SECTION_TABS.map((tab) => {
+                            const isActive = focusSection === tab.section;
                             return (
-                                <div key={player.id} className="col-md-6 mb-2">
-                                    <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
-                                        <div className="card-body py-2">
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <span className="d-inline-flex align-items-center gap-2">
-                                                    {getPlayerAvatar(player.id) && (
-                                                        <img
-                                                            className="player-avatar"
-                                                            src={getPlayerAvatar(player.id)}
-                                                            alt={`${getPlayerDisplayName(player.id)} 頭像`}
-                                                        />
-                                                    )}
-                                                    <strong>{getPlayerDisplayName(player.id)}</strong>
-                                                    {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
-                                                    {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
-                                                </span>
-                                                <small className="text-muted">
-                                                    手牌: {player.hand.length}
-                                                    <br />
-                                                    魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <button
+                                    key={tab.section}
+                                    type="button"
+                                    className={`game-room-tabs__button ${isActive ? 'is-active' : ''}`}
+                                    onClick={() => setFocusSection(tab.section)}
+                                    aria-pressed={isActive}
+                                >
+                                    {tab.label}
+                                </button>
                             );
                         })}
-                    </div>
+                    </nav>
+                    <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
+                        {focusSection === 'info' && (
+                            <div className="game-focus-content game-info-panel">
+                                <div className="game-info-status-row mb-3">
+                                    <div className="game-info-status-row__current">
+                                        {activeTurnPlayerName === displayName ? '你的回合' : '對手的回合'}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-danger btn-sm game-info-status-row__leave"
+                                        onClick={() => {
+                                            if (window.confirm('確定要離開遊戲嗎？')) {
+                                                handleReturnToLobby();
+                                            }
+                                        }}
+                                    >
+                                        離開遊戲
+                                    </button>
+                                </div>
+                                <div className="row mb-3 gy-3">
+                                    {state.players.map((player, index) => {
+                                        const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
+                                        const actionUsedMap = new Map(player.actionTokens.map((token) => [token.type, token.used]));
+                                        const isLocalPlayerRow = player.id === currentPlayerId;
+                                        const activeReplayCards = expandedInfoReplayAction ? localReplayCardsByAction[expandedInfoReplayAction] : [];
 
-                    {/* 遊戲主要區域 */}
+                                        return (
+                                            <div key={player.id} className="col-md-6 mb-2">
+                                                <div className={`card player-card ${campClass} ${index === state.currentPlayer ? 'bg-light' : ''}`}>
+                                                    <div className="card-body py-2">
+                                                        <div className="d-flex justify-content-between align-items-center">
+                                                            <span className="d-inline-flex align-items-center gap-2">
+                                                                {getPlayerAvatar(player.id) && (
+                                                                    <img
+                                                                        className="player-avatar"
+                                                                        src={getPlayerAvatar(player.id)}
+                                                                        alt={`${getPlayerDisplayName(player.id)} 頭像`}
+                                                                    />
+                                                                )}
+                                                                <strong>{getPlayerDisplayName(player.id)}</strong>
+                                                                {index === state.currentPlayer && <span className="badge bg-warning text-dark ms-2">進行中</span>}
+                                                                {index === 0 && <span className="badge bg-info text-white ms-2">房主</span>}
+                                                            </span>
+                                                            <small className="text-muted">
+                                                                手牌: {player.hand.length}
+                                                                <br />
+                                                                魅力: {player.score?.charm || 0} / 藝妓: {player.score?.tokens || 0}
+                                                            </small>
+                                                        </div>
+                                                        <div className="game-info-action-row mt-2">
+                                                            {actionStatusConfig.map((actionItem) => {
+                                                                const used = actionUsedMap.get(actionItem.type) ?? false;
+                                                                const replayEligible = isReplayEligible(player.id, actionItem.type);
+                                                                const isReplayActive = replayEligible && expandedInfoReplayAction === actionItem.type;
+                                                                const classNames = [
+                                                                    'game-info-action',
+                                                                    used ? 'is-used' : 'is-available',
+                                                                    replayEligible ? 'is-replayable' : 'is-status-only',
+                                                                    isReplayActive ? 'is-replay-active' : ''
+                                                                ].filter(Boolean).join(' ');
+
+                                                                return (
+                                                                    <button
+                                                                        key={`${player.id}-${actionItem.type}`}
+                                                                        type="button"
+                                                                        className={classNames}
+                                                                        onClick={() => handleInfoActionIconClick(player.id, actionItem.type)}
+                                                                        disabled={!replayEligible}
+                                                                        aria-label={`${actionItem.label}${used ? '（已使用）' : '（未使用）'}`}
+                                                                    >
+                                                                        <img className="game-info-action__icon" src={actionItem.iconUrl} alt={actionItem.label} />
+                                                                        <span className="game-info-action__label">{actionItem.label}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {isLocalPlayerRow && expandedInfoReplayAction && activeReplayCards.length > 0 && (
+                                                            <div className="game-info-replay mt-2">
+                                                                <div className="game-info-replay__title">
+                                                                    {expandedInfoReplayAction === 'secret' ? '密約回看' : '取捨回看'}
+                                                                </div>
+                                                                <div className="game-info-replay__cards">
+                                                                    {activeReplayCards.map((card) => (
+                                                                        <div
+                                                                            key={card.id}
+                                                                            className="item-card item-card--image item-card--mini"
+                                                                            style={{ backgroundImage: `url(${getItemCardImage(card, activeGeishaSet)})` }}
+                                                                        >
+                                                                            <div className="item-card__overlay" />
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
                     <GameBoard
                         state={state}
                         playerId={currentPlayerId}
@@ -414,27 +995,54 @@ const GameRoom: React.FC = () => {
                         canAct={canAct}
                         highlightCardId={drawHighlightCardId}
                         highlightActive={isDrawHighlightActive}
+                        motionCues={activeMotionCues}
+                        prefersReducedMotion={prefersReducedMotion}
+                        focusSection={focusSection}
+                        openingDealSteps={activeOpeningDealSteps}
+                        openingHandReveal={openingHandRevealModel.isEligible || openingHandRevealModel.status === 'revealed' ? openingHandRevealModel : null}
+                        onTakeOpeningHand={handleTakeOpeningHand}
                     />
-
-                    {/* 離開遊戲按鈕 */}
-                    <div className="text-center mt-4 mb-2">
-                        <button
-                            className="btn btn-outline-danger btn-sm"
-                            onClick={() => {
-                                if (window.confirm('確定要離開遊戲嗎？')) {
-                                    navigate('/');
-                                }
-                            }}
-                        >
-                            離開遊戲
-                        </button>
-                    </div>
                 </div>
             </div>
 
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
             )}
+
+            {isActiveSelfDrawNotification && (
+                <div className="draw-notification shadow" role="status" aria-label="抽牌通知">
+                    <div className="draw-notification__card-back" aria-hidden="true">
+                        <span />
+                    </div>
+                    <div className="draw-notification__content">
+                        <div className="draw-notification__title">你抽到一張新牌</div>
+                        <div className="draw-notification__actions">
+                            <button
+                                type="button"
+                                className="btn btn-outline-light btn-sm"
+                                onClick={handleDrawNotificationDismiss}
+                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'dismiss')}
+                            >
+                                稍後確認
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-light btn-sm"
+                                onClick={handleDrawNotificationViewNow}
+                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'view_now')}
+                            >
+                                現在查看
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <OpeningDealModal
+                isOpen={isOpeningDealModalActive}
+                model={openingDealModalModel}
+                onComplete={handleOpeningDealModalComplete}
+            />
 
             {roundSummary && (
                 <div className="round-summary-overlay">
@@ -450,14 +1058,6 @@ const GameRoom: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {isDrawModalOpen && (
-                <div className="top-sheet">
-                    <div className="top-sheet__panel">
-                        <div className="top-sheet__title">你抽到一張新牌</div>
                     </div>
                 </div>
             )}
@@ -530,7 +1130,7 @@ const GameRoom: React.FC = () => {
                                         ))}
                                     </div>
                                     <div className="d-flex justify-content-center gap-2">
-                                        <button className="btn btn-primary" onClick={() => navigate('/')}>
+                                        <button className="btn btn-primary" onClick={handleReturnToLobby}>
                                             返回大廳
                                         </button>
                                         <button
@@ -565,8 +1165,10 @@ const GameRoom: React.FC = () => {
                     playerId={currentPlayerId}
                     players={state.players}
                     getCharmByGeishaId={(geishaId) => state.geishas.find((geisha) => geisha.id === geishaId)?.charmPoints ?? 0}
-                    geishaSet={state.geishaSet ?? 'default'}
+                    geishaSet={activeGeishaSet}
                     onResolve={sendGameAction}
+                    activeMotionKind={activePendingMotionKind}
+                    prefersReducedMotion={prefersReducedMotion}
                 />
             )}
         </div>

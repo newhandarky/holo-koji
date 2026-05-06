@@ -13,6 +13,7 @@ import {
     WebSocketEventType
 } from 'game-shared-types';
 import { gameWebSocket } from '../services/websocket';
+import { frontendLogger } from '../utils/runtimeLogger';
 import config from '../config/environment';
 
 // 連線事件的保留名稱，避免與伺服器事件衝突
@@ -24,6 +25,14 @@ export interface CardDrawEvent {
     playerId: string;
     // 抽到的卡片
     card: ItemCard;
+}
+
+export interface DealAnimationEvent {
+    sequence: Array<{
+        order: number;
+        playerId: string;
+        card: ItemCard;
+    }>;
 }
 
 interface RoundCompletePayload {
@@ -138,6 +147,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     const [clientState, clientDispatch] = useReducer(clientReducer, initialClientState); // 建立客戶端狀態容器
     const { dispatch: gameDispatch } = useGame(); // 取得全域遊戲狀態的 dispatch
     const [drawQueue, setDrawQueue] = useState<CardDrawEvent[]>([]);
+    const [dealQueue, setDealQueue] = useState<DealAnimationEvent[]>([]);
     const [roundSummary, setRoundSummary] = useState<{ round: number } | null>(null);
     const roundSummaryTimerRef = useRef<number | null>(null);
     const [readyStatus, setReadyStatus] = useState<ReadyStatusPayload | null>(null);
@@ -235,6 +245,32 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             }
         };
 
+        const handleDealAnimation = (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+
+            const candidate = payload as Partial<DealAnimationEvent>;
+            if (!Array.isArray(candidate.sequence)) {
+                return;
+            }
+
+            const sequence = candidate.sequence.filter((step): step is DealAnimationEvent['sequence'][number] => (
+                Boolean(step)
+                && typeof step === 'object'
+                && typeof step.order === 'number'
+                && typeof step.playerId === 'string'
+                && Boolean(step.card)
+                && typeof step.card === 'object'
+            ));
+
+            if (sequence.length === 0) {
+                return;
+            }
+
+            setDealQueue((previous) => [...previous, { sequence }]);
+        };
+
         const handleRoundComplete = (payload: unknown) => {
             if (!payload || typeof payload !== 'object') {
                 return;
@@ -274,6 +310,11 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             } else {
                 setReadyStatus(candidate);
             }
+        };
+
+        const ignoreLifecycleEvent = () => {
+            // 這些事件目前只作為 server 廣播輔助，不需要額外前端處理；
+            // 明確註冊 no-op handler，避免正常流程被記成「找不到處理器」警告。
         };
 
         const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
@@ -329,6 +370,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('ERROR', handleErrorMessage);
         registerEventHandler('GAME_ENDED', syncGameState);
         registerEventHandler('CARD_DRAWN', handleCardDrawn);
+        registerEventHandler('DEAL_ANIMATION', handleDealAnimation);
+        registerEventHandler('ACTION_EXECUTED', ignoreLifecycleEvent);
 
         gameWebSocket.on(CONNECTION_OPEN, handleOpen);
         gameWebSocket.on(CONNECTION_CLOSE, handleClose);
@@ -348,13 +391,17 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             isActive = false;
             cleanupHandlers();
             setDrawQueue([]);
+            setDealQueue([]);
         };
     }, [gameId, playerData?.id, gameDispatch]);
 
     // 發送遊戲行動到伺服器
     const sendGameAction = useCallback((action: GameAction) => {
         if (!gameId || !playerData?.id) {
-            console.warn('⚠️ [useWebSocket] 缺少 gameId，無法發送遊戲動作');
+            frontendLogger.warn('⚠️ [useWebSocket] 缺少 gameId，無法發送遊戲動作', {
+                hasGameId: Boolean(gameId),
+                hasPlayerId: Boolean(playerData?.id)
+            });
             return;
         }
 
@@ -369,7 +416,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     // 送出再來一場請求（同房間重開）
     const requestRematch = useCallback(() => {
         if (!gameId || !playerData?.id) {
-            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法發送再來一場');
+            frontendLogger.warn('⚠️ [useWebSocket] 缺少必要資訊，無法發送再來一場', {
+                hasGameId: Boolean(gameId),
+                hasPlayerId: Boolean(playerData?.id)
+            });
             return;
         }
 
@@ -384,7 +434,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     // 玩家準備確認
     const confirmReady = useCallback(() => {
         if (!gameId || !playerData?.id) {
-            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認準備');
+            frontendLogger.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認準備', {
+                hasGameId: Boolean(gameId),
+                hasPlayerId: Boolean(playerData?.id)
+            });
             return;
         }
 
@@ -399,7 +452,10 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     // 確認順序（順序決定完成後使用）
     const confirmOrder = useCallback(() => {
         if (!gameId || !playerData?.id) {
-            console.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認順序');
+            frontendLogger.warn('⚠️ [useWebSocket] 缺少必要資訊，無法確認順序', {
+                hasGameId: Boolean(gameId),
+                hasPlayerId: Boolean(playerData?.id)
+            });
             return;
         }
 
@@ -417,7 +473,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
     // 主動觸發順序決定（目前預留使用）
     const startOrderDecision = useCallback((players: string[]) => {
         if (!gameId) {
-            console.warn('⚠️ [useWebSocket] 缺少 gameId，無法啟動順序決定');
+            frontendLogger.warn('⚠️ [useWebSocket] 缺少 gameId，無法啟動順序決定');
             return;
         }
 
@@ -442,6 +498,14 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         setDrawQueue(prev => prev.slice(1));
     }, []);
 
+    const consumeDealEvent = useCallback(() => {
+        setDealQueue(prev => prev.slice(1));
+    }, []);
+
+    const leaveRoom = useCallback(() => {
+        gameWebSocket.disconnect();
+    }, []);
+
     // 回傳給 UI 的狀態與操作
     return {
         gameState: clientState.gameState,
@@ -456,6 +520,9 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         confirmOrder,
         startOrderDecision,
         clearError,
+        leaveRoom,
+        dealQueue,
+        consumeDealEvent,
         drawQueue,
         consumeDrawEvent
     };

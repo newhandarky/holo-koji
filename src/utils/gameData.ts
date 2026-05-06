@@ -1,207 +1,145 @@
-import { Geisha, GeishaSetKey } from "game-shared-types"
+import { characterProfilesBySet, CharacterProfile, Geisha, GeishaSet, ItemCard } from "game-shared-types"
 
-// 取得部署時的靜態資源基底路徑（支援 GitHub Pages）
-const publicBaseUrl = process.env.PUBLIC_URL ?? '';
+export interface ItemIconDefinition {
+    key: string;
+    label: string;
+    glyph: string;
+    accentClassName: string;
+    fallbackLabel: string;
+    imageUrl?: string;
+}
 
-// 藝妓資料：名稱與圖片網址
-export const geishaData = [
-    {
-        name: '一伊那尓栖',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/ninomae-inanis.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/ina-tako.png`
+const buildUnknownItemIconDefinition = (itemType: string): ItemIconDefinition => ({
+    key: `unknown:${itemType}`,
+    label: itemType,
+    glyph: '?',
+    accentClassName: 'item-icon--unknown',
+    fallbackLabel: '未知道具'
+});
+
+const ginzaItemDefinitions: Record<string, ItemIconDefinition> = {
+    sake_01: {
+        key: 'default:sake_01',
+        label: 'Sake 01',
+        glyph: '酒',
+        accentClassName: 'item-icon--gold',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-0263adb6-f340-46f9-86d6-0af83cdc0693-ChatGPT-Image-2026-5-1-02_20_07.png'
     },
-    {
-        name: '大神ミオ',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/ookami-mio.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/mio-hatotaurosu.png`
+    sake_02: {
+        key: 'default:sake_02',
+        label: 'Sake 02',
+        glyph: '酒',
+        accentClassName: 'item-icon--coral',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-012e2f1c-59e5-422c-92f5-c2d836144343-ChatGPT-Image-2026-5-1-02_23_19.png'
     },
-    {
-        name: '百鬼あやめ',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/nakiri-ayame.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/ayame-poyoyo.png`
+    sake_03: {
+        key: 'default:sake_03',
+        label: 'Sake 03',
+        glyph: '酒',
+        accentClassName: 'item-icon--plum',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-fed18579-b61e-4e96-b3ea-38aedbb1801a-ChatGPT-Image-2026-5-1-02_11_49.png'
     },
-    {
-        name: '白上フブキ',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/shirakami-fubuki.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/fubuki-konkonkon.png`
+    sake_04: {
+        key: 'default:sake_04',
+        label: 'Sake 04',
+        glyph: '酒',
+        accentClassName: 'item-icon--violet',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-5b3899fd-2738-420f-9069-aa1f7134f55c-ChatGPT-Image-2026-5-1-02_31_22.png'
     },
-    {
-        name: 'さくらみこ',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/sakura-miko.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/miko-taiyaki.png`
+    sake_05: {
+        key: 'default:sake_05',
+        label: 'Sake 05',
+        glyph: '酒',
+        accentClassName: 'item-icon--jade',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-43d08d05-b5ba-4c51-b6ad-d7015306c8f7-ChatGPT-Image-2026-5-1-02_25_06.png'
     },
-    {
-        name: '風真いろは',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/kazama-iroha.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/iroha-jakin.png`
+    sake_06: {
+        key: 'default:sake_06',
+        label: 'Sake 06',
+        glyph: '酒',
+        accentClassName: 'item-icon--sun',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-2ef254e2-0aad-4286-98d8-c261fc9e33ed-ChatGPT-Image-2026-5-1-02_27_04.png'
     },
-    {
-        name: '儒烏風亭らでん',
-        imageUrl: `${publicBaseUrl}/images/geisha/origin/juufuutei-raden.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/origin/raden-sensu.png`
+    sake_07: {
+        key: 'default:sake_07',
+        label: 'Sake 07',
+        glyph: '酒',
+        accentClassName: 'item-icon--ice',
+        fallbackLabel: '酒',
+        imageUrl: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/%E9%8A%80%E5%BA%A7-ICON/1777617306158-434f9580-6456-45aa-b5df-3d91a36c1a52-ChatGPT-Image-2026-5-1-02_28_43.png'
     }
-];
-
-export const akatsuki = [
-    {
-        name: '火威青',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/ao.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/ao-shanpan.png`
-    },
-    {
-        name: '潤羽るしあ',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/lushia.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/lushia-butterfly.jpg`
-    },
-    {
-        name: '沙花叉クロヱ',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/sakamata.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/sakamata-eyemask.png`
-    },
-    {
-        name: 'Gawr Gura',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/gura.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/gura-shasha.jpg`
-    },
-    {
-        name: '湊あくあ',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/aqua.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/aqua-neko.png`
-    },
-    {
-        name: '天音かなた',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/kanata.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/kanata-uparupa.png`
-    },
-    {
-        name: '桐生ココ',
-        imageUrl: `${publicBaseUrl}/images/geisha/akatsuki/coco.png`,
-        cardUrl: `${publicBaseUrl}/images/items/akatsuki/coco-incoco.jpg`
-    }
-];
-
-export const onesan = [
-    {
-        name: 'アキ・ローゼンタール',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/aki.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/rosetai.jpg`
-    },
-    {
-        name: '癒月ちょこ',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/choko.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/choco-fan.jpg`
-    },
-    {
-        name: 'ときのそら',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/sora.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/ankimo.jpg`
-    },
-    {
-        name: 'Mori Calliope',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/cali.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/death-sensei.jpg`
-    },
-    {
-        name: 'AZKi',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/azki.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/guess.jpg`
-    },
-    {
-        name: 'Elizabeth Rose Bloodflame',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/Elizabeth.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/sword.jpg`
-    },
-    {
-        name: 'Nerissa Ravencroft',
-        imageUrl: `${publicBaseUrl}/images/geisha/onesan/Nerissa.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/onesan-items/jial-bird.jpg`
-    }
-];
-
-export const collaboration = [
-    {
-        name: 'アキ・ローゼンタール',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/marin.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/gojo.png`
-    },
-    {
-        name: '癒月ちょこ',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/ren.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/inu.png`
-    },
-    {
-        name: 'ときのそら',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/yoru.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/weapon.jpg`
-    },
-    {
-        name: 'Mori Calliope',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/megumin.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/neko.jpg`
-    },
-    {
-        name: 'AZKi',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/arima.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/aqua.jpg`
-    },
-    {
-        name: 'Elizabeth Rose Bloodflame',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/furiren.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/bsg.png`
-    },
-    {
-        name: 'Nerissa Ravencroft',
-        imageUrl: `${publicBaseUrl}/images/geisha/collaboration/erien.jpg`,
-        cardUrl: `${publicBaseUrl}/images/items/collaboration/candy.png`
-    }
-];
-
-const geishaSetMap: Record<GeishaSetKey, typeof geishaData> = {
-    default: geishaData,
-    akatsuki,
-    onesan,
-    collaboration
 };
+
+const ginzaPositionItemTypes = Object.keys(ginzaItemDefinitions).sort();
 
 const charmPointsDistribution = [2, 2, 2, 3, 3, 4, 5];
 
-/**
- * 創建隨機順序的藝妓陣列
- */
-export function createRandomizedGeishas(geishaSet: GeishaSetKey = 'default'): Geisha[] {
-    const data = geishaSetMap[geishaSet] ?? geishaData;
-    const shuffledGeishas = [...data].sort(() => Math.random() - 0.5);
+export function getCharacterProfilesForSet(geishaSet: GeishaSet): CharacterProfile[] {
+    return characterProfilesBySet[geishaSet] ?? characterProfilesBySet.default;
+}
 
-    return shuffledGeishas.map((geisha, index) => ({
+export function createRandomizedGeishas(_geishaSet?: GeishaSet): Geisha[] {
+    return charmPointsDistribution.map((charmPoints, index) => ({
         id: index + 1,
-        name: geisha.name,
-        charmPoints: charmPointsDistribution[index],
+        name: `藝妓 ${index + 1}`,
+        charmPoints,
+        imageUrl: '',
         controlledBy: null,
     }));
 }
 
-const getGeishaDataBySet = (geishaSet: GeishaSetKey = 'default') =>
-    geishaSetMap[geishaSet] ?? geishaData;
-
-// 依藝妓 ID 取得名稱
-export function getGeishaNameById(geishaId: number, geishaSet: GeishaSetKey = 'default'): string {
-    const data = getGeishaDataBySet(geishaSet);
-    return data[geishaId - 1]?.name ?? `藝妓 ${geishaId}`;
+export function getItemIconDefinitionByType(itemType: string, _geishaSet?: GeishaSet): ItemIconDefinition {
+    return ginzaItemDefinitions[itemType] ?? buildUnknownItemIconDefinition(itemType);
 }
 
-// 依藝妓 ID 取得圖片網址
-export function getGeishaImageById(geishaId: number, geishaSet: GeishaSetKey = 'default'): string {
-    const data = getGeishaDataBySet(geishaSet);
-    return data[geishaId - 1]?.imageUrl ?? '';
+export function getItemIconDefinitionByPosition(positionIndex: number, geishaSet?: GeishaSet): ItemIconDefinition {
+    const normalizedIndex = Math.max(1, Math.floor(positionIndex));
+    const mappedType = ginzaPositionItemTypes[normalizedIndex - 1];
+
+    if (!mappedType) {
+        return buildUnknownItemIconDefinition(`position-${normalizedIndex}`);
+    }
+
+    return getItemIconDefinitionByType(mappedType, geishaSet);
 }
 
-// 依藝妓 ID 取得魅力值
+export function getGeishaNameById(geishaId: number, _geishaSet?: GeishaSet): string {
+    return `藝妓 ${geishaId}`;
+}
+
 export function getGeishaCharmById(geishaId: number): number {
     return charmPointsDistribution[geishaId - 1] ?? 0;
 }
 
-// 依藝妓 ID 取得手牌圖片網址
-export function getGeishaCardImageById(geishaId: number, geishaSet: GeishaSetKey = 'default'): string {
-    const data = getGeishaDataBySet(geishaSet);
-    return data[geishaId - 1]?.cardUrl ?? '';
+export function getGeishaCardImageById(_geishaId: number, _geishaSet?: GeishaSet): string {
+    return '';
+}
+
+export function getItemCardImage(card: ItemCard, geishaSet?: GeishaSet): string {
+    return card.itemImageUrl?.trim() || getGeishaCardImageById(card.geishaId, geishaSet);
+}
+
+export function getItemCardLabel(card: ItemCard, geishaSet?: GeishaSet): string {
+    return card.itemLabel?.trim() || getGeishaNameById(card.geishaId, geishaSet);
+}
+
+export function getItemIconDefinitionForCard(card: ItemCard, geishaSet?: GeishaSet): ItemIconDefinition {
+    if (card.itemIconUrl?.trim()) {
+        return {
+            key: `${card.itemAssetName ?? card.type}:${card.itemIconUrl}`,
+            label: card.itemLabel?.trim() || card.type,
+            glyph: card.itemLabel?.trim()?.slice(0, 1) || '酒',
+            accentClassName: 'item-icon--gold',
+            fallbackLabel: card.itemLabel?.trim() || card.type,
+            imageUrl: card.itemIconUrl.trim()
+        };
+    }
+
+    return getItemIconDefinitionByType(card.type, geishaSet);
 }

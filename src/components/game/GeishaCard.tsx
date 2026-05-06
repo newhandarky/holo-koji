@@ -1,8 +1,9 @@
 
 // src/components/game/GeishaCard.tsx
-import React from 'react';
-import { Geisha, GeishaSetKey } from "game-shared-types"
-import { getGeishaImageById } from '../../utils/gameData';
+import React, { CSSProperties, useEffect, useState } from 'react';
+import { Geisha } from "game-shared-types";
+import { ItemIconDefinition } from '../../utils/gameData';
+import { MotionCue } from './gameMotion';
 
 /**
  * GeishaCard 組件：顯示單張藝妓卡片
@@ -16,14 +17,11 @@ interface Props {
     opponentCount: number;
     // 自己的玩家 ID
     currentPlayerId: string;
-    // 房主 ID（用於陣營顏色）
-    hostId: string;
-    // 自己的陣營
-    myCamp: 'host' | 'guest';
-    // 對手的陣營
-    opponentCamp: 'host' | 'guest';
-    // 藝妓組合
-    geishaSet?: GeishaSetKey;
+    isFocused?: boolean;
+    // 對應場上位置的道具 icon
+    itemIcon?: ItemIconDefinition | null;
+    motionCues?: MotionCue[];
+    prefersReducedMotion?: boolean;
 }
 
 const GeishaCard: React.FC<Props> = ({
@@ -31,45 +29,113 @@ const GeishaCard: React.FC<Props> = ({
     myCount,
     opponentCount,
     currentPlayerId,
-    hostId,
-    myCamp,
-    opponentCamp,
-    geishaSet
+    isFocused = false,
+    itemIcon = null,
+    motionCues = [],
+    prefersReducedMotion = false
 }) => {
-    // 根據控制方加上樣式（以玩家 ID 判斷陣營）
-    const isHostControlled = Boolean(hostId) && geisha.controlledBy === hostId;
-    const className = `geisha-card ${isHostControlled ? 'geisha-card--host' :
-        geisha.controlledBy ? 'geisha-card--guest' : ""
+    const [imageFailed, setImageFailed] = useState(false);
+
+    useEffect(() => {
+        setImageFailed(false);
+    }, [geisha.imageUrl]);
+
+    const isMineControlled = Boolean(currentPlayerId) && geisha.controlledBy === currentPlayerId;
+    const isOpponentControlled = Boolean(geisha.controlledBy) && !isMineControlled;
+    const className = `geisha-card ${isFocused ? 'geisha-card--focused' : ''} ${isMineControlled ? 'geisha-card--self-controlled' :
+        isOpponentControlled ? 'geisha-card--opponent-controlled' : ''
         }`;
-    // 藝妓背景圖片
-    const imageUrl = getGeishaImageById(geisha.id, geishaSet ?? 'default');
+    const imageUrl = geisha.imageUrl?.trim() ?? '';
+    const showArtwork = Boolean(imageUrl) && !imageFailed;
+    const hasActiveMotion = motionCues.length > 0;
+    const cardClassName = `${className} ${hasActiveMotion ? 'geisha-card--motion-active' : ''} ${prefersReducedMotion && hasActiveMotion ? 'geisha-card--motion-reduced' : ''}`;
+    const renderMotionLabel = (cue: MotionCue) => {
+        if (cue.kind === 'gift-result') return cue.owner === 'self' ? '贈予入場' : '對手贈予';
+        if (cue.kind === 'competition-result') return cue.owner === 'self' ? '競爭入場' : '對手競爭';
+        return cue.owner === 'self' ? '我方出牌' : '對手出牌';
+    };
 
     return (
-        <div
-            className={className}
-            style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : undefined }}
-        >
-            <div className="geisha-card__overlay" />
-            <div className="geisha-card__score-badge">魅力 {geisha.charmPoints}</div>
-            <div className="geisha-score-row">
-                <div className="geisha-score geisha-score--opponent">
-                    {Array.from({ length: opponentCount }).map((_, index) => (
-                        <span
-                            key={`opp-${geisha.id}-${index}`}
-                            className={`geisha-score-chip geisha-score-chip--${opponentCamp}`}
-                        />
-                    ))}
+        <div className={cardClassName}>
+            <div className="geisha-card__media">
+                {motionCues.length > 0 && (
+                    <div className="geisha-card__motion-layer" aria-hidden="true">
+                        {motionCues.map((cue) => {
+                            const style = {
+                                ['--motion-delay' as string]: `${cue.delayMs}ms`,
+                                ['--motion-duration' as string]: `${cue.durationMs}ms`
+                            } as CSSProperties;
+
+                            return (
+                                <div
+                                    key={cue.id}
+                                    className={`geisha-card__motion-cue geisha-card__motion-cue--${cue.kind} geisha-card__motion-cue--from-${cue.sourceZone}`}
+                                    style={style}
+                                >
+                                    <span className="geisha-card__motion-chip">{renderMotionLabel(cue)}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+                {showArtwork ? (
+                    <img
+                        className="geisha-card__artwork"
+                        src={imageUrl}
+                        alt={`${geisha.name} 角色圖`}
+                        loading="lazy"
+                        onError={() => setImageFailed(true)}
+                    />
+                ) : (
+                    <div className="geisha-card__fallback">
+                        <span className="geisha-card__fallback-label">Artwork Unavailable</span>
+                        <strong className="geisha-card__fallback-name">{geisha.name}</strong>
+                        <span className="geisha-card__fallback-score">魅力 {geisha.charmPoints}</span>
+                    </div>
+                )}
+                <div className="geisha-card__scrim" />
+                <div className="geisha-card__overlay">
+                    <div className="geisha-card__overlay-content">
+                        <span className="geisha-card__name">{geisha.name}</span>
+                        <div className="geisha-card__overlay-meta">
+                            {itemIcon ? (
+                                <span className="geisha-card__slot-icon-wrap">
+                                    <span className="geisha-card__slot-icon" title={itemIcon.label}>
+                                        {itemIcon.imageUrl ? (
+                                            <img
+                                                className="geisha-card__slot-icon-image"
+                                                src={itemIcon.imageUrl}
+                                                alt={itemIcon.label}
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <span className={`geisha-card__slot-icon-glyph ${itemIcon.accentClassName}`}>
+                                                {itemIcon.glyph}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="geisha-card__charm-badge">{geisha.charmPoints}</span>
+                                </span>
+                            ) : (
+                                <span className="geisha-card__slot-icon-wrap">
+                                    <span className="geisha-card__slot-icon-fallback">?</span>
+                                    <span className="geisha-card__charm-badge">{geisha.charmPoints}</span>
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
-                <div className="geisha-score geisha-score--mine">
-                    {Array.from({ length: myCount }).map((_, index) => (
-                        <span
-                            key={`mine-${geisha.id}-${index}`}
-                            className={`geisha-score-chip geisha-score-chip--${myCamp}`}
-                        />
-                    ))}
+                <div className="geisha-card__footer">
+                    <div className="geisha-card__count geisha-card__count--self">
+                        <span className="geisha-card__count-label">我方</span>
+                        <span className="geisha-card__count-value">{myCount}</span>
+                    </div>
+                    <div className="geisha-card__count geisha-card__count--opponent">
+                        <span className="geisha-card__count-label">對手</span>
+                        <span className="geisha-card__count-value">{opponentCount}</span>
+                    </div>
                 </div>
             </div>
-            {geisha.controlledBy && <span>🎴</span>}
         </div>
     );
 };

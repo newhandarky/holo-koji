@@ -7,14 +7,56 @@ declare global {
 }
 
 let liffInitPromise: Promise<void> | null = null;
+let liffReady = false;
 
 const isLikelyLineClient = () => /Line\//i.test(navigator.userAgent);
 
-export const isLineClient = () => {
+const canUseLineClient = () => {
     if (window.liff && typeof window.liff.isInClient === 'function') {
-        return window.liff.isInClient();
+        try {
+            return window.liff.isInClient() === true;
+        } catch {
+            return false;
+        }
     }
+
     return isLikelyLineClient();
+};
+
+const canUseShareTargetPicker = () => {
+    if (typeof window.liff?.shareTargetPicker !== 'function') {
+        return false;
+    }
+
+    if (typeof window.liff?.isApiAvailable !== 'function') {
+        return false;
+    }
+
+    try {
+        return window.liff.isApiAvailable('shareTargetPicker') === true;
+    } catch {
+        return false;
+    }
+};
+
+const isSupportedLiffOrigin = () => {
+    if (isLikelyLineClient()) {
+        return true;
+    }
+
+    if (!config.webAppUrl) {
+        return false;
+    }
+
+    try {
+        return window.location.origin === new URL(config.webAppUrl).origin;
+    } catch {
+        return false;
+    }
+};
+
+export const isLineClient = () => {
+    return canUseLineClient();
 };
 
 export interface LineProfile {
@@ -23,24 +65,46 @@ export interface LineProfile {
     pictureUrl?: string;
 }
 
+export type InviteOutcome =
+    | { mode: 'share'; url: string }
+    | { mode: 'copy'; url: string }
+    | { mode: 'cancelled'; url: string }
+    | { mode: 'unavailable'; url: string; reason: string }
+    | { mode: 'failed'; url?: string; reason: string };
+
+export interface SafeInviteDiagnostics {
+    supportedOrigin: boolean;
+    hasSdk: boolean;
+    ready: boolean;
+    inLineClient: boolean | 'unknown';
+    shareTargetPickerAvailable: boolean | 'unknown';
+    fallbackAvailable: boolean;
+}
+
 const ensureLiffReady = async () => {
-    if (!window.liff || !config.liffId) {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         return;
     }
 
     if (!liffInitPromise) {
         liffInitPromise = window.liff.init({ liffId: config.liffId }).catch((error: unknown) => {
             liffInitPromise = null;
+            liffReady = false;
             throw error;
         });
     }
 
     await liffInitPromise;
+    liffReady = true;
 };
 
 export const initLiffIfPossible = async () => {
     if (!window.liff || !config.liffId) {
         return { ready: false as const, reason: 'missing' as const };
+    }
+
+    if (!isSupportedLiffOrigin()) {
+        return { ready: false as const, reason: 'unsupported-origin' as const };
     }
 
     try {
@@ -51,10 +115,55 @@ export const initLiffIfPossible = async () => {
     }
 };
 
-export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || !!window.liff;
+export const shouldShowLiffDiagnostics = () => isLikelyLineClient() || (!!window.liff && isSupportedLiffOrigin());
+
+export const getLiffDiagnosticsSnapshot = () => {
+    const supportedOrigin = isSupportedLiffOrigin();
+    const hasSdk = Boolean(window.liff);
+
+    let loggedIn: boolean | 'unknown' = 'unknown';
+    let inLineClient: boolean | 'unknown' = 'unknown';
+    let shareTargetPickerAvailable: boolean | 'unknown' = 'unknown';
+
+    if (hasSdk && config.liffId && supportedOrigin && typeof window.liff?.isLoggedIn === 'function') {
+        try {
+            loggedIn = window.liff.isLoggedIn();
+        } catch {
+            loggedIn = 'unknown';
+        }
+    }
+
+    if (hasSdk && typeof window.liff?.isInClient === 'function') {
+        try {
+            inLineClient = window.liff.isInClient();
+        } catch {
+            inLineClient = 'unknown';
+        }
+    } else if (isLikelyLineClient()) {
+        inLineClient = true;
+    }
+
+    if (hasSdk && typeof window.liff?.isApiAvailable === 'function') {
+        try {
+            shareTargetPickerAvailable = window.liff.isApiAvailable('shareTargetPicker');
+        } catch {
+            shareTargetPickerAvailable = 'unknown';
+        }
+    }
+
+    return {
+        supportedOrigin,
+        hasSdk,
+        ready: liffReady,
+        loggedIn,
+        inLineClient,
+        shareTargetPickerAvailable,
+        fallbackAvailable: true
+    };
+};
 
 export const getLineProfile = async (): Promise<LineProfile | null> => {
-    if (!window.liff || !config.liffId) {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         return null;
     }
 
@@ -119,28 +228,55 @@ const resolveLiffInviteUrl = (roomId: string) => {
 
 export const getLiffInviteUrl = (roomId: string) => resolveLiffInviteUrl(roomId);
 
-export const shareRoomInvite = async (roomId: string) => {
+const writeClipboard = async (value: string) => {
+    if (!navigator.clipboard?.writeText) {
+        return false;
+    }
+
+    try {
+        await navigator.clipboard.writeText(value);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+export const shareRoomInvite = async (roomId: string): Promise<InviteOutcome> => {
     const inviteUrl = resolveInviteUrl(roomId);
-    const message = `一起玩花見小路！點此加入房間`;
+    const message = `一起玩花見小路！房間編號：${roomId}。點此加入對戰`;
 
-    if (!window.liff || !config.liffId) {
-        await navigator.clipboard.writeText(inviteUrl);
-        return { mode: 'copy' as const, url: inviteUrl };
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
+        const copied = await writeClipboard(inviteUrl);
+        return copied
+            ? { mode: 'copy' as const, url: inviteUrl }
+            : { mode: 'unavailable' as const, url: inviteUrl, reason: 'clipboard-unavailable' };
     }
 
-    await ensureLiffReady();
-
-    if (!window.liff.isInClient()) {
-        await navigator.clipboard.writeText(inviteUrl);
-        return { mode: 'copy' as const, url: inviteUrl };
+    try {
+        await ensureLiffReady();
+    } catch {
+        const copied = await writeClipboard(inviteUrl);
+        return copied
+            ? { mode: 'copy' as const, url: inviteUrl }
+            : { mode: 'unavailable' as const, url: inviteUrl, reason: 'liff-init-failed' };
     }
 
-    if (typeof window.liff.isApiAvailable === 'function' && !window.liff.isApiAvailable('shareTargetPicker')) {
-        throw new Error('此 LIFF 未啟用 Share Target Picker，請到 LINE Developers 開啟此功能。');
+    if (!canUseLineClient()) {
+        const copied = await writeClipboard(inviteUrl);
+        return copied
+            ? { mode: 'copy' as const, url: inviteUrl }
+            : { mode: 'unavailable' as const, url: inviteUrl, reason: 'not-line-client' };
+    }
+
+    if (!canUseShareTargetPicker()) {
+        const copied = await writeClipboard(inviteUrl);
+        return copied
+            ? { mode: 'copy' as const, url: inviteUrl }
+            : { mode: 'unavailable' as const, url: inviteUrl, reason: 'share-target-picker-unavailable' };
     }
 
     const liffInviteUrl = resolveLiffInviteUrl(roomId);
-    const liffMessage = `一起玩花見小路！點此加入房間：${liffInviteUrl}`;
+    const liffMessage = `${message}：${liffInviteUrl}`;
     const flexMessage = [
         {
             type: 'flex',
@@ -179,7 +315,7 @@ export const shareRoomInvite = async (roomId: string) => {
                         },
                         {
                             type: 'text',
-                            text: '點擊卡片直接加入對戰',
+                            text: '點擊卡片後確認名稱即可加入對戰',
                             size: 'sm',
                             color: '#999999',
                             margin: 'sm'
@@ -190,18 +326,22 @@ export const shareRoomInvite = async (roomId: string) => {
         }
     ];
 
-    const result = await window.liff.shareTargetPicker(flexMessage).catch(async () => {
-        return window.liff.shareTargetPicker([
-            {
-                type: 'text',
-                text: liffMessage
-            }
-        ]);
-    });
+    let result: unknown;
+    try {
+        result = await window.liff.shareTargetPicker(flexMessage).catch(async () => {
+            return window.liff.shareTargetPicker([
+                {
+                    type: 'text',
+                    text: liffMessage
+                }
+            ]);
+        });
+    } catch {
+        return { mode: 'failed' as const, url: liffInviteUrl, reason: 'share-failed' };
+    }
 
     if (!result) {
-        await navigator.clipboard.writeText(liffInviteUrl);
-        return { mode: 'copy' as const, url: liffInviteUrl };
+        return { mode: 'cancelled' as const, url: liffInviteUrl };
     }
 
     return { mode: 'share' as const, url: liffInviteUrl };

@@ -1,14 +1,22 @@
 export type PlayerId = 'player1' | 'player2';
 export interface Geisha {
     id: number;
+    characterId?: string;
+    boardSlotId?: number;
     name: string;
     charmPoints: number;
+    imageUrl: string;
     controlledBy: PlayerId | null;
 }
 export interface ItemCard {
     id: string;
     geishaId: number;
     type: string;
+    boardSlotId?: number;
+    itemAssetName?: string;
+    itemLabel?: string;
+    itemImageUrl?: string;
+    itemIconUrl?: string;
 }
 export type ActionType = 'secret' | 'trade-off' | 'gift' | 'competition';
 export type GamePhase = 'waiting' | 'deciding_order' | 'playing' | 'resolution' | 'ended';
@@ -35,13 +43,13 @@ export interface PendingGiftInteraction {
     type: 'GIFT_SELECTION';
     initiatorId: string;
     targetPlayerId: string;
-    offeredCards: ItemCard[];
+    offeredCards?: ItemCard[];
 }
 export interface PendingCompetitionInteraction {
     type: 'COMPETITION_SELECTION';
     initiatorId: string;
     targetPlayerId: string;
-    groups: ItemCard[][];
+    groups?: ItemCard[][];
 }
 export type PendingInteraction = PendingGiftInteraction | PendingCompetitionInteraction;
 export interface OrderDecision {
@@ -57,7 +65,118 @@ export interface OrderDecision {
     waitingFor: string[];
     currentPlayer: string;
 }
-export type GeishaSet = 'default' | 'akatsuki' | 'onesan' | 'collaboration';
+export type OpeningDealStep = {
+    type: 'BURN_HIDDEN_CARD';
+    order: number;
+    targetZone: 'hidden-reserve';
+} | {
+    type: 'DEAL_CARD_BACK';
+    order: number;
+    targetPlayerId: string;
+    cardIndex: number;
+} | {
+    type: 'OPENING_DEAL_COMPLETE';
+    order: number;
+};
+export interface OpeningDealSummary {
+    sequenceId: string;
+    status: 'pending' | 'completed' | 'not_replayable';
+    steps: OpeningDealStep[];
+    completed: boolean;
+    replayable: boolean;
+}
+export type GeishaSet = 'default' | 'collaboration' | 'hololive';
+export type RoomSetupMode = 'random' | 'custom';
+export interface CharacterProfile {
+    characterId: string;
+    name: string;
+    imageUrl: string;
+}
+export declare const characterProfilesBySet: Record<GeishaSet, CharacterProfile[]>;
+export interface CustomCharacterSelection {
+    characterIds: string[];
+}
+export interface VerifiedLineIdentity {
+    provider: 'line';
+    lineUserId: string;
+    verifiedAt: string;
+    source: string;
+}
+export interface MinimalAccountCounters {
+    gamesPlayed: number;
+    wins: number;
+    lastPlayedAt: string | null;
+}
+export interface LineAccountProfile {
+    lineUserId: string;
+    displayName: string;
+    avatarUrl?: string;
+    createdAt: string;
+    updatedAt: string;
+    counters: MinimalAccountCounters;
+}
+export interface AccountPersistenceStatus {
+    mode: 'durable' | 'temporary';
+    available: boolean;
+    message: string;
+}
+export type AccountSyncStatus = 'bound' | 'guest' | 'sync-failed' | 'unverified';
+export interface AccountSyncResult {
+    status: AccountSyncStatus;
+    profile?: LineAccountProfile;
+    persistenceStatus: AccountPersistenceStatus;
+    guestNotice?: string;
+}
+export interface AccountSyncRequest {
+    verifiedIdentity?: VerifiedLineIdentity;
+    profile?: {
+        displayName?: string;
+        avatarUrl?: string;
+    };
+}
+export type AchievementId = 'first_completed_match' | 'first_win' | 'complete_3_matches' | 'win_3_matches';
+export type AchievementConditionType = 'completed_games' | 'wins';
+export type AchievementItemState = 'locked' | 'in_progress' | 'unlocked';
+export type AchievementStatus = 'available' | 'guest' | 'unavailable';
+export interface AchievementCatalogItem {
+    achievementId: AchievementId;
+    title: string;
+    description: string;
+    conditionType: AchievementConditionType;
+    target: number;
+}
+export interface AchievementSummaryItem {
+    achievementId: AchievementId;
+    title: string;
+    description: string;
+    state: AchievementItemState;
+    currentValue: number;
+    target: number;
+    unlockedAt?: string;
+    isNew: boolean;
+}
+export interface AchievementStatusResult {
+    status: AchievementStatus;
+    persistenceStatus: AccountPersistenceStatus;
+    message?: string;
+    newUnlockCount?: number;
+    items?: AchievementSummaryItem[];
+    generatedAt?: string;
+}
+export interface AchievementAcknowledgeRequest {
+    achievementIds?: AchievementId[];
+}
+export interface CreateRoomPayload {
+    playerId: string;
+    displayName?: string;
+    lineUserId?: string;
+    avatarUrl?: string;
+    mode?: 'online' | 'npc';
+    aiDifficulty?: 'easy' | 'medium' | 'hard' | 'expert' | 'hell';
+    geishaSet?: GeishaSet;
+    setupMode?: RoomSetupMode;
+    customSelection?: CustomCharacterSelection;
+}
 export interface GameState {
     gameId: string;
     players: Player[];
@@ -71,6 +190,10 @@ export interface GameState {
     drawPile: ItemCard[];
     discardPile: ItemCard[];
     removedCard?: ItemCard;
+    openingDeal?: OpeningDealSummary;
+    settlement?: {
+        removedCard?: ItemCard;
+    };
     pendingInteraction: PendingInteraction | null;
     lastAction?: {
         playerId: string;
@@ -177,7 +300,7 @@ export interface RoomInfo {
     maxPlayers: number;
     gameState: 'waiting' | 'playing' | 'ended';
 }
-export type WebSocketEventType = 'GAME_STATE_SYNC' | 'ORDER_DECISION_STARTED' | 'ORDER_DECISION_COMPLETED' | 'TURN_CHANGED' | 'PLAYER_JOINED' | 'ERROR' | 'ORDER_DECISION_START' | 'GAME_STARTED' | 'GAME_STATE_UPDATED' | 'GAME_STATE_UPDATE' | 'ORDER_CONFIRMATION_UPDATE' | 'ORDER_CONFIRMATIONS_UPDATED' | 'PLAYER_LEFT' | 'ORDER_DECISION_RESULT' | 'TURN_ENDED' | 'GAME_ENDED' | 'ROOM_CREATED' | 'ORDER_CONFIRMED' | 'STATE_CHANGED';
+export type WebSocketEventType = 'GAME_STATE_SYNC' | 'ORDER_DECISION_STARTED' | 'ORDER_DECISION_COMPLETED' | 'TURN_CHANGED' | 'PLAYER_JOINED' | 'ERROR' | 'ORDER_DECISION_START' | 'GAME_STARTED' | 'GAME_STATE_UPDATED' | 'GAME_STATE_UPDATE' | 'ORDER_CONFIRMATION_UPDATE' | 'ORDER_CONFIRMATIONS_UPDATED' | 'PLAYER_LEFT' | 'ORDER_DECISION_RESULT' | 'TURN_ENDED' | 'GAME_ENDED' | 'ROOM_CREATED' | 'ORDER_CONFIRMED' | 'STATE_CHANGED' | 'DEAL_ANIMATION' | 'CARD_DRAWN' | 'ACTION_EXECUTED' | 'PENDING_INTERACTION' | 'INTERACTION_RESOLVED' | 'ROUND_COMPLETE';
 export interface WebSocketMessage<T = any> {
     type: WebSocketEventType | string;
     payload: T;

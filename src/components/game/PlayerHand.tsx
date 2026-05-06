@@ -1,7 +1,9 @@
 // src/components/game/PlayerHand.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { ItemCard, GeishaSetKey } from "game-shared-types"
-import { getGeishaCardImageById, getGeishaCharmById } from '../../utils/gameData';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ItemCard, GeishaSet } from "game-shared-types"
+import { getItemCardImage, getItemCardLabel } from '../../utils/gameData';
+import { MotionCue, OpeningDealCueStep } from './gameMotion';
+import type { OpeningHandRevealModel } from './openingHandRevealModel';
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌
@@ -12,17 +14,86 @@ interface Props {
     highlightCardId?: string | null;                 // 新抽到的卡片 ID
     highlightActive?: boolean;                       // 是否啟用抽牌動畫
     getCharmByGeishaId?: (geishaId: number) => number; // 取得魅力值（以伺服器資料為主）
-    geishaSet?: GeishaSetKey; // 藝妓組合
+    geishaSet?: GeishaSet; // 藝妓組合
+    motionCues?: MotionCue[];
+    prefersReducedMotion?: boolean;
+    openingDealSteps?: OpeningDealCueStep[];
+    openingHandReveal?: OpeningHandRevealModel | null;
+    onTakeOpeningHand?: () => void;
 }
 
 // 玩家手牌區顯示與選牌
-const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, highlightActive, getCharmByGeishaId, geishaSet }) => {
+const PlayerHand: React.FC<Props> = ({
+    cards,
+    onCardSelect,
+    highlightCardId,
+    highlightActive,
+    getCharmByGeishaId,
+    geishaSet,
+    motionCues = [],
+    prefersReducedMotion = false,
+    openingDealSteps = [],
+    openingHandReveal = null,
+    onTakeOpeningHand
+}) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
+    // 本地維護焦點卡片（扇形內局部放大）
+    const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+    const [drawBackCueIds, setDrawBackCueIds] = useState<Set<string>>(new Set());
+    const previousCardIdsRef = useRef<string[]>([]);
     // 已選卡片 ID 集合（快速判斷是否選取）
     const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
     // 手牌 ID 組合鍵（用於偵測手牌變更）
     const cardIdsKey = useMemo(() => cards.map(card => card.id).join('|'), [cards]);
+    const drawMotionByCardId = useMemo(() => {
+        const map = new Map<string, MotionCue>();
+        motionCues
+            .filter((cue) => cue.kind === 'draw' && cue.cardId)
+            .forEach((cue) => map.set(cue.cardId!, cue));
+        return map;
+    }, [motionCues]);
+    const removalCues = useMemo(() => motionCues.filter((cue) => cue.kind === 'removal'), [motionCues]);
+    const selfDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'self'), [openingDealSteps]);
+    const opponentDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'opponent'), [openingDealSteps]);
+    const isOpeningDealActive = openingDealSteps.length > 0;
+    const isOpeningHandConcealed = Boolean(openingHandReveal?.isConcealed);
+    const isOpeningHandRevealing = openingHandReveal?.status === 'revealing';
+    const isOpeningHandInteractionBlocked = Boolean(openingHandReveal?.isInteractionBlocked);
+    const revealVisibleCardIds = useMemo(() => new Set(
+        openingHandReveal?.steps.filter((step) => step.visible).map((step) => step.cardId) ?? []
+    ), [openingHandReveal?.steps]);
+
+    useEffect(() => {
+        const timers: number[] = [];
+
+        motionCues
+            .filter((cue) => cue.kind === 'draw' && cue.cardId && !cue.reducedMotion)
+            .forEach((cue) => {
+                setDrawBackCueIds((previous) => {
+                    if (previous.has(cue.id)) {
+                        return previous;
+                    }
+
+                    const next = new Set(previous);
+                    next.add(cue.id);
+                    return next;
+                });
+
+                const timerId = window.setTimeout(() => {
+                    setDrawBackCueIds((previous) => {
+                        const next = new Set(previous);
+                        next.delete(cue.id);
+                        return next;
+                    });
+                }, Math.min(520, Math.max(260, cue.durationMs / 2)));
+                timers.push(timerId);
+            });
+
+        return () => {
+            timers.forEach((timerId) => window.clearTimeout(timerId));
+        };
+    }, [motionCues]);
 
     // 當手牌變更時重置選牌狀態，避免選到舊牌
     useEffect(() => {
@@ -30,9 +101,69 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, hig
         onCardSelect([]);
     }, [cardIdsKey, onCardSelect]);
 
+    // 首次進入手牌時聚焦中間牌；手牌更新時優先保留舊焦點，否則取最接近的牌。
+    useEffect(() => {
+        const previousCardIds = previousCardIdsRef.current;
+
+        if (cards.length === 0) {
+            setFocusedCardId(null);
+            previousCardIdsRef.current = [];
+            return;
+        }
+
+        setFocusedCardId((previousFocusedCardId) => {
+            if (!previousFocusedCardId) {
+                return cards[Math.floor((cards.length - 1) / 2)]?.id ?? null;
+            }
+
+            const existingIndex = cards.findIndex((card) => card.id === previousFocusedCardId);
+            if (existingIndex >= 0) {
+                return previousFocusedCardId;
+            }
+
+            const previousIndex = previousCardIds.indexOf(previousFocusedCardId);
+            if (previousIndex < 0) {
+                return cards[Math.floor((cards.length - 1) / 2)]?.id ?? null;
+            }
+
+            const nearestIndex = Math.min(previousIndex, cards.length - 1);
+            return cards[nearestIndex]?.id ?? cards[cards.length - 1]?.id ?? null;
+        });
+        previousCardIdsRef.current = cards.map((card) => card.id);
+    }, [cards, cardIdsKey]);
+
+    const focusedIndex = useMemo(() => {
+        if (!focusedCardId) {
+            return cards.length > 0 ? Math.floor((cards.length - 1) / 2) : -1;
+        }
+
+        const index = cards.findIndex((card) => card.id === focusedCardId);
+        if (index >= 0) {
+            return index;
+        }
+
+        return cards.length > 0 ? Math.floor((cards.length - 1) / 2) : -1;
+    }, [cards, focusedCardId]);
+
+    const moveFocus = (direction: 'prev' | 'next') => {
+        if (cards.length === 0) {
+            return;
+        }
+
+        const currentIndex = focusedIndex >= 0 ? focusedIndex : Math.floor((cards.length - 1) / 2);
+        const offset = direction === 'prev' ? -1 : 1;
+        const nextIndex = (currentIndex + offset + cards.length) % cards.length;
+        setFocusedCardId(cards[nextIndex]?.id ?? null);
+    };
+
     // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
     const toggleCard = (card: ItemCard) => {
+        if (isOpeningHandInteractionBlocked) {
+            return;
+        }
+
         setSelected((prevSelected) => {
+            setFocusedCardId(card.id);
             const exists = prevSelected.some(c => c.id === card.id);
             const nextSelected = exists
                 ? prevSelected.filter(c => c.id !== card.id)
@@ -44,22 +175,177 @@ const PlayerHand: React.FC<Props> = ({ cards, onCardSelect, highlightCardId, hig
     };
 
     return (
-        <div className="player-hand-row">
-            {cards.map(card => (
-                <div
-                    key={card.id}
-                    className={`item-card item-card--image item-card--hand ${
-                        selectedIdSet.has(card.id) ? 'selected' : ''
-                    } ${
-                        highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
-                    }`}
-                    onClick={() => toggleCard(card)}
-                    style={{ backgroundImage: `url(${getGeishaCardImageById(card.geishaId, geishaSet ?? 'default')})` }}
-                >
-                    <div className="item-card__overlay" />
-                    <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
+        <div className="player-hand-panel">
+            <div
+                className={`player-hand-stage ${isOpeningDealActive ? 'player-hand-stage--deal-active' : ''}`}
+                role="group"
+                aria-label="手牌焦點切換"
+            >
+                <div className="player-hand-stage__content">
+                    {isOpeningDealActive && (
+                        <div className="player-hand-deal-lanes" aria-hidden="true">
+                            <div className="player-hand-deal-lane player-hand-deal-lane--opponent">
+                                {opponentDealSteps.map((step) => {
+                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
+                                    return (
+                                        <div
+                                            key={step.id}
+                                            className={`player-hand-deal-card player-hand-deal-card--opponent ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
+                                            style={{
+                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
+                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
+                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
+                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
+                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="player-hand-deal-lane player-hand-deal-lane--self">
+                                {selfDealSteps.map((step) => {
+                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
+                                    return (
+                                        <div
+                                            key={step.id}
+                                            className={`player-hand-deal-card player-hand-deal-card--self ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
+                                            style={{
+                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
+                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
+                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
+                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
+                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    {removalCues.length > 0 && (
+                        <div className="player-hand-removal-cues" aria-hidden="true">
+                            {removalCues.map((cue, index) => (
+                                <div
+                                    key={cue.id}
+                                    className={`player-hand-removal-cue player-hand-removal-cue--${cue.owner} ${cue.reducedMotion ? 'player-hand-removal-cue--reduced' : ''}`}
+                                    style={{
+                                        ['--removal-index' as string]: `${index}`,
+                                        ['--motion-delay' as string]: `${cue.delayMs}ms`,
+                                        ['--motion-duration' as string]: `${cue.durationMs}ms`
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    <div className="player-hand-row">
+                        {cards.map((card, index) => {
+                            const center = (cards.length - 1) / 2;
+                            const relativeIndex = index - center;
+                            const absRelative = Math.abs(relativeIndex);
+                            const stackLevel = cards.length - Math.round(absRelative);
+                            const rotationDeg = relativeIndex * 5;
+                            const cardImage = getItemCardImage(card, geishaSet ?? 'default');
+                            const hasCardImage = cardImage.trim().length > 0;
+                            const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
+                            const isSelected = selectedIdSet.has(card.id);
+                            const isFocused = focusedCardId === card.id;
+                            const isConcealedCard = isOpeningHandConcealed && !revealVisibleCardIds.has(card.id);
+                            const revealStep = openingHandReveal?.steps.find((step) => step.cardId === card.id);
+                            const drawMotionCue = drawMotionByCardId.get(card.id);
+                            const isDrawBackVisible = Boolean(drawMotionCue && drawBackCueIds.has(drawMotionCue.id));
+
+                            return (
+                                <button
+                                    key={card.id}
+                                    type="button"
+                                    className={`item-card item-card--image item-card--hand ${
+                                        isSelected ? 'selected' : ''
+                                    } ${
+                                        isFocused ? 'item-card--focused' : ''
+                                    } ${
+                                        highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
+                                    } ${
+                                        drawMotionByCardId.has(card.id) ? 'item-card--motion-draw' : ''
+                                    } ${
+                                        prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
+                                    } ${
+                                        hasCardImage ? '' : 'item-card--missing-artwork'
+                                    } ${
+                                        isConcealedCard ? 'item-card--opening-concealed' : ''
+                                    } ${
+                                        isOpeningHandRevealing && !isConcealedCard ? 'item-card--opening-revealed' : ''
+                                    }`}
+                                    disabled={isOpeningHandInteractionBlocked}
+                                    aria-pressed={isSelected}
+                                    aria-label={isConcealedCard || isDrawBackVisible ? `手牌 ${index + 1} 牌背` : undefined}
+                                    onClick={() => toggleCard(card)}
+                                    style={{
+                                        backgroundImage: isConcealedCard || isDrawBackVisible ? 'none' : hasCardImage ? `url(${cardImage})` : 'none',
+                                        ['--fan-index' as string]: `${relativeIndex}`,
+                                        ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
+                                        ['--fan-abs-index' as string]: `${absRelative}`,
+                                        ['--fan-z-index' as string]: `${stackLevel}`,
+                                        ['--motion-delay' as string]: `${revealStep?.delayMs ?? drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
+                                        ['--motion-duration' as string]: `${revealStep?.durationMs ?? drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
+                                    }}
+                                >
+                                    <div className="item-card__overlay" />
+                                    {(isConcealedCard || isDrawBackVisible) && (
+                                        <div className="item-card__opening-back" aria-hidden="true">
+                                            <span />
+                                        </div>
+                                    )}
+                                    {!isConcealedCard && !isDrawBackVisible && !hasCardImage && (
+                                        <div className="item-card__fallback-label">{fallbackLabel}</div>
+                                    )}
+                                    {isSelected && (
+                                        <div className="item-card__selected-check" aria-hidden="true">✓</div>
+                                    )}
+                                    {drawMotionByCardId.has(card.id) && (
+                                        <div className="item-card__motion-glow" aria-hidden="true" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {openingHandReveal?.status === 'pending_take' && (
+                        <div className="opening-hand-gate" role="status" aria-label="開局手牌可拿取">
+                            <button
+                                type="button"
+                                className="opening-hand-gate__button"
+                                onClick={onTakeOpeningHand}
+                            >
+                                拿取手牌
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="player-hand-controls">
+                        <button
+                            type="button"
+                            className="player-hand-controls__button"
+                            onClick={() => moveFocus('prev')}
+                            disabled={cards.length < 2}
+                            aria-label="上一張手牌"
+                        >
+                            ←
+                        </button>
+                        <span className="player-hand-controls__status" aria-live="polite">
+                            {cards.length === 0 ? '0 / 0' : `${Math.max(focusedIndex, 0) + 1} / ${cards.length}`}
+                        </span>
+                        <button
+                            type="button"
+                            className="player-hand-controls__button"
+                            onClick={() => moveFocus('next')}
+                            disabled={cards.length < 2}
+                            aria-label="下一張手牌"
+                        >
+                            →
+                        </button>
+                    </div>
                 </div>
-            ))}
+            </div>
         </div>
     );
 };

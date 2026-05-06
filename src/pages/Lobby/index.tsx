@@ -1,9 +1,18 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
+import { AccountSyncResult, AchievementStatusResult, GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
 import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
+import { getBoundAccountProfile, syncLineAccount } from '../../utils/lineAccount';
+import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
+import { getCharacterProfilesForSet } from '../../utils/gameData';
+import { frontendLogger } from '../../utils/runtimeLogger';
+import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import { AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
+import LobbyBrandSurface from './LobbyBrandSurface';
+import LobbyPlayControls from './LobbyPlayControls';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -14,24 +23,43 @@ const Lobby: React.FC = () => {
     // 對戰模式（online = 玩家對戰，npc = 對戰 AI）
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
-    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
-    // 藝妓組合
-    const [geishaSet, setGeishaSet] = useState<'default' | 'akatsuki' | 'onesan' | 'collaboration'>('default');
+    const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('easy');
+    // 藝妓組合選擇（online / npc 共用）
+    const [selectedGeishaSet, setSelectedGeishaSet] = useState<GeishaSet>('default');
+    const [setupMode, setSetupMode] = useState<RoomSetupMode>('random');
+    const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     // LINE 使用者資料（若在 LIFF 內）
     const [lineProfile, setLineProfile] = useState<LineProfile | null>(null);
+    const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
+    const [achievementStatus, setAchievementStatus] = useState<AchievementStatusResult | null>(null);
+    const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false);
+    const [invitedRoom, setInvitedRoom] = useState<{ roomId: string; source: 'query' | 'liff' } | null>(null);
+    const [inviteRecovery, setInviteRecovery] = useState<{ roomId: string; reason: string; message: string } | null>(null);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
+    const accountSyncStartedRef = useRef(false);
+    const pendingJoinRoomRef = useRef<string | null>(null);
+    const invitedRoomRef = useRef<{ roomId: string; source: 'query' | 'liff' } | null>(null);
+    const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
+    const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
+        ? accountSyncResult.guestNotice
+        : undefined;
+    const isAccountSyncPending = Boolean(lineProfile && !accountSyncResult);
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
         playerNameRef.current = playerName;
     }, [playerName]);
+
+    useEffect(() => {
+        invitedRoomRef.current = invitedRoom;
+    }, [invitedRoom]);
 
     // 若網址帶 roomId，預填加入房間欄位
     useEffect(() => {
@@ -41,6 +69,7 @@ const Lobby: React.FC = () => {
         const normalizedRoomId = invitedRoomId.toUpperCase();
         setRoomId(normalizedRoomId);
         setMatchMode('online');
+        setInvitedRoom({ roomId: normalizedRoomId, source: source === 'liff' ? 'liff' : 'query' });
 
         if (source === 'liff') {
             const nextParams = new URLSearchParams(window.location.search);
@@ -50,6 +79,23 @@ const Lobby: React.FC = () => {
             window.history.replaceState(null, '', nextUrl);
         }
     }, []);
+
+    useEffect(() => {
+        if (setupMode !== 'custom') {
+            setSelectedCharacterIds([]);
+            return;
+        }
+
+        const profiles = getCharacterProfilesForSet(selectedGeishaSet);
+        setSelectedCharacterIds((currentIds) => {
+            if (profiles.length === 7) {
+                return profiles.map((profile) => profile.characterId);
+            }
+
+            const validIds = new Set(profiles.map((profile) => profile.characterId));
+            return currentIds.filter((characterId) => validIds.has(characterId));
+        });
+    }, [selectedGeishaSet, setupMode]);
 
     // 取得 LINE 使用者資料（若在 LIFF 內）
     useEffect(() => {
@@ -72,8 +118,20 @@ const Lobby: React.FC = () => {
                 if (!playerNameRef.current) {
                     setPlayerName(profile.displayName);
                 }
+
             } catch (error) {
-                console.warn('⚠️ 讀取 LINE 使用者資料失敗:', error);
+                frontendLogger.warn('⚠️ 讀取 LINE 使用者資料失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+                setAccountSyncResult({
+                    status: 'sync-failed',
+                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
+                    persistenceStatus: {
+                        mode: 'temporary',
+                        available: true,
+                        message: 'Account profiles are temporary in this environment.'
+                    }
+                });
             }
         };
 
@@ -83,6 +141,63 @@ const Lobby: React.FC = () => {
             isActive = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!lineProfile || connectionStatus !== 'connected' || accountSyncStartedRef.current) {
+            return;
+        }
+
+        let isActive = true;
+        accountSyncStartedRef.current = true;
+
+        syncLineAccount(lineProfile)
+            .then((syncResult) => {
+                if (!isActive) return;
+                setAccountSyncResult(syncResult);
+            })
+            .catch((error) => {
+                if (!isActive) return;
+                frontendLogger.warn('⚠️ LINE 帳號同步失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+                setAccountSyncResult({
+                    status: 'sync-failed',
+                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
+                    persistenceStatus: {
+                        mode: 'temporary',
+                        available: true,
+                        message: 'Account profiles are temporary in this environment.'
+                    }
+                });
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [connectionStatus, lineProfile]);
+
+    useEffect(() => {
+        if (connectionStatus !== 'connected' || isAccountSyncPending) {
+            return;
+        }
+
+        let isActive = true;
+        requestAchievementStatus()
+            .then((result) => {
+                if (!isActive) return;
+                setAchievementStatus(result);
+            })
+            .catch((error) => {
+                if (!isActive) return;
+                frontendLogger.warn('⚠️ 成就狀態讀取失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+            });
+
+        return () => {
+            isActive = false;
+        };
+    }, [accountSyncResult, connectionStatus, isAccountSyncPending]);
 
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
@@ -95,11 +210,13 @@ const Lobby: React.FC = () => {
                 await gameWebSocket.connect(config.websocketUrl);
                 if (!isActive) return;
                 setConnectionStatus('connected');
-                console.log('✅ [Lobby] WebSocket 連線成功');
+                frontendLogger.info('✅ [Lobby] WebSocket 連線成功');
             } catch (error) {
                 if (!isActive) return;
                 setConnectionStatus('disconnected');
-                console.error('❌ [Lobby] WebSocket 連線失敗:', error);
+                frontendLogger.error('❌ [Lobby] WebSocket 連線失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
             }
         };
 
@@ -111,7 +228,6 @@ const Lobby: React.FC = () => {
 
         // 房間建立成功後處理
         const handleRoomCreated = (payload: any) => {
-            console.log('🏠 [Lobby] 房間建立成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -126,7 +242,6 @@ const Lobby: React.FC = () => {
 
         // 加入房間成功後處理
         const handlePlayerJoined = (payload: any) => {
-            console.log('👤 [Lobby] 玩家加入成功，保存玩家ID並跳轉:', payload);
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -140,20 +255,51 @@ const Lobby: React.FC = () => {
         };
 
         // 收到伺服器錯誤時提示使用者
+        const resolveInviteRecovery = (payload: any) => {
+            const code = typeof payload?.code === 'string' ? payload.code : '';
+            const message = typeof payload?.message === 'string' ? payload.message : '無法加入房間';
+            if (code === 'ROOM_NOT_FOUND' || message === '房間不存在') {
+                return { reason: 'missing', message: '找不到這個邀請房間。請確認房號，或請對方重送邀請。' };
+            }
+            if (code === 'ROOM_FULL' || message === '房間已滿') {
+                return { reason: 'full', message: '這個邀請房間已滿。請對方重送邀請，或回到大廳建立新房間。' };
+            }
+            if (code === 'ROOM_ALREADY_STARTED') {
+                return { reason: 'started', message: '這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。' };
+            }
+            if (code === 'INVALID_JOIN_REQUEST' || message === '缺少 roomId 或 playerId') {
+                return { reason: 'invalid', message: '這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。' };
+            }
+            return { reason: 'unknown', message: '目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。' };
+        };
+
         const handleError = (payload: any) => {
-            console.error('❌ [Lobby] 伺服器錯誤:', payload);
+            frontendLogger.error('❌ [Lobby] 伺服器錯誤', {
+                message: typeof payload?.message === 'string' ? payload.message : 'unknown',
+                code: typeof payload?.code === 'string' ? payload.code : undefined
+            });
             setIsConnecting(false);
+            const pendingJoinRoom = pendingJoinRoomRef.current;
+            pendingJoinRoomRef.current = null;
+            if (pendingJoinRoom && invitedRoomRef.current?.roomId === pendingJoinRoom) {
+                const recovery = resolveInviteRecovery(payload);
+                setInviteRecovery({
+                    roomId: pendingJoinRoom,
+                    reason: recovery.reason,
+                    message: recovery.message
+                });
+                return;
+            }
+
             alert(`錯誤: ${payload.message}`);
         };
 
-        console.log('📋 [Lobby] 註冊事件監聽器');
         gameWebSocket.on('ROOM_CREATED', handleRoomCreated);
         gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined);
         gameWebSocket.on('ERROR', handleError);
 
         return () => {
             isActive = false;
-            console.log('🧹 [Lobby] 組件卸載，清理事件監聽器');
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
             gameWebSocket.off('ERROR');
@@ -162,17 +308,29 @@ const Lobby: React.FC = () => {
 
     // 建立房間請求
     const createRoom = () => {
-        if (!playerName.trim() || connectionStatus !== 'connected') return;
+        if (!canCreateRoom) return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送建立房間請求:', { playerId: playerName, mode: matchMode, aiDifficulty, geishaSet });
+        const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
+        const customSelection = setupMode === 'custom'
+            ? { characterIds: selectedCharacterIds }
+            : undefined;
+        frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
+            playerId: playerName,
+            mode: matchMode,
+            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
+            geishaSet: selectedGeishaSet,
+            setupMode
+        });
         gameWebSocket.send('CREATE_ROOM', {
             playerId: playerName,
-            displayName: lineProfile?.displayName ?? playerName,
-            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
-            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined,
+            displayName: playerName,
+            lineUserId: boundAccountProfile?.lineUserId,
+            avatarUrl: boundAccountProfile?.avatarUrl,
             mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
-            geishaSet
+            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
+            geishaSet: selectedGeishaSet,
+            setupMode,
+            ...(customSelection ? { customSelection } : {})
         });
     };
 
@@ -180,189 +338,190 @@ const Lobby: React.FC = () => {
     const joinRoom = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
-        console.log('📤 [Lobby] 發送加入房間請求:', { roomId, playerId: playerName });
+        pendingJoinRoomRef.current = roomId;
+        setInviteRecovery(null);
+        frontendLogger.diagnostic('🐞 [Lobby] 加入房間摘要', {
+            roomId,
+            playerId: playerName
+        });
         gameWebSocket.send('JOIN_ROOM', {
             roomId,
             playerId: playerName,
-            displayName: lineProfile?.displayName ?? playerName,
-            lineUserId: lineProfile?.userId ?? localStorage.getItem('lineUserId') ?? undefined,
-            avatarUrl: lineProfile?.pictureUrl ?? localStorage.getItem('lineAvatarUrl') ?? undefined
+            displayName: playerName,
+            lineUserId: boundAccountProfile?.lineUserId,
+            avatarUrl: boundAccountProfile?.avatarUrl
         });
     };
 
-    // 依連線狀態回傳文字顏色
-    const getStatusColor = () => {
-        switch (connectionStatus) {
-            case 'connected': return 'text-success';
-            case 'connecting': return 'text-warning';
-            default: return 'text-danger';
+    const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
+    const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
+    const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
+    const customSelectionCount = selectedCharacterIds.length;
+    const isCustomSelectionReady = setupMode !== 'custom' || customSelectionCount === 7;
+    const canCreateRoom = Boolean(
+        playerName.trim()
+        && !isConnecting
+        && !isAccountSyncPending
+        && connectionStatus === 'connected'
+        && selectedGeishaSetOption?.available
+        && isCustomSelectionReady
+    );
+    const canJoinRoom = Boolean(
+        playerName.trim()
+        && roomId.trim()
+        && !isConnecting
+        && !isAccountSyncPending
+        && connectionStatus === 'connected'
+    );
+
+    const handleGeishaSetChange = (value: GeishaSet) => {
+        setSelectedGeishaSet(value);
+    };
+
+    const handleSetupModeChange = (value: RoomSetupMode) => {
+        setSetupMode(value);
+    };
+
+    const toggleCharacterSelection = (characterId: string) => {
+        setSelectedCharacterIds((currentIds) => {
+            if (currentIds.includes(characterId)) {
+                return currentIds.filter((id) => id !== characterId);
+            }
+            return [...currentIds, characterId];
+        });
+    };
+
+    const achievementItems = achievementStatus?.items ?? [];
+    const achievementNewUnlockCount = achievementStatus?.newUnlockCount ?? 0;
+    const achievementMessage = achievementStatus?.message;
+
+    const openAchievements = () => {
+        setIsAchievementPanelOpen((current) => !current);
+        if (achievementNewUnlockCount <= 0 || !achievementItems.some((item) => item.isNew)) {
+            return;
+        }
+
+        acknowledgeAchievementUnlocks({
+            achievementIds: achievementItems.filter((item) => item.isNew).map((item) => item.achievementId)
+        })
+            .then(setAchievementStatus)
+            .catch((error) => {
+                frontendLogger.warn('⚠️ 成就提示清除失敗', {
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+            });
+    };
+
+    const invitedRoomNotice = invitedRoom
+        ? `已從邀請連結帶入房間 ${invitedRoom.roomId}，確認玩家名稱後再加入。`
+        : undefined;
+
+    const copyInviteRoomId = async () => {
+        if (!inviteRecovery?.roomId) return;
+        try {
+            await navigator.clipboard.writeText(inviteRecovery.roomId);
+        } catch {
+            const textArea = document.createElement('textarea');
+            textArea.value = inviteRecovery.roomId;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
         }
     };
 
-    // 依連線狀態回傳顯示文字
-    const getStatusText = () => {
-        switch (connectionStatus) {
-            case 'connected': return '🟢 已連接到伺服器';
-            case 'connecting': return '🟡 連接中...';
-            default: return '🔴 未連接到伺服器';
-        }
-    };
-
-    // 檢查當前網域，決定是否使用 Hash Router
-    const shouldUseHash = () => {
-        return window.location.host.includes('github.io');
+    const clearInviteRecovery = () => {
+        setInviteRecovery(null);
     };
 
     return (
-        <div className="lobby-background d-flex align-items-center justify-content-center">
-            <div className="card p-4" style={{ minWidth: 350, maxWidth: 400 }}>
-                <div className="text-center mb-4">
-                    <h2 className="mb-3">花見小路</h2>
-                    <p className="text-secondary">線上對戰版</p>
-                    <small className={getStatusColor()}>
-                        {getStatusText()}
-                    </small>
-                    {config.isDevelopment && (
-                        <div className="mt-2">
-                            <small className="text-muted">
-                                環境: {process.env.NODE_ENV}<br />
-                                WebSocket: {config.websocketUrl}<br />
-                                Router: {shouldUseHash() ? 'HashRouter' : 'BrowserRouter'}
-                            </small>
-                        </div>
-                    )}
-                </div>
+        <div className="lobby-background">
+            <div className="container-fluid px-3 px-md-4 py-4 py-md-5">
+                <LobbyBrandSurface
+                    onOpenDiagnostics={() => navigate('/diagnostics')}
+                    heroAside={(
+                        <>
+                            <section className="lobby-achievements" aria-label="成就">
+                                <button
+                                    type="button"
+                                    className="lobby-achievements__entry"
+                                    onClick={openAchievements}
+                                    aria-expanded={isAchievementPanelOpen}
+                                >
+                                    <span>
+                                        <span className="lobby-achievements__kicker">Achievements</span>
+                                        <span className="lobby-achievements__title">成就</span>
+                                    </span>
+                                    {achievementNewUnlockCount > 0 && (
+                                        <span className="lobby-achievements__badge">新解鎖 {achievementNewUnlockCount}</span>
+                                    )}
+                                </button>
 
-                <div className="mb-3">
-                    <label className="form-label">對戰模式</label>
-                    <div className="d-flex gap-3 mb-3">
-                        <label className="form-check-label">
-                            <input
-                                type="radio"
-                                className="form-check-input me-2"
-                                name="matchMode"
-                                value="online"
-                                checked={matchMode === 'online'}
-                                onChange={() => setMatchMode('online')}
-                                disabled={isConnecting}
-                            />
-                            線上玩家
-                        </label>
-                        <label className="form-check-label">
-                            <input
-                                type="radio"
-                                className="form-check-input me-2"
-                                name="matchMode"
-                                value="npc"
-                                checked={matchMode === 'npc'}
-                                onChange={() => setMatchMode('npc')}
-                                disabled={isConnecting}
-                            />
-                            對戰 NPC
-                        </label>
-                    </div>
-                    {matchMode === 'npc' && (
-                        <div className="mb-3">
-                            <label className="form-label">AI 強度</label>
-                            <select
-                                className="form-select"
-                                value={aiDifficulty}
-                                onChange={(event) => setAiDifficulty(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
-                                disabled={isConnecting}
-                            >
-                                <option value="easy">しぐれうい</option>
-                                <option value="medium">大空スバル</option>
-                                <option value="hard">兎田ぺこら</option>
-                                <option value="expert">猫又おかゆ</option>
-                                <option value="hell">ときのそら</option>
-                            </select>
-                        </div>
+                                {isAchievementPanelOpen && (
+                                    <div className="lobby-achievements__panel">
+                                        {achievementStatus?.status === 'available' && achievementItems.length > 0 ? (
+                                            <div className="lobby-achievements__list">
+                                                {achievementItems.map((item) => (
+                                                    <div key={item.achievementId} className={`lobby-achievement-item lobby-achievement-item--${item.state}`}>
+                                                        <div>
+                                                            <div className="lobby-achievement-item__title">
+                                                                {item.title}
+                                                                {item.isNew && <span className="lobby-achievement-item__new">新</span>}
+                                                            </div>
+                                                            <div className="lobby-achievement-item__description">{item.description}</div>
+                                                        </div>
+                                                        <div className="lobby-achievement-item__progress">
+                                                            {item.currentValue} / {item.target}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="lobby-achievements__empty" role="status">
+                                                {achievementMessage ?? '成就狀態讀取中。'}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </section>
+
+                            <div className="lobby-copy-note">
+                                <strong>遊戲說明：</strong>
+                                <span>透過四種行動收集物品卡，獲得女公關的好感。控制四位以上女公關或累積 11 點魅力值即可獲勝。</span>
+                            </div>
+                        </>
                     )}
-                    <div className="mb-3">
-                        <label className="form-label">藝妓組合</label>
-                        <select
-                            className="form-select"
-                            value={geishaSet}
-                            onChange={(event) => setGeishaSet(event.target.value as 'default' | 'akatsuki' | 'onesan' | 'collaboration')}
-                            disabled={isConnecting}
-                        >
-                            <option value="default">預設</option>
-                            <option value="akatsuki">曉</option>
-                            <option value="onesan">大姊姊組</option>
-                            <option value="collaboration">擅自合作組</option>
-                        </select>
-                    </div>
-                    <label className="form-label">玩家名稱</label>
-                    <input
-                        type="text"
-                        className="form-control mb-3"
-                        placeholder="輸入你的名稱"
-                        value={playerName}
-                        onChange={e => setPlayerName(e.target.value)}
-                        disabled={isConnecting}
-                        maxLength={20}
+                >
+                    <LobbyPlayControls
+                        playerName={playerName}
+                        roomId={roomId}
+                        matchMode={matchMode}
+                        aiDifficulty={normalizeAiDifficulty(aiDifficulty)}
+                        selectedGeishaSet={selectedGeishaSet}
+                        setupMode={setupMode}
+                        availableCharacterProfiles={availableCharacterProfiles}
+                        selectedCharacterIds={selectedCharacterIds}
+                        customSelectionCount={customSelectionCount}
+                        isConnecting={isConnecting}
+                        canCreateRoom={canCreateRoom}
+                        canJoinRoom={canJoinRoom}
+                        hasUnavailableCharacterSet={hasUnavailableCharacterSet}
+                        accountGuestNotice={accountGuestNotice}
+                        invitedRoomNotice={invitedRoomNotice}
+                        inviteRecovery={inviteRecovery}
+                        onPlayerNameChange={setPlayerName}
+                        onRoomIdChange={setRoomId}
+                        onMatchModeChange={setMatchMode}
+                        onAiDifficultyChange={setAiDifficulty}
+                        onGeishaSetChange={handleGeishaSetChange}
+                        onSetupModeChange={handleSetupModeChange}
+                        onCharacterSelectionToggle={toggleCharacterSelection}
+                        onCopyInviteRoomId={copyInviteRoomId}
+                        onClearInviteRecovery={clearInviteRecovery}
+                        onCreateRoom={createRoom}
+                        onJoinRoom={joinRoom}
                     />
-                    <button
-                        className="btn btn-primary w-100"
-                        onClick={createRoom}
-                        disabled={!playerName.trim() || isConnecting || connectionStatus !== 'connected'}
-                    >
-                        {isConnecting ? (
-                            <>
-                                <span className="spinner-border spinner-border-sm me-2"></span>
-                                建立中...
-                            </>
-                        ) : '🏠 建立房間'}
-                    </button>
-                </div>
-
-                {matchMode === 'online' && (
-                    <>
-                        <hr className="my-4" />
-                        <div>
-                            <label className="form-label">加入房間</label>
-                            <input
-                                type="text"
-                                className="form-control mb-2"
-                                placeholder="輸入房間代碼"
-                                value={roomId}
-                                onChange={e => setRoomId(e.target.value.toUpperCase())}
-                                disabled={isConnecting}
-                                maxLength={6}
-                            />
-                            <button
-                                className="btn btn-success w-100"
-                                onClick={joinRoom}
-                                disabled={!playerName.trim() || !roomId.trim() || isConnecting || connectionStatus !== 'connected'}
-                            >
-                                {isConnecting ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2"></span>
-                                        加入中...
-                                    </>
-                                ) : '🚪 加入房間'}
-                            </button>
-                        </div>
-                    </>
-                )}
-
-                <div className="mt-4 pt-3 border-top">
-                    <small className="text-muted">
-                        <strong>遊戲說明：</strong><br />
-                        透過四種行動收集物品卡，獲得藝妓的好感。<br />
-                        控制四位以上藝妓或累積11點魅力值即可獲勝！
-                    </small>
-                </div>
-
-                {config.isDevelopment && (
-                    <div className="mt-3 p-2 bg-light rounded">
-                        <small className="text-muted">
-                            <strong>開發資訊：</strong><br />
-                            連線狀態: {connectionStatus}<br />
-                            已註冊事件: {gameWebSocket.messageHandlers?.size || 0}
-                        </small>
-                    </div>
-                )}
+                </LobbyBrandSurface>
             </div>
         </div>
     );

@@ -3,19 +3,19 @@ import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { GameProvider } from './contexts/GameContext';
 import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
+import DiagnosticsPage from './pages/Diagnostics';
 import { initLiffIfPossible, shouldShowLiffDiagnostics } from './utils/lineLiff';
 import config from './config/environment';
-
-// 判斷是否使用 HashRouter（GitHub Pages 需要）
-const shouldUseHashRouter = () => {
-  // 如果是在 GitHub Pages 網域，就用 HashRouter
-  return window.location.host.includes('github.io');
-};
+import { shouldUseHashRouter } from './utils/routerMode';
 
 // App 根元件：負責路由與全域狀態掛載
 function App() {
   // 動態選擇路由器
   const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
+  const routerFuture = {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  } as const;
   const [liffError, setLiffError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,10 +94,11 @@ function App() {
           </div>
         </div>
       )}
-      <Router>
+      <Router future={routerFuture}>
         <Routes>
           {/* 大廳頁面 */}
           <Route path="/" element={<Lobby />} />
+          <Route path="/diagnostics" element={<DiagnosticsPage />} />
           {/* 遊戲房間頁面 */}
           <Route path="/game/:roomId" element={<GameRoom />} />
         </Routes>

@@ -7,6 +7,7 @@ interface EnvironmentConfig {
     webAppUrl: string;
     isDevelopment: boolean;
     isProduction: boolean;
+    diagnosticsEnabled: boolean;
 }
 
 // 統一集中管理前端環境參數
@@ -31,15 +32,7 @@ const config: EnvironmentConfig = {
     isDevelopment: process.env.NODE_ENV === 'development',
     // 是否為生產環境
     isProduction: process.env.NODE_ENV === 'production',
+    diagnosticsEnabled: process.env.REACT_APP_ENABLE_DIAGNOSTICS === 'true',
 };
-
-// 生產環境也顯示配置資訊，方便除錯
-console.log('🔧 [Environment] 配置資訊:');
-console.log('  WebSocket URL:', config.websocketUrl);
-console.log('  API URL:', config.apiUrl);
-console.log('  LIFF ID:', config.liffId);
-console.log('  環境:', process.env.NODE_ENV);
-console.log('  是否為生產環境:', config.isProduction);
-console.log('  是否為開發環境:', config.isDevelopment);
 
 export default config;

@@ -10,6 +10,7 @@ import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../u
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import { AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 import LobbyBrandSurface from './LobbyBrandSurface';
 import LobbyPlayControls from './LobbyPlayControls';
 
@@ -22,7 +23,7 @@ const Lobby: React.FC = () => {
     // 對戰模式（online = 玩家對戰，npc = 對戰 AI）
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
-    const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'expert' | 'hell'>('easy');
+    const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('easy');
     // 藝妓組合選擇（online / npc 共用）
     const [selectedGeishaSet, setSelectedGeishaSet] = useState<GeishaSet>('default');
     const [setupMode, setSetupMode] = useState<RoomSetupMode>('random');
@@ -309,13 +310,14 @@ const Lobby: React.FC = () => {
     const createRoom = () => {
         if (!canCreateRoom) return;
         setIsConnecting(true);
+        const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
         const customSelection = setupMode === 'custom'
             ? { characterIds: selectedCharacterIds }
             : undefined;
         frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
             playerId: playerName,
             mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
+            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
             geishaSet: selectedGeishaSet,
             setupMode
         });
@@ -325,7 +327,7 @@ const Lobby: React.FC = () => {
             lineUserId: boundAccountProfile?.lineUserId,
             avatarUrl: boundAccountProfile?.avatarUrl,
             mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? aiDifficulty : undefined,
+            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
             geishaSet: selectedGeishaSet,
             setupMode,
             ...(customSelection ? { customSelection } : {})
@@ -483,7 +485,7 @@ const Lobby: React.FC = () => {
                         playerName={playerName}
                         roomId={roomId}
                         matchMode={matchMode}
-                        aiDifficulty={aiDifficulty}
+                        aiDifficulty={normalizeAiDifficulty(aiDifficulty)}
                         selectedGeishaSet={selectedGeishaSet}
                         setupMode={setupMode}
                         availableCharacterProfiles={availableCharacterProfiles}

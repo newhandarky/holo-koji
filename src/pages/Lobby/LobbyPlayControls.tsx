@@ -1,12 +1,13 @@
 import React from 'react';
 import { CharacterProfile, GeishaSet, RoomSetupMode } from 'game-shared-types';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import { AI_DIFFICULTY_OPTIONS, AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 
 interface LobbyPlayControlsProps {
     playerName: string;
     roomId: string;
     matchMode: 'online' | 'npc';
-    aiDifficulty: 'easy' | 'medium' | 'hard' | 'expert' | 'hell';
+    aiDifficulty: AiDifficulty;
     selectedGeishaSet: GeishaSet;
     setupMode: RoomSetupMode;
     availableCharacterProfiles: CharacterProfile[];
@@ -25,7 +26,7 @@ interface LobbyPlayControlsProps {
     onPlayerNameChange: (value: string) => void;
     onRoomIdChange: (value: string) => void;
     onMatchModeChange: (value: 'online' | 'npc') => void;
-    onAiDifficultyChange: (value: 'easy' | 'medium' | 'hard' | 'expert' | 'hell') => void;
+    onAiDifficultyChange: (value: AiDifficulty) => void;
     onGeishaSetChange: (value: GeishaSet) => void;
     onSetupModeChange: (value: RoomSetupMode) => void;
     onCharacterSelectionToggle: (characterId: string) => void;
@@ -131,19 +132,33 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
 
             {matchMode === 'npc' && (
                 <div className="mb-3">
-                    <label className="form-label">AI 強度</label>
-                    <select
-                        className="form-select"
-                        value={aiDifficulty}
-                        onChange={(event) => onAiDifficultyChange(event.target.value as 'easy' | 'medium' | 'hard' | 'expert' | 'hell')}
-                        disabled={isConnecting}
-                    >
-                        <option value="easy">しぐれうい</option>
-                        <option value="medium">大空スバル</option>
-                        <option value="hard">兎田ぺこら</option>
-                        <option value="expert">猫又おかゆ</option>
-                        <option value="hell">ときのそら</option>
-                    </select>
+                    <label className="form-label" id="ai-difficulty-label">AI 難度</label>
+                    <div className="lobby-ai-difficulty" role="radiogroup" aria-labelledby="ai-difficulty-label">
+                        {AI_DIFFICULTY_OPTIONS.map((option) => {
+                            const checked = normalizeAiDifficulty(aiDifficulty) === option.value;
+
+                            return (
+                                <label
+                                    key={option.value}
+                                    className={`lobby-ai-difficulty__option ${checked ? 'is-active' : ''}`}
+                                >
+                                    <input
+                                        type="radio"
+                                        className="form-check-input"
+                                        name="aiDifficulty"
+                                        value={option.value}
+                                        checked={checked}
+                                        onChange={() => onAiDifficultyChange(option.value)}
+                                        disabled={isConnecting}
+                                    />
+                                    <span className="lobby-ai-difficulty__copy">
+                                        <span className="lobby-ai-difficulty__label">{option.label}</span>
+                                        <span className="lobby-ai-difficulty__description">{option.description}</span>
+                                    </span>
+                                </label>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

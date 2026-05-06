@@ -20,7 +20,7 @@ import {
 import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
 import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
-import { shareRoomInvite, getLiffInviteUrl, isLineClient } from '../../utils/lineLiff';
+import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
 import { getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';
 
@@ -121,6 +121,7 @@ const GameRoom: React.FC = () => {
     const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
     const [focusSection, setFocusSection] = useState<FocusSection>('characterBoard');
     const [expandedInfoReplayAction, setExpandedInfoReplayAction] = useState<ReplayActionType>(null);
+    const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null);
     const previousFocusSectionRef = useRef<FocusSection>('characterBoard');
     const wasInteractionLockedRef = useRef(false);
     const canActBeforeBlockingRef = useRef(false);
@@ -282,6 +283,42 @@ const GameRoom: React.FC = () => {
         }
     };
 
+    const getInviteOutcomeMessage = (outcome: InviteOutcome) => {
+        switch (outcome.mode) {
+            case 'share':
+                return 'LINE 邀請已送出。';
+            case 'copy':
+                return '已複製邀請連結，請貼給好友。';
+            case 'cancelled':
+                return '已取消 LINE 好友選擇，可以重試或改用連結分享。';
+            case 'unavailable':
+                return '目前無法自動複製邀請連結，請手動複製下方連結分享。';
+            case 'failed':
+                return 'LINE 邀請暫時失敗，請改用下方連結分享。';
+            default:
+                return '邀請狀態已更新。';
+        }
+    };
+
+    const getInviteOutcomeTone = (outcome: InviteOutcome) => {
+        if (outcome.mode === 'share' || outcome.mode === 'copy') return 'success';
+        if (outcome.mode === 'cancelled' || outcome.mode === 'unavailable') return 'warning';
+        return 'danger';
+    };
+
+    const handleShareRoomInvite = async () => {
+        if (!roomId) return;
+        const result = await shareRoomInvite(roomId);
+        setInviteOutcome(result);
+
+        if (result.mode === 'failed') {
+            frontendLogger.warn('⚠️ LINE 邀請失敗', {
+                roomId,
+                reason: result.reason
+            });
+        }
+    };
+
     // 玩家確認順序
     const handleConfirmOrder = () => {
         confirmOrder();
@@ -430,21 +467,7 @@ const GameRoom: React.FC = () => {
                             <div className={`waiting-room-actions ${!isLineClient() && roomId ? '' : 'waiting-room-actions--single'}`}>
                                 <button
                                     className="btn btn-success btn-sm waiting-room-button"
-                                    onClick={async () => {
-                                        if (!roomId) return;
-                                        try {
-                                            const result = await shareRoomInvite(roomId);
-                                            if (result.mode === 'copy') {
-                                                alert('已複製邀請連結，請貼給好友！');
-                                            }
-                                        } catch (error) {
-                                            frontendLogger.error('❌ LINE 邀請失敗', {
-                                                error: error instanceof Error ? error.message : 'unknown'
-                                            });
-                                            const message = error instanceof Error ? error.message : 'LINE 邀請失敗，請改用複製連結分享。';
-                                            alert(message);
-                                        }
-                                    }}
+                                    onClick={handleShareRoomInvite}
                                 >
                                     LINE 邀請好友
                                 </button>
@@ -464,6 +487,15 @@ const GameRoom: React.FC = () => {
                         {!isLineClient() && (
                             <div className="mt-2 text-muted">
                                 <small>提示：請在 LINE App 內開啟，才能使用選擇好友功能。</small>
+                            </div>
+                        )}
+
+                        {inviteOutcome && (
+                            <div className={`waiting-room-invite-feedback waiting-room-invite-feedback--${getInviteOutcomeTone(inviteOutcome)}`} role="status">
+                                <div>{getInviteOutcomeMessage(inviteOutcome)}</div>
+                                {inviteOutcome.url && (
+                                    <code className="waiting-room-invite-feedback__url">{inviteOutcome.url}</code>
+                                )}
                             </div>
                         )}
 

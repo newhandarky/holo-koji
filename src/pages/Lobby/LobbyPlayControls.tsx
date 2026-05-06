@@ -17,6 +17,11 @@ interface LobbyPlayControlsProps {
     canJoinRoom: boolean;
     hasUnavailableCharacterSet: boolean;
     accountGuestNotice?: string;
+    invitedRoomNotice?: string;
+    inviteRecovery?: {
+        roomId: string;
+        message: string;
+    } | null;
     onPlayerNameChange: (value: string) => void;
     onRoomIdChange: (value: string) => void;
     onMatchModeChange: (value: 'online' | 'npc') => void;
@@ -24,6 +29,8 @@ interface LobbyPlayControlsProps {
     onGeishaSetChange: (value: GeishaSet) => void;
     onSetupModeChange: (value: RoomSetupMode) => void;
     onCharacterSelectionToggle: (characterId: string) => void;
+    onCopyInviteRoomId: () => void;
+    onClearInviteRecovery: () => void;
     onCreateRoom: () => void;
     onJoinRoom: () => void;
 }
@@ -43,6 +50,8 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     canJoinRoom,
     hasUnavailableCharacterSet,
     accountGuestNotice,
+    invitedRoomNotice,
+    inviteRecovery,
     onPlayerNameChange,
     onRoomIdChange,
     onMatchModeChange,
@@ -50,6 +59,8 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     onGeishaSetChange,
     onSetupModeChange,
     onCharacterSelectionToggle,
+    onCopyInviteRoomId,
+    onClearInviteRecovery,
     onCreateRoom,
     onJoinRoom
 }) => (
@@ -65,6 +76,28 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
             {accountGuestNotice && (
                 <div className="lobby-account-notice" role="status">
                     {accountGuestNotice}
+                </div>
+            )}
+
+            {invitedRoomNotice && (
+                <div className="lobby-invite-notice" role="status">
+                    {invitedRoomNotice}
+                </div>
+            )}
+
+            {inviteRecovery && (
+                <div className="lobby-invite-recovery" role="alert">
+                    <div className="lobby-invite-recovery__message">{inviteRecovery.message}</div>
+                    <code className="lobby-invite-recovery__room">{inviteRecovery.roomId}</code>
+                    <div className="lobby-invite-recovery__actions">
+                        <button type="button" className="btn btn-outline-light btn-sm" onClick={onCopyInviteRoomId}>
+                            複製房號
+                        </button>
+                        <button type="button" className="btn btn-outline-light btn-sm" onClick={onClearInviteRecovery}>
+                            回到一般加入
+                        </button>
+                    </div>
+                    <div className="lobby-invite-recovery__hint">可請對方重送邀請，或回到建立/加入房間流程。</div>
                 </div>
             )}
 

@@ -21,6 +21,11 @@ const formatLineLoginStatus = (value: DiagnosticsSnapshot['lineLoggedIn']) => {
     return value ? '已登入' : '未登入';
 };
 
+const formatBooleanUnknown = (value: boolean | 'unknown', trueText: string, falseText: string) => {
+    if (value === 'unknown') return '未知';
+    return value ? trueText : falseText;
+};
+
 export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
     const liff = getLiffDiagnosticsSnapshot();
     const account = getAccountDiagnosticsSnapshot();
@@ -36,6 +41,9 @@ export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
         liffSupportedOrigin: liff.supportedOrigin,
         liffReady: liff.ready,
         lineLoggedIn: liff.loggedIn,
+        lineInClient: liff.inLineClient,
+        shareTargetPickerAvailable: liff.shareTargetPickerAvailable,
+        inviteFallbackAvailable: liff.fallbackAvailable,
         accountSyncStatus: account.accountSyncStatus,
         accountPersistenceMode: account.accountPersistenceMode,
         accountPersistenceAvailable: account.accountPersistenceAvailable,
@@ -92,6 +100,22 @@ export const buildDiagnosticsSummaryItems = (snapshot: DiagnosticsSnapshot): Dia
         label: 'LINE 登入狀態',
         value: formatLineLoginStatus(snapshot.lineLoggedIn),
         statusTone: snapshot.lineLoggedIn === true ? 'success' : snapshot.lineLoggedIn === false ? 'warning' : 'neutral'
+    },
+    {
+        label: 'LINE App 內開啟',
+        value: formatBooleanUnknown(snapshot.lineInClient, '是', '否'),
+        statusTone: snapshot.lineInClient === true ? 'success' : 'neutral'
+    },
+    {
+        label: '好友選擇器可用',
+        value: formatBooleanUnknown(snapshot.shareTargetPickerAvailable, '可用', '不可用'),
+        statusTone: snapshot.shareTargetPickerAvailable === true ? 'success' : snapshot.shareTargetPickerAvailable === false ? 'warning' : 'neutral',
+        helpText: '僅顯示能力摘要，不包含好友或 LINE profile 資料。'
+    },
+    {
+        label: '邀請 fallback',
+        value: snapshot.inviteFallbackAvailable ? '可複製連結' : '不可用',
+        statusTone: snapshot.inviteFallbackAvailable ? 'success' : 'warning'
     },
     {
         label: '帳號同步狀態',

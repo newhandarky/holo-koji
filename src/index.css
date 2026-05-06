@@ -274,6 +274,51 @@ code {
   line-height: 1.5;
 }
 
+.lobby-invite-notice,
+.lobby-invite-recovery {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.lobby-invite-notice {
+  border: 1px solid rgba(109, 213, 157, 0.38);
+  background: rgba(29, 180, 70, 0.12);
+  color: rgba(235, 255, 241, 0.96);
+}
+
+.lobby-invite-recovery {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 210, 128, 0.36);
+  background: rgba(255, 210, 128, 0.12);
+  color: rgba(255, 246, 224, 0.96);
+}
+
+.lobby-invite-recovery__room {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff6de;
+}
+
+.lobby-invite-recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lobby-invite-recovery__hint {
+  color: rgba(255, 246, 224, 0.78);
+  font-size: 0.82rem;
+}
+
 .lobby-achievements {
   display: grid;
   gap: 10px;
@@ -2752,6 +2797,45 @@ code {
 
 .waiting-room-button {
   width: 100%;
+}
+
+.waiting-room-invite-feedback {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.waiting-room-invite-feedback--success {
+  border: 1px solid rgba(25, 135, 84, 0.24);
+  background: rgba(25, 135, 84, 0.1);
+  color: #0f5132;
+}
+
+.waiting-room-invite-feedback--warning {
+  border: 1px solid rgba(255, 193, 7, 0.34);
+  background: rgba(255, 193, 7, 0.12);
+  color: #664d03;
+}
+
+.waiting-room-invite-feedback--danger {
+  border: 1px solid rgba(220, 53, 69, 0.24);
+  background: rgba(220, 53, 69, 0.1);
+  color: #842029;
+}
+
+.waiting-room-invite-feedback__url {
+  display: block;
+  max-width: 100%;
+  padding: 4px 6px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.54);
 }
 
 @media (min-width: 576px) {

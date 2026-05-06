@@ -9,6 +9,9 @@ export interface DiagnosticsSnapshot {
     liffSupportedOrigin: boolean;
     liffReady: boolean;
     lineLoggedIn: boolean | 'unknown';
+    lineInClient: boolean | 'unknown';
+    shareTargetPickerAvailable: boolean | 'unknown';
+    inviteFallbackAvailable: boolean;
     accountSyncStatus: 'bound' | 'guest' | 'sync-failed' | 'unverified';
     accountPersistenceMode: 'durable' | 'temporary';
     accountPersistenceAvailable: boolean;

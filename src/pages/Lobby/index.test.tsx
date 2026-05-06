@@ -1,10 +1,10 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { gameWebSocket } from '../../services/websocket';
 import Lobby from './index';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
-import { getLineProfile } from '../../utils/lineLiff';
+import { getInviteRoomIdFromLocation, getLineProfile } from '../../utils/lineLiff';
 import { syncLineAccount } from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 
@@ -36,7 +36,7 @@ jest.mock('../../services/websocket', () => {
 });
 
 jest.mock('../../utils/lineLiff', () => ({
-    getInviteRoomIdFromLocation: () => ({ roomId: '', source: null }),
+    getInviteRoomIdFromLocation: jest.fn(() => ({ roomId: '', source: 'none' })),
     getLineProfile: jest.fn().mockResolvedValue(null)
 }));
 
@@ -67,6 +67,7 @@ jest.mock('../../utils/achievementAccount', () => ({
 
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
+const mockGetInviteRoomIdFromLocation = getInviteRoomIdFromLocation as jest.MockedFunction<typeof getInviteRoomIdFromLocation>;
 const mockGetLineProfile = getLineProfile as jest.MockedFunction<typeof getLineProfile>;
 const mockSyncLineAccount = syncLineAccount as jest.MockedFunction<typeof syncLineAccount>;
 const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
@@ -82,6 +83,8 @@ describe('Lobby character set selection', () => {
         mockGameWebSocket.on.mockClear();
         mockGameWebSocket.off.mockClear();
         mockGameWebSocket.send.mockClear();
+        mockGetInviteRoomIdFromLocation.mockReset();
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: '', source: 'none' });
         mockGetLineProfile.mockReset();
         mockGetLineProfile.mockResolvedValue(null);
         mockSyncLineAccount.mockReset();
@@ -117,6 +120,10 @@ describe('Lobby character set selection', () => {
         });
         window.localStorage.clear();
         jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: jest.fn().mockResolvedValue(undefined) }
+        });
         CHARACTER_SET_OPTIONS.forEach((option) => {
             option.available = true;
             option.disabledReason = undefined;
@@ -128,6 +135,17 @@ describe('Lobby character set selection', () => {
     });
 
     const renderLobby = () => render(<Lobby />);
+    const emitServerError = async (payload: { message: string; code?: string }) => {
+        await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith('ERROR', expect.any(Function)));
+        const errorHandlerCall = [...mockGameWebSocket.on.mock.calls]
+            .reverse()
+            .find(([messageType]) => messageType === 'ERROR');
+        const errorHandler = errorHandlerCall?.[1] as ((payload: unknown) => void) | undefined;
+        expect(errorHandler).toEqual(expect.any(Function));
+        act(() => {
+            errorHandler?.(payload);
+        });
+    };
 
     test('renders Ginza-branded homepage without homepage diagnostics block', () => {
         renderLobby();
@@ -605,5 +623,103 @@ describe('Lobby character set selection', () => {
             achievementIds: ['first_completed_match']
         }));
         await waitFor(() => expect(screen.queryByText('新解鎖 1')).not.toBeInTheDocument());
+    });
+
+    test('invite query room id is prefilled and does not auto-join on page load', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'abc123', source: 'query' });
+
+        renderLobby();
+
+        expect(await screen.findByText('已從邀請連結帶入房間 ABC123，確認玩家名稱後再加入。')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('輸入房間代碼')).toHaveValue('ABC123');
+        expect(mockGameWebSocket.send).not.toHaveBeenCalledWith('JOIN_ROOM', expect.anything());
+    });
+
+    test('invite LIFF state room id is normalized for confirmed join only', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'xyz789', source: 'liff' });
+        const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation(() => undefined);
+
+        renderLobby();
+
+        expect(await screen.findByText('已從邀請連結帶入房間 XYZ789，確認玩家名稱後再加入。')).toBeInTheDocument();
+        expect(replaceStateSpy).toHaveBeenCalled();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledWith(
+            'JOIN_ROOM',
+            expect.objectContaining({
+                roomId: 'XYZ789',
+                playerId: 'joiner'
+            })
+        );
+    });
+
+    test('missing invited room shows recovery without losing original room id', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'abc123', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({ message: '房間不存在', code: 'ROOM_NOT_FOUND' });
+
+        expect(await screen.findByText('找不到這個邀請房間。請確認房號，或請對方重送邀請。')).toBeInTheDocument();
+        expect(screen.getByText('ABC123')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '複製房號' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '回到一般加入' })).toBeInTheDocument();
+    });
+
+    test('full invited room shows recovery guidance', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'full01', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({ message: '房間已滿', code: 'ROOM_FULL' });
+
+        expect(await screen.findByText('這個邀請房間已滿。請對方重送邀請，或回到大廳建立新房間。')).toBeInTheDocument();
+        expect(screen.getByText('FULL01')).toBeInTheDocument();
+    });
+
+    test('already-started invited room shows recovery guidance', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'start1', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({ message: '房間已開始對局', code: 'ROOM_ALREADY_STARTED' });
+
+        expect(await screen.findByText('這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。')).toBeInTheDocument();
+        expect(screen.getByText('START1')).toBeInTheDocument();
+    });
+
+    test('invalid invited room join shows recovery guidance', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'bad001', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({ message: '缺少 roomId 或 playerId', code: 'INVALID_JOIN_REQUEST' });
+
+        expect(await screen.findByText('這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。')).toBeInTheDocument();
+        expect(screen.getByText('BAD001')).toBeInTheDocument();
+    });
+
+    test('unknown invited room join failure shows safe recovery guidance', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'unk001', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({ message: 'unknown' });
+
+        expect(await screen.findByText('目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。')).toBeInTheDocument();
+        expect(screen.getByText('UNK001')).toBeInTheDocument();
     });
 });

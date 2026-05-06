@@ -577,6 +577,25 @@ describe('GameRoom character set room surface', () => {
         expect(screen.queryByTestId('mock-visible-own-hand')).not.toBeInTheDocument();
     });
 
+    test('opening hand gate remains available when opponent action marks deal replay not replayable', () => {
+        (mockState.players[0] as any).hand = makeOpeningHand();
+        (mockState.players[1] as any).actionTokens = makeActionTokens('secret');
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = {
+            ...makeOpeningDeal(),
+            status: 'not_replayable',
+            replayable: false
+        };
+
+        render(<GameRoom />);
+        act(() => {
+            jest.advanceTimersByTime(6000);
+        });
+
+        expect(screen.getByRole('button', { name: '拿取手牌' })).toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-status', 'pending_take');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-blocked', 'true');
+    });
+
     test('progressed or non-starting hand state skips take opening hand gate', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState.players[0] as any).actionTokens = makeActionTokens('secret');

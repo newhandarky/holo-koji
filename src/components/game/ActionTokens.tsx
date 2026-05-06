@@ -1,7 +1,7 @@
 // src/components/game/ActionTokens.tsx
 import React, { useState } from 'react';
 import { ActionToken, ItemCard, GeishaSet } from "game-shared-types"
-import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardImage } from '../../utils/gameData';
 import { actionIconMap } from '../../utils/actionAssets';
 
 /**
@@ -44,7 +44,6 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                         style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
                     >
                         <div className="item-card__overlay" />
-                        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                     </div>
                 ))}
             </div>

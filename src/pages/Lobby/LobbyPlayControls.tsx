@@ -64,7 +64,12 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     onClearInviteRecovery,
     onCreateRoom,
     onJoinRoom
-}) => (
+}) => {
+    const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
+    const selectedDifficulty = AI_DIFFICULTY_OPTIONS.find((option) => option.value === normalizedAiDifficulty)
+        ?? AI_DIFFICULTY_OPTIONS[0];
+
+    return (
     <div className="lobby-controls">
         <div className="lobby-controls__heading">
             <div>
@@ -132,33 +137,24 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
 
             {matchMode === 'npc' && (
                 <div className="mb-3">
-                    <label className="form-label" id="ai-difficulty-label">AI 難度</label>
-                    <div className="lobby-ai-difficulty" role="radiogroup" aria-labelledby="ai-difficulty-label">
+                    <label className="form-label" htmlFor="ai-difficulty-select">AI 難度</label>
+                    <select
+                        id="ai-difficulty-select"
+                        className="form-select"
+                        value={normalizedAiDifficulty}
+                        onChange={(event) => onAiDifficultyChange(normalizeAiDifficulty(event.target.value))}
+                        disabled={isConnecting}
+                        aria-label="AI 難度"
+                    >
                         {AI_DIFFICULTY_OPTIONS.map((option) => {
-                            const checked = normalizeAiDifficulty(aiDifficulty) === option.value;
-
                             return (
-                                <label
-                                    key={option.value}
-                                    className={`lobby-ai-difficulty__option ${checked ? 'is-active' : ''}`}
-                                >
-                                    <input
-                                        type="radio"
-                                        className="form-check-input"
-                                        name="aiDifficulty"
-                                        value={option.value}
-                                        checked={checked}
-                                        onChange={() => onAiDifficultyChange(option.value)}
-                                        disabled={isConnecting}
-                                    />
-                                    <span className="lobby-ai-difficulty__copy">
-                                        <span className="lobby-ai-difficulty__label">{option.label}</span>
-                                        <span className="lobby-ai-difficulty__description">{option.description}</span>
-                                    </span>
-                                </label>
+                                <option key={option.value} value={option.value}>
+                                    {option.label} - {option.description}
+                                </option>
                             );
                         })}
-                    </div>
+                    </select>
+                    <div className="form-text">{selectedDifficulty.description}</div>
                 </div>
             )}
 
@@ -262,7 +258,6 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
                 ) : '🏠 建立房間'}
             </button>
         </div>
-
         {matchMode === 'online' && (
             <div className="lobby-form-block lobby-form-block--secondary">
                 <label className="form-label">加入房間</label>
@@ -289,12 +284,8 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
                 </button>
             </div>
         )}
-
-        <div className="lobby-copy-note">
-            <strong>遊戲說明：</strong>
-            <span>透過四種行動收集物品卡，獲得女公關的好感。控制四位以上女公關或累積 11 點魅力值即可獲勝。</span>
-        </div>
     </div>
-);
+    );
+};
 
 export default LobbyPlayControls;

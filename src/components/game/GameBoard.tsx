@@ -398,7 +398,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 {isHandExpanded && (
                     <div className="game-hand-actions-panel">
                         <div className="game-hand-actions-panel__body">
-                            {!canAct && (
+                            {!canAct && !isOpeningHandInteractionBlocked && (
                                 <div className="alert alert-info py-2 mb-2">等待對手操作中...</div>
                             )}
 

@@ -40,6 +40,7 @@ const PlayerHand: React.FC<Props> = ({
     const [selected, setSelected] = useState<ItemCard[]>([]);
     // 本地維護焦點卡片（扇形內局部放大）
     const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
+    const [drawBackCueIds, setDrawBackCueIds] = useState<Set<string>>(new Set());
     const previousCardIdsRef = useRef<string[]>([]);
     // 已選卡片 ID 集合（快速判斷是否選取）
     const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
@@ -62,6 +63,37 @@ const PlayerHand: React.FC<Props> = ({
     const revealVisibleCardIds = useMemo(() => new Set(
         openingHandReveal?.steps.filter((step) => step.visible).map((step) => step.cardId) ?? []
     ), [openingHandReveal?.steps]);
+
+    useEffect(() => {
+        const timers: number[] = [];
+
+        motionCues
+            .filter((cue) => cue.kind === 'draw' && cue.cardId && !cue.reducedMotion)
+            .forEach((cue) => {
+                setDrawBackCueIds((previous) => {
+                    if (previous.has(cue.id)) {
+                        return previous;
+                    }
+
+                    const next = new Set(previous);
+                    next.add(cue.id);
+                    return next;
+                });
+
+                const timerId = window.setTimeout(() => {
+                    setDrawBackCueIds((previous) => {
+                        const next = new Set(previous);
+                        next.delete(cue.id);
+                        return next;
+                    });
+                }, Math.min(520, Math.max(260, cue.durationMs / 2)));
+                timers.push(timerId);
+            });
+
+        return () => {
+            timers.forEach((timerId) => window.clearTimeout(timerId));
+        };
+    }, [motionCues]);
 
     // 當手牌變更時重置選牌狀態，避免選到舊牌
     useEffect(() => {
@@ -219,6 +251,8 @@ const PlayerHand: React.FC<Props> = ({
                             const isFocused = focusedCardId === card.id;
                             const isConcealedCard = isOpeningHandConcealed && !revealVisibleCardIds.has(card.id);
                             const revealStep = openingHandReveal?.steps.find((step) => step.cardId === card.id);
+                            const drawMotionCue = drawMotionByCardId.get(card.id);
+                            const isDrawBackVisible = Boolean(drawMotionCue && drawBackCueIds.has(drawMotionCue.id));
 
                             return (
                                 <button
@@ -243,10 +277,10 @@ const PlayerHand: React.FC<Props> = ({
                                     }`}
                                     disabled={isOpeningHandInteractionBlocked}
                                     aria-pressed={isSelected}
-                                    aria-label={isConcealedCard ? `開局手牌 ${index + 1}` : undefined}
+                                    aria-label={isConcealedCard || isDrawBackVisible ? `手牌 ${index + 1} 牌背` : undefined}
                                     onClick={() => toggleCard(card)}
                                     style={{
-                                        backgroundImage: isConcealedCard ? 'none' : hasCardImage ? `url(${cardImage})` : 'none',
+                                        backgroundImage: isConcealedCard || isDrawBackVisible ? 'none' : hasCardImage ? `url(${cardImage})` : 'none',
                                         ['--fan-index' as string]: `${relativeIndex}`,
                                         ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
                                         ['--fan-abs-index' as string]: `${absRelative}`,
@@ -256,15 +290,15 @@ const PlayerHand: React.FC<Props> = ({
                                     }}
                                 >
                                     <div className="item-card__overlay" />
-                                    {isConcealedCard && (
+                                    {(isConcealedCard || isDrawBackVisible) && (
                                         <div className="item-card__opening-back" aria-hidden="true">
                                             <span />
                                         </div>
                                     )}
-                                    {!isConcealedCard && !hasCardImage && (
+                                    {!isConcealedCard && !isDrawBackVisible && !hasCardImage && (
                                         <div className="item-card__fallback-label">{fallbackLabel}</div>
                                     )}
-                                    {!isConcealedCard && (
+                                    {!isConcealedCard && !isDrawBackVisible && (
                                         <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                                     )}
                                     {isSelected && (

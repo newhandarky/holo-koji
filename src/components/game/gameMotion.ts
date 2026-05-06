@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GameState, ItemCard, PendingInteraction } from 'game-shared-types';
+import { getDrawFlipDurationMs } from './drawNotificationModel';
 
 export type MotionCueKind = 'draw' | 'removal' | 'placement' | 'gift-result' | 'competition-result';
 export type MotionOwner = 'self' | 'opponent';
@@ -65,11 +66,6 @@ const OPENING_DEAL_STEP_DELAY_MS = {
 const OPENING_DEAL_STEP_DURATION_MS = {
     normal: 260,
     reduced: 180
-};
-
-const DRAW_CUE_DURATION_MS = {
-    normal: 360,
-    reduced: 240
 };
 
 const getOpponent = (state: GameState, currentPlayerId: string) =>
@@ -233,7 +229,7 @@ export const createDrawMotionCue = (
     sourceZone: 'hand',
     targetZone: 'hand',
     createdAt: Date.now(),
-    durationMs: prefersReducedMotion ? DRAW_CUE_DURATION_MS.reduced : DRAW_CUE_DURATION_MS.normal,
+    durationMs: getDrawFlipDurationMs(prefersReducedMotion),
     delayMs: 0,
     reducedMotion: prefersReducedMotion
 }])[0];

@@ -1,6 +1,7 @@
 /* 全局重置與字體設定 */
 @import './components/game/OpeningDealModal.css';
 @import './components/game/PlayerHand.css';
+@import './components/game/DrawNotification.css';
 
 :root {
   --ginza-bg:

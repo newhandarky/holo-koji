@@ -19,7 +19,7 @@ type MockDealEvent = {
 const mockHookState: {
     isConnected: boolean;
     error: string | null;
-    roundSummary: null;
+    roundSummary: any | null;
     readyStatus: null;
     confirmOrder: jest.Mock;
     sendGameAction: jest.Mock;
@@ -111,6 +111,8 @@ jest.mock('../../components/game/GameBoard', () => (props: any) => (
         data-opening-hand-concealed={String(Boolean(props.openingHandReveal?.isConcealed))}
         data-opening-hand-blocked={String(Boolean(props.openingHandReveal?.isInteractionBlocked))}
         data-opening-hand-revealed-count={String(props.openingHandReveal?.revealedCount ?? 0)}
+        data-highlight-card-id={props.highlightCardId ?? ''}
+        data-motion-card-ids={(props.motionCues ?? []).map((cue: any) => cue.cardId).filter(Boolean).join(',')}
     >
         角色內容
         {props.openingHandReveal?.status === 'pending_take' && (
@@ -209,8 +211,19 @@ describe('GameRoom character set room surface', () => {
             }
         ];
         mockState.geishaSet = 'hololive';
+        mockState.orderDecision = {
+            isOpen: false,
+            phase: 'idle',
+            players: [],
+            result: null,
+            confirmations: [],
+            waitingFor: []
+        };
+        mockState.pendingInteraction = null;
         mockHookState.isConnected = true;
         mockHookState.error = null;
+        mockHookState.roundSummary = null;
+        mockHookState.readyStatus = null;
         mockHookState.dealQueue = [];
         mockHookState.drawQueue = [];
         mockNavigate.mockReset();
@@ -583,7 +596,7 @@ describe('GameRoom character set room surface', () => {
         expect(screen.queryByRole('button', { name: '拿取手牌' })).not.toBeInTheDocument();
     });
 
-    test('draw cue stays local to the receiving player and clears quickly', () => {
+    test('self draw on character board keeps focus and shows safe notification', () => {
         mockHookState.drawQueue = [{
             playerId: 'p1',
             card: { id: 'card-99', geishaId: 2, type: 'real' }
@@ -591,13 +604,78 @@ describe('GameRoom character set room surface', () => {
 
         render(<GameRoom />);
 
-        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-active', 'true');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'characterBoard');
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '稍後確認' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '現在查看' })).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('card-99');
+        expect(document.body.textContent).not.toContain('geishaId');
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
 
         act(() => {
-            jest.advanceTimersByTime(500);
+            jest.advanceTimersByTime(5000);
         });
 
         expect(mockHookState.consumeDrawEvent).toHaveBeenCalled();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'characterBoard');
+    });
+
+    test('self draw on info section keeps info focused without expanding hand actions', () => {
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-info-1', geishaId: 2, type: 'real' }
+        }];
+
+        render(<GameRoom />);
+        fireEvent.click(screen.getByRole('button', { name: '資訊' }));
+
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'info');
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-active', 'false');
+    });
+
+    test('self draw notification keyboard actions match pointer decisions', () => {
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-99', geishaId: 2, type: 'real' }
+        }];
+
+        const { unmount } = render(<GameRoom />);
+
+        fireEvent.keyDown(screen.getByRole('button', { name: '稍後確認' }), { key: 'Enter' });
+        expect(mockHookState.consumeDrawEvent).toHaveBeenCalledTimes(1);
+
+        unmount();
+        mockHookState.consumeDrawEvent.mockReset();
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-100', geishaId: 3, type: 'real' }
+        }];
+
+        render(<GameRoom />);
+
+        fireEvent.keyDown(screen.getByRole('button', { name: '現在查看' }), { key: ' ' });
+
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'handActions');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-active', 'true');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-card-id', 'card-100');
+    });
+
+    test('later confirmation followed by manual hand navigation does not replay the same draw', () => {
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-later-1', geishaId: 3, type: 'real' }
+        }];
+
+        render(<GameRoom />);
+
+        fireEvent.click(screen.getByRole('button', { name: '稍後確認' }));
+        fireEvent.click(screen.getByRole('button', { name: '手牌&指令' }));
+
+        expect(mockHookState.consumeDrawEvent).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'handActions');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-active', 'false');
     });
 
     test('non-holder only sees a brief draw status text without full hand-entry cue', () => {
@@ -610,6 +688,107 @@ describe('GameRoom character set room surface', () => {
 
         expect(screen.getByText('玩家二 抽到了新卡')).toBeInTheDocument();
         expect(screen.queryByText('你抽到一張新牌')).not.toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('hidden-p2-1');
+        expect(document.body.textContent).not.toContain('geishaId');
+    });
+
+    test('self draw in handActions skips notification and starts draw presentation', () => {
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-101', geishaId: 4, type: 'real' }
+        }];
+
+        render(<GameRoom />);
+        fireEvent.click(screen.getByRole('button', { name: '手牌&指令' }));
+
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'handActions');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-active', 'true');
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-motion-card-ids', 'card-101');
+    });
+
+    test('self draw during order decision defers notification until release and uses release focus', () => {
+        mockState.orderDecision = {
+            isOpen: true,
+            phase: 'choosing',
+            players: [],
+            result: null,
+            confirmations: [],
+            waitingFor: ['p1']
+        };
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-102', geishaId: 5, type: 'real' }
+        }];
+
+        const { rerender } = render(<GameRoom />);
+
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+
+        mockState.orderDecision = {
+            isOpen: false,
+            phase: 'idle',
+            players: [],
+            result: null,
+            confirmations: [],
+            waitingFor: []
+        };
+        rerender(<GameRoom />);
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'characterBoard');
+    });
+
+    test('self draw during round summary defers notification until summary closes', () => {
+        mockHookState.roundSummary = {
+            round: 1,
+            players: []
+        };
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-summary-1', geishaId: 5, type: 'real' }
+        }];
+
+        const { rerender } = render(<GameRoom />);
+
+        expect(screen.getByText('第 1 回合結算完成')).toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+
+        mockHookState.roundSummary = null;
+        rerender(<GameRoom />);
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+    });
+
+    test('multiple self draw events process in arrival order after each decision', () => {
+        const firstDraw = {
+            playerId: 'p1',
+            card: { id: 'card-queue-1', geishaId: 1, type: 'real' }
+        };
+        const secondDraw = {
+            playerId: 'p1',
+            card: { id: 'card-queue-2', geishaId: 2, type: 'real' }
+        };
+        mockHookState.drawQueue = [firstDraw, secondDraw];
+
+        const { rerender } = render(<GameRoom />);
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('card-queue-1');
+
+        fireEvent.click(screen.getByRole('button', { name: '稍後確認' }));
+        expect(mockHookState.consumeDrawEvent).toHaveBeenCalledTimes(1);
+
+        mockHookState.drawQueue = [secondDraw];
+        rerender(<GameRoom />);
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '現在查看' }));
+
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-highlight-card-id', 'card-queue-2');
     });
 
     test('active gameplay does not show waiting-room invite controls', () => {

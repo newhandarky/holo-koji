@@ -18,6 +18,13 @@ import {
     OpeningDealCueStep,
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
+import {
+    classifyDrawEvent,
+    getDrawEventId,
+    getDrawFlipDurationMs,
+    getDrawNotificationTimeoutMs,
+    routeDrawPresentation
+} from '../../components/game/drawNotificationModel';
 import { buildOpeningDealModalModel } from '../../components/game/openingDealModalModel';
 import {
     buildOpeningHandRevealModel,
@@ -122,6 +129,8 @@ const GameRoom: React.FC = () => {
     const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
     // 抽牌動畫是否顯示
     const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
+    const [activeDrawNotificationEventId, setActiveDrawNotificationEventId] = useState<string | null>(null);
+    const [activeDrawAnimationEventId, setActiveDrawAnimationEventId] = useState<string | null>(null);
     const [activeOpeningDealSteps, setActiveOpeningDealSteps] = useState<OpeningDealCueStep[]>([]);
     // 再來一場送出狀態
     const [isRematchRequested, setIsRematchRequested] = useState(false);
@@ -138,6 +147,7 @@ const GameRoom: React.FC = () => {
     const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
     const completedOpeningDealModalSequencesRef = useRef<Set<string>>(new Set());
     const completedOpeningHandRevealSequencesRef = useRef<Set<string>>(new Set());
+    const completedDrawEventIdsRef = useRef<Set<string>>(new Set());
     const openingHandRevealTimersRef = useRef<number[]>([]);
     const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
     const [activeOpeningDealModalSequenceId, setActiveOpeningDealModalSequenceId] = useState<string | null>(null);
@@ -197,43 +207,6 @@ const GameRoom: React.FC = () => {
             setIsEndSheetCollapsed(false);
         }
     }, [state.phase]);
-
-    // 抽牌提示顯示與消失
-    useEffect(() => {
-        if (drawQueue.length === 0) {
-            setRecentDraw(null);
-            return;
-        }
-
-        const { playerId, card } = drawQueue[0];
-        if (playerId === currentPlayerId && card.type !== 'hidden') {
-            setRecentDraw(null);
-            setDrawHighlightCardId(card.id);
-            setIsDrawHighlightActive(true);
-            enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
-
-            const highlightDuration = prefersReducedMotion ? 240 : 360;
-            const clearTimer = window.setTimeout(() => {
-                setIsDrawHighlightActive(false);
-                setDrawHighlightCardId(null);
-                consumeDrawEvent();
-            }, highlightDuration + 60);
-
-            return () => {
-                window.clearTimeout(clearTimer);
-            };
-        }
-
-        const label = `${getPlayerDisplayName(playerId)} 抽到了新卡`;
-        setRecentDraw(label);
-
-        const timer = window.setTimeout(() => {
-            setRecentDraw(null);
-            consumeDrawEvent();
-        }, prefersReducedMotion ? 520 : 700);
-
-        return () => window.clearTimeout(timer);
-    }, [drawQueue, currentPlayerId, consumeDrawEvent, enqueueMotionCues, prefersReducedMotion, getPlayerDisplayName]);
 
     useEffect(() => {
         if (!currentPlayerId || dealQueue.length === 0) {
@@ -430,6 +403,7 @@ const GameRoom: React.FC = () => {
         || isOpeningDealActive
         || isOpeningHandRevealBlocking
         || state.orderDecision.isOpen
+        || Boolean(roundSummary)
         || Boolean(readyStatus)
         || isGameEnded;
     const canAct =
@@ -440,6 +414,21 @@ const GameRoom: React.FC = () => {
         && !isOpeningHandRevealBlocking
         && !state.orderDecision.isOpen;
     const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
+    const activeDrawQueueEvent = drawQueue[0] ?? null;
+    const activeDrawEventId = activeDrawQueueEvent ? getDrawEventId(activeDrawQueueEvent) : null;
+    const isActiveSelfDrawNotification = Boolean(
+        activeDrawEventId
+        && activeDrawNotificationEventId === activeDrawEventId
+        && activeDrawQueueEvent?.playerId === currentPlayerId
+        && activeDrawQueueEvent.card.type !== 'hidden'
+    );
+    const shouldHoldFocusForSelfDraw = Boolean(
+        activeDrawEventId
+        && !completedDrawEventIdsRef.current.has(activeDrawEventId)
+        && activeDrawQueueEvent?.playerId === currentPlayerId
+        && activeDrawQueueEvent.card.type !== 'hidden'
+        && focusSection !== 'handActions'
+    );
     const localActionTokenMap = useMemo(
         () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
         [currentPlayer?.actionTokens]
@@ -465,6 +454,134 @@ const GameRoom: React.FC = () => {
             setExpandedInfoReplayAction(actionType);
         }
     }, [isReplayEligible]);
+
+    const consumeActiveDrawEvent = useCallback((eventId: string) => {
+        completedDrawEventIdsRef.current.add(eventId);
+        setRecentDraw(null);
+        setActiveDrawNotificationEventId((currentId) => currentId === eventId ? null : currentId);
+        setActiveDrawAnimationEventId((currentId) => currentId === eventId ? null : currentId);
+        setIsDrawHighlightActive(false);
+        setDrawHighlightCardId(null);
+        consumeDrawEvent();
+    }, [consumeDrawEvent]);
+
+    const startDrawFlipPresentation = useCallback((eventId: string, card: ItemCard) => {
+        if (activeDrawAnimationEventId === eventId || completedDrawEventIdsRef.current.has(eventId)) {
+            return;
+        }
+
+        setRecentDraw(null);
+        setActiveDrawNotificationEventId(null);
+        setActiveDrawAnimationEventId(eventId);
+        setDrawHighlightCardId(card.id);
+        setIsDrawHighlightActive(true);
+        enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
+
+        window.setTimeout(() => {
+            consumeActiveDrawEvent(eventId);
+        }, getDrawFlipDurationMs(prefersReducedMotion) + 120);
+    }, [
+        activeDrawAnimationEventId,
+        consumeActiveDrawEvent,
+        enqueueMotionCues,
+        prefersReducedMotion
+    ]);
+
+    const handleDrawNotificationDismiss = useCallback(() => {
+        if (!activeDrawEventId) {
+            return;
+        }
+
+        consumeActiveDrawEvent(activeDrawEventId);
+    }, [activeDrawEventId, consumeActiveDrawEvent]);
+
+    const handleDrawNotificationViewNow = useCallback(() => {
+        if (!activeDrawQueueEvent || !activeDrawEventId || activeDrawQueueEvent.card.type === 'hidden') {
+            return;
+        }
+
+        setFocusSection('handActions');
+        startDrawFlipPresentation(activeDrawEventId, activeDrawQueueEvent.card);
+    }, [activeDrawEventId, activeDrawQueueEvent, startDrawFlipPresentation]);
+
+    const handleDrawNotificationKeyDown = useCallback((
+        event: React.KeyboardEvent<HTMLButtonElement>,
+        action: 'dismiss' | 'view_now'
+    ) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+        if (action === 'dismiss') {
+            handleDrawNotificationDismiss();
+            return;
+        }
+
+        handleDrawNotificationViewNow();
+    }, [handleDrawNotificationDismiss, handleDrawNotificationViewNow]);
+
+    useEffect(() => {
+        if (!activeDrawQueueEvent || !activeDrawEventId) {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(null);
+            setActiveDrawAnimationEventId(null);
+            setIsDrawHighlightActive(false);
+            setDrawHighlightCardId(null);
+            completedDrawEventIdsRef.current.clear();
+            return;
+        }
+
+        if (completedDrawEventIdsRef.current.has(activeDrawEventId)) {
+            return;
+        }
+
+        const drawReviewEvent = classifyDrawEvent(activeDrawQueueEvent, currentPlayerId);
+        const route = routeDrawPresentation(drawReviewEvent, focusSection, isInteractionLocked);
+
+        if (route === 'defer') {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(null);
+            return;
+        }
+
+        if (route === 'opponent') {
+            const label = `${getPlayerDisplayName(activeDrawQueueEvent.playerId)} 抽到了新卡`;
+            setRecentDraw(label);
+            setActiveDrawNotificationEventId(null);
+
+            const timer = window.setTimeout(() => {
+                consumeActiveDrawEvent(activeDrawEventId);
+            }, prefersReducedMotion ? 520 : 700);
+
+            return () => window.clearTimeout(timer);
+        }
+
+        if (route === 'notify') {
+            setRecentDraw(null);
+            setActiveDrawNotificationEventId(activeDrawEventId);
+
+            const timer = window.setTimeout(() => {
+                consumeActiveDrawEvent(activeDrawEventId);
+            }, getDrawNotificationTimeoutMs());
+
+            return () => window.clearTimeout(timer);
+        }
+
+        if (drawReviewEvent.cardReference) {
+            startDrawFlipPresentation(activeDrawEventId, drawReviewEvent.cardReference);
+        }
+    }, [
+        activeDrawEventId,
+        activeDrawQueueEvent,
+        consumeActiveDrawEvent,
+        currentPlayerId,
+        focusSection,
+        getPlayerDisplayName,
+        isInteractionLocked,
+        prefersReducedMotion,
+        startDrawFlipPresentation
+    ]);
     const handleOpeningDealModalComplete = useCallback(() => {
         if (activeOpeningDealModalSequenceId) {
             completedOpeningDealModalSequencesRef.current.add(activeOpeningDealModalSequenceId);
@@ -586,18 +703,18 @@ const GameRoom: React.FC = () => {
         }
         if (wasLocked && !isInteractionLocked) {
             const becameActionable = !canActBeforeBlockingRef.current && canAct;
-            setFocusSection(becameActionable ? 'handActions' : previousFocusSectionRef.current);
+            setFocusSection(becameActionable && !shouldHoldFocusForSelfDraw ? 'handActions' : previousFocusSectionRef.current);
         }
         wasInteractionLockedRef.current = isInteractionLocked;
-    }, [canAct, focusSection, isInteractionLocked]);
+    }, [canAct, focusSection, isInteractionLocked, shouldHoldFocusForSelfDraw]);
 
     useEffect(() => {
         const wasCanAct = previousCanActRef.current;
-        if (!wasCanAct && canAct && !isInteractionLocked) {
+        if (!wasCanAct && canAct && !isInteractionLocked && !shouldHoldFocusForSelfDraw) {
             setFocusSection('handActions');
         }
         previousCanActRef.current = canAct;
-    }, [canAct, isInteractionLocked]);
+    }, [canAct, isInteractionLocked, shouldHoldFocusForSelfDraw]);
 
     if (!isConnected) {
         return (
@@ -891,6 +1008,35 @@ const GameRoom: React.FC = () => {
 
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
+            )}
+
+            {isActiveSelfDrawNotification && (
+                <div className="draw-notification shadow" role="status" aria-label="抽牌通知">
+                    <div className="draw-notification__card-back" aria-hidden="true">
+                        <span />
+                    </div>
+                    <div className="draw-notification__content">
+                        <div className="draw-notification__title">你抽到一張新牌</div>
+                        <div className="draw-notification__actions">
+                            <button
+                                type="button"
+                                className="btn btn-outline-light btn-sm"
+                                onClick={handleDrawNotificationDismiss}
+                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'dismiss')}
+                            >
+                                稍後確認
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-light btn-sm"
+                                onClick={handleDrawNotificationViewNow}
+                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'view_now')}
+                            >
+                                現在查看
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <OpeningDealModal

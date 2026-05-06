@@ -75,12 +75,13 @@ describe('gameMotion helpers', () => {
         expect(getOpeningDealCueDuration(reduced)).toBeLessThan(getOpeningDealCueDuration(normal));
     });
 
-    test('draw cue is intentionally short and returns immediately to normal hand state', () => {
+    test('draw cue stays within 030 flip presentation budgets', () => {
         const normalCue = createDrawMotionCue('card-1', false);
         const reducedCue = createDrawMotionCue('card-1', true);
 
         expect(normalCue.kind).toBe('draw');
-        expect(normalCue.durationMs).toBeLessThanOrEqual(360);
+        expect(normalCue.durationMs).toBeLessThanOrEqual(2000);
+        expect(reducedCue.durationMs).toBeLessThanOrEqual(1000);
         expect(reducedCue.durationMs).toBeLessThan(normalCue.durationMs);
     });
 

@@ -19,6 +19,13 @@ import {
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import { buildOpeningDealModalModel } from '../../components/game/openingDealModalModel';
+import {
+    buildOpeningHandRevealModel,
+    createOpeningHandRevealSteps,
+    getOpeningHandRevealTotalMs,
+    getOpeningHandTakeEligibility,
+    OpeningHandRevealStatus
+} from '../../components/game/openingHandRevealModel';
 import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
 import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
@@ -130,9 +137,18 @@ const GameRoom: React.FC = () => {
     const previousCanActRef = useRef(false);
     const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
     const completedOpeningDealModalSequencesRef = useRef<Set<string>>(new Set());
+    const completedOpeningHandRevealSequencesRef = useRef<Set<string>>(new Set());
+    const openingHandRevealTimersRef = useRef<number[]>([]);
     const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
     const [activeOpeningDealModalSequenceId, setActiveOpeningDealModalSequenceId] = useState<string | null>(null);
+    const [openingHandRevealStatus, setOpeningHandRevealStatus] = useState<OpeningHandRevealStatus>('not_eligible');
+    const [openingHandRevealedCount, setOpeningHandRevealedCount] = useState(0);
     const prefersReducedMotion = usePrefersReducedMotion();
+
+    const clearOpeningHandRevealTimers = useCallback(() => {
+        openingHandRevealTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+        openingHandRevealTimersRef.current = [];
+    }, []);
 
     const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
         if (cues.length === 0) {
@@ -380,12 +396,39 @@ const GameRoom: React.FC = () => {
     }, [activeOpeningDealModalSequenceId, currentPlayerId, prefersReducedMotion, state.openingDeal, state.players]);
     const isOpeningDealModalActive = Boolean(openingDealModalModel);
     const isOpeningDealActive = activeOpeningDealSteps.length > 0 || isOpeningDealModalActive;
+    const openingHandEligibility = useMemo(
+        () => getOpeningHandTakeEligibility(state, currentPlayerId),
+        [currentPlayerId, state]
+    );
+    const openingHandRevealSequenceId = openingHandEligibility.sequenceId
+        ?? (roomId && currentPlayerId ? `${roomId}-${state.round}-${currentPlayerId}` : null);
+    const openingHandRevealModel = useMemo(() => buildOpeningHandRevealModel({
+        eligibility: {
+            ...openingHandEligibility,
+            isEligible: openingHandEligibility.isEligible && !isOpeningDealActive,
+            sequenceId: openingHandRevealSequenceId
+        },
+        cards: currentPlayer?.hand ?? [],
+        status: openingHandRevealStatus,
+        reducedMotion: prefersReducedMotion,
+        revealedCount: openingHandRevealedCount
+    }), [
+        currentPlayer?.hand,
+        openingHandEligibility,
+        openingHandRevealSequenceId,
+        openingHandRevealStatus,
+        openingHandRevealedCount,
+        isOpeningDealActive,
+        prefersReducedMotion
+    ]);
+    const isOpeningHandRevealBlocking = openingHandRevealModel.isInteractionBlocked;
 
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
     const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
     const isInteractionLocked = Boolean(pendingInteraction)
         || isOpeningDealActive
+        || isOpeningHandRevealBlocking
         || state.orderDecision.isOpen
         || Boolean(readyStatus)
         || isGameEnded;
@@ -394,6 +437,7 @@ const GameRoom: React.FC = () => {
         && state.players[state.currentPlayer]?.id === currentPlayerId
         && !pendingInteraction
         && !isOpeningDealActive
+        && !isOpeningHandRevealBlocking
         && !state.orderDecision.isOpen;
     const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
     const localActionTokenMap = useMemo(
@@ -428,6 +472,91 @@ const GameRoom: React.FC = () => {
 
         setActiveOpeningDealModalSequenceId(null);
     }, [activeOpeningDealModalSequenceId]);
+
+    useEffect(() => {
+        if (!openingHandRevealModel.isEligible || !openingHandRevealSequenceId) {
+            clearOpeningHandRevealTimers();
+            setOpeningHandRevealStatus('not_eligible');
+            setOpeningHandRevealedCount(0);
+            return;
+        }
+
+        if (completedOpeningHandRevealSequencesRef.current.has(openingHandRevealSequenceId)) {
+            setOpeningHandRevealStatus('revealed');
+            setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
+            return;
+        }
+
+        setOpeningHandRevealStatus((currentStatus) => {
+            if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
+                return currentStatus;
+            }
+
+            return 'pending_take';
+        });
+        setOpeningHandRevealedCount(0);
+        setFocusSection('handActions');
+    }, [
+        clearOpeningHandRevealTimers,
+        currentPlayer?.hand.length,
+        openingHandRevealModel.isEligible,
+        openingHandRevealSequenceId
+    ]);
+
+    useEffect(() => () => {
+        clearOpeningHandRevealTimers();
+    }, [clearOpeningHandRevealTimers]);
+
+    const completeOpeningHandReveal = useCallback(() => {
+        if (openingHandRevealSequenceId) {
+            completedOpeningHandRevealSequencesRef.current.add(openingHandRevealSequenceId);
+        }
+
+        clearOpeningHandRevealTimers();
+        setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
+        setOpeningHandRevealStatus('revealed');
+        setFocusSection('handActions');
+    }, [clearOpeningHandRevealTimers, currentPlayer?.hand.length, openingHandRevealSequenceId]);
+
+    const handleTakeOpeningHand = useCallback(() => {
+        if (
+            openingHandRevealStatus !== 'pending_take'
+            || !openingHandRevealModel.isEligible
+            || !currentPlayer
+        ) {
+            return;
+        }
+
+        clearOpeningHandRevealTimers();
+
+        if (prefersReducedMotion) {
+            completeOpeningHandReveal();
+            return;
+        }
+
+        const steps = createOpeningHandRevealSteps(currentPlayer.hand, false);
+        setOpeningHandRevealStatus('revealing');
+        setOpeningHandRevealedCount(0);
+
+        steps.forEach((step, index) => {
+            const timerId = window.setTimeout(() => {
+                setOpeningHandRevealedCount(index + 1);
+            }, step.delayMs + step.durationMs);
+            openingHandRevealTimersRef.current.push(timerId);
+        });
+
+        const completeTimerId = window.setTimeout(() => {
+            completeOpeningHandReveal();
+        }, getOpeningHandRevealTotalMs(steps, false));
+        openingHandRevealTimersRef.current.push(completeTimerId);
+    }, [
+        clearOpeningHandRevealTimers,
+        completeOpeningHandReveal,
+        currentPlayer,
+        openingHandRevealModel.isEligible,
+        openingHandRevealStatus,
+        prefersReducedMotion
+    ]);
 
     useEffect(() => {
         const surface = gameSurfaceRef.current;
@@ -754,6 +883,8 @@ const GameRoom: React.FC = () => {
                         prefersReducedMotion={prefersReducedMotion}
                         focusSection={focusSection}
                         openingDealSteps={activeOpeningDealSteps}
+                        openingHandReveal={openingHandRevealModel.isEligible || openingHandRevealModel.status === 'revealed' ? openingHandRevealModel : null}
+                        onTakeOpeningHand={handleTakeOpeningHand}
                     />
                 </div>
             </div>

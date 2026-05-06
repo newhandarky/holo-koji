@@ -5,6 +5,7 @@ import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
 import CompetitionGroupModal from './CompetitionGroupModal';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
+import type { OpeningHandRevealModel } from './openingHandRevealModel';
 import {
     ItemCard,
     ActionType,
@@ -37,6 +38,8 @@ interface GameBoardProps {
     prefersReducedMotion?: boolean;
     // 目前房間聚焦區塊
     focusSection: FocusSection;
+    openingHandReveal?: OpeningHandRevealModel | null;
+    onTakeOpeningHand?: () => void;
 }
 
 export type FocusSection = 'info' | 'characterBoard' | 'handActions';
@@ -52,7 +55,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     motionCues = [],
     openingDealSteps = [],
     prefersReducedMotion = false,
-    focusSection
+    focusSection,
+    openingHandReveal = null,
+    onTakeOpeningHand
 }) => {
     const activeGeishaSet: GeishaSet = state.geishaSet ?? 'default';
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
@@ -68,6 +73,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const opponentState = state.players.find((player) => player.id !== playerId) ?? null;
     const isCharacterExpanded = focusSection === 'characterBoard';
     const isHandExpanded = focusSection === 'handActions';
+    const isOpeningHandInteractionBlocked = Boolean(openingHandReveal?.isInteractionBlocked);
 
     // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
@@ -220,7 +226,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {
-        if (!isMyTurn || !myState) {
+        if (!isMyTurn || !myState || isOpeningHandInteractionBlocked) {
             return;
         }
 
@@ -279,6 +285,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
     // 競爭分組選擇完成後送出行動
     const handleCompetitionConfirm = (groups: string[][]) => {
+        if (isOpeningHandInteractionBlocked) {
+            return;
+        }
+
         onSendAction({
             type: 'INITIATE_COMPETITION',
             payload: {
@@ -299,8 +309,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
     // 更新選牌狀態並同步給父層
     const handleCardSelect = useCallback((cards: ItemCard[]) => {
+        if (isOpeningHandInteractionBlocked) {
+            return;
+        }
+
         setSelectedCards(cards);
-    }, []);
+    }, [isOpeningHandInteractionBlocked]);
 
     if (!myState) {
         return null;
@@ -398,13 +412,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
                                 motionCues={handMotionCues}
                                 prefersReducedMotion={prefersReducedMotion}
                                 openingDealSteps={openingDealSteps}
+                                openingHandReveal={openingHandReveal}
+                                onTakeOpeningHand={onTakeOpeningHand}
                             />
                         </div>
                         <div className="game-hand-actions-panel__footer">
                             <ActionTokens
                                 tokens={myState.actionTokens}
                                 onAction={handleAction}
-                                disabled={!isMyTurn}
+                                disabled={!isMyTurn || isOpeningHandInteractionBlocked}
                                 usedCards={{
                                     secret: myState.secretCards,
                                     'trade-off': myState.discardedCards

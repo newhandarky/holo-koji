@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ItemCard, GeishaSet } from "game-shared-types"
 import { getItemCardImage, getItemCardLabel, getGeishaCharmById } from '../../utils/gameData';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
+import type { OpeningHandRevealModel } from './openingHandRevealModel';
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌
@@ -17,6 +18,8 @@ interface Props {
     motionCues?: MotionCue[];
     prefersReducedMotion?: boolean;
     openingDealSteps?: OpeningDealCueStep[];
+    openingHandReveal?: OpeningHandRevealModel | null;
+    onTakeOpeningHand?: () => void;
 }
 
 // 玩家手牌區顯示與選牌
@@ -29,7 +32,9 @@ const PlayerHand: React.FC<Props> = ({
     geishaSet,
     motionCues = [],
     prefersReducedMotion = false,
-    openingDealSteps = []
+    openingDealSteps = [],
+    openingHandReveal = null,
+    onTakeOpeningHand
 }) => {
     // 本地維護選擇狀態
     const [selected, setSelected] = useState<ItemCard[]>([]);
@@ -51,6 +56,12 @@ const PlayerHand: React.FC<Props> = ({
     const selfDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'self'), [openingDealSteps]);
     const opponentDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'opponent'), [openingDealSteps]);
     const isOpeningDealActive = openingDealSteps.length > 0;
+    const isOpeningHandConcealed = Boolean(openingHandReveal?.isConcealed);
+    const isOpeningHandRevealing = openingHandReveal?.status === 'revealing';
+    const isOpeningHandInteractionBlocked = Boolean(openingHandReveal?.isInteractionBlocked);
+    const revealVisibleCardIds = useMemo(() => new Set(
+        openingHandReveal?.steps.filter((step) => step.visible).map((step) => step.cardId) ?? []
+    ), [openingHandReveal?.steps]);
 
     // 當手牌變更時重置選牌狀態，避免選到舊牌
     useEffect(() => {
@@ -115,6 +126,10 @@ const PlayerHand: React.FC<Props> = ({
 
     // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
     const toggleCard = (card: ItemCard) => {
+        if (isOpeningHandInteractionBlocked) {
+            return;
+        }
+
         setSelected((prevSelected) => {
             setFocusedCardId(card.id);
             const exists = prevSelected.some(c => c.id === card.id);
@@ -202,6 +217,8 @@ const PlayerHand: React.FC<Props> = ({
                             const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
                             const isSelected = selectedIdSet.has(card.id);
                             const isFocused = focusedCardId === card.id;
+                            const isConcealedCard = isOpeningHandConcealed && !revealVisibleCardIds.has(card.id);
+                            const revealStep = openingHandReveal?.steps.find((step) => step.cardId === card.id);
 
                             return (
                                 <button
@@ -219,24 +236,37 @@ const PlayerHand: React.FC<Props> = ({
                                         prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
                                     } ${
                                         hasCardImage ? '' : 'item-card--missing-artwork'
+                                    } ${
+                                        isConcealedCard ? 'item-card--opening-concealed' : ''
+                                    } ${
+                                        isOpeningHandRevealing && !isConcealedCard ? 'item-card--opening-revealed' : ''
                                     }`}
+                                    disabled={isOpeningHandInteractionBlocked}
                                     aria-pressed={isSelected}
+                                    aria-label={isConcealedCard ? `開局手牌 ${index + 1}` : undefined}
                                     onClick={() => toggleCard(card)}
                                     style={{
-                                        backgroundImage: hasCardImage ? `url(${cardImage})` : 'none',
+                                        backgroundImage: isConcealedCard ? 'none' : hasCardImage ? `url(${cardImage})` : 'none',
                                         ['--fan-index' as string]: `${relativeIndex}`,
                                         ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
                                         ['--fan-abs-index' as string]: `${absRelative}`,
                                         ['--fan-z-index' as string]: `${stackLevel}`,
-                                        ['--motion-delay' as string]: `${drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
-                                        ['--motion-duration' as string]: `${drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
+                                        ['--motion-delay' as string]: `${revealStep?.delayMs ?? drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
+                                        ['--motion-duration' as string]: `${revealStep?.durationMs ?? drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
                                     }}
                                 >
                                     <div className="item-card__overlay" />
-                                    {!hasCardImage && (
+                                    {isConcealedCard && (
+                                        <div className="item-card__opening-back" aria-hidden="true">
+                                            <span />
+                                        </div>
+                                    )}
+                                    {!isConcealedCard && !hasCardImage && (
                                         <div className="item-card__fallback-label">{fallbackLabel}</div>
                                     )}
-                                    <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
+                                    {!isConcealedCard && (
+                                        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
+                                    )}
                                     {isSelected && (
                                         <div className="item-card__selected-check" aria-hidden="true">✓</div>
                                     )}
@@ -247,6 +277,18 @@ const PlayerHand: React.FC<Props> = ({
                             );
                         })}
                     </div>
+
+                    {openingHandReveal?.status === 'pending_take' && (
+                        <div className="opening-hand-gate" role="status" aria-label="開局手牌可拿取">
+                            <button
+                                type="button"
+                                className="opening-hand-gate__button"
+                                onClick={onTakeOpeningHand}
+                            >
+                                拿取手牌
+                            </button>
+                        </div>
+                    )}
 
                     <div className="player-hand-controls">
                         <button

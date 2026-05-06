@@ -222,6 +222,29 @@ code {
   color: rgba(255, 241, 221, 0.92);
 }
 
+.lobby-hero__aside {
+  display: grid;
+  gap: 16px;
+  max-width: 34rem;
+  margin-top: 28px;
+}
+
+.lobby-hero__aside .form-label,
+.lobby-hero__aside .form-text {
+  color: var(--ginza-muted-text);
+}
+
+.lobby-hero__aside .form-control,
+.lobby-hero__aside .form-select {
+  background: rgba(16, 8, 10, 0.72);
+  border: 1px solid rgba(255, 236, 208, 0.16);
+  color: var(--ginza-readable-text);
+}
+
+.lobby-hero__aside .form-control::placeholder {
+  color: rgba(255, 247, 236, 0.42);
+}
+
 .lobby-hero__diagnostics {
   margin-top: 34px;
   padding: 0;
@@ -468,47 +491,6 @@ code {
   border-color: rgba(255, 224, 180, 0.28);
 }
 
-.lobby-ai-difficulty {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.lobby-ai-difficulty__option {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 72px;
-  padding: 10px;
-  border: 1px solid rgba(255, 236, 208, 0.14);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-}
-
-.lobby-ai-difficulty__option.is-active {
-  background: linear-gradient(135deg, rgba(191, 40, 66, 0.34), rgba(255, 190, 129, 0.16));
-  border-color: rgba(255, 224, 180, 0.28);
-}
-
-.lobby-ai-difficulty__copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.lobby-ai-difficulty__label {
-  color: var(--ginza-readable-text);
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.lobby-ai-difficulty__description {
-  color: rgba(255, 241, 221, 0.72);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
 .lobby-character-selection {
   display: grid;
   gap: 10px;
@@ -689,10 +671,6 @@ code {
   }
 
   .lobby-mode-toggle {
-    grid-template-columns: 1fr;
-  }
-
-  .lobby-ai-difficulty {
     grid-template-columns: 1fr;
   }
 
@@ -1149,15 +1127,18 @@ code {
   flex-direction: column;
   gap: 12px;
   max-width: min(70%, 136px);
+  overflow: visible;
 }
 
 .geisha-card__name {
   color: #fff8ef;
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1.28;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .geisha-card__overlay-meta {
@@ -1167,14 +1148,14 @@ code {
 
 .geisha-card__slot-icon-wrap {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   flex: 0 0 auto;
 }
 
 .geisha-card__slot-icon {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   border-radius: 0;
   display: inline-flex;
   align-items: center;
@@ -1207,8 +1188,8 @@ code {
 }
 
 .geisha-card__slot-icon-fallback {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1265,8 +1246,8 @@ code {
 }
 
 .geisha-card__count-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: calc(0.68rem + 8px);
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   overflow: hidden;
@@ -1274,8 +1255,8 @@ code {
 }
 
 .geisha-card__count-value {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: calc(1rem + 8px);
+  font-weight: 800;
   flex: 0 0 auto;
 }
 
@@ -3093,22 +3074,26 @@ code {
   }
 
   .geisha-card__name {
-    font-size: 16px;
+    font-size: 24px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .geisha-card__slot-icon-wrap {
-    width: 42px;
-    height: 42px;
+    width: 64px;
+    height: 64px;
   }
 
   .geisha-card__slot-icon {
-    width: 42px;
-    height: 42px;
+    width: 64px;
+    height: 64px;
   }
 
   .geisha-card__slot-icon-fallback {
-    width: 42px;
-    height: 42px;
+    width: 64px;
+    height: 64px;
   }
 
   .geisha-card__charm-badge {
@@ -3125,11 +3110,13 @@ code {
   }
 
   .geisha-card__count-label {
-    font-size: 0.56rem;
+    font-size: calc(0.56rem + 8px);
+    font-weight: 800;
   }
 
   .geisha-card__count-value {
-    font-size: 0.88rem;
+    font-size: calc(0.88rem + 8px);
+    font-weight: 800;
   }
 
   .geisha-card__motion-cue {

@@ -26,7 +26,6 @@ const renderCard = (card: ItemCard, getCharmByGeishaId?: (geishaId: number) => n
         style={{ backgroundImage: `url(${getItemCardImage(card, geishaSet ?? 'default')})` }}
     >
         <div className="item-card__overlay" />
-        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
     </div>
 );
 

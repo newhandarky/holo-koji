@@ -73,7 +73,7 @@ const makeState = (overrides: Partial<GameState> = {}): GameState => ({
 });
 
 describe('openingHandRevealModel', () => {
-    test('marks opening take eligible only for completed opening deal with starting hand and unused actions', () => {
+    test('marks opening take eligible for a completed opening deal with starting hand and unused actions', () => {
         const eligibility = getOpeningHandTakeEligibility(makeState(), 'p1');
 
         expect(eligibility).toMatchObject({
@@ -83,6 +83,24 @@ describe('openingHandRevealModel', () => {
             isStartingHandCount: true,
             hasUsedAnyActionToken: false,
             hasPendingInteraction: false,
+            isEligible: true,
+            sequenceId: 'opening-1'
+        });
+    });
+
+    test('keeps opening take eligible after replay is marked not replayable by an opponent action', () => {
+        const eligibility = getOpeningHandTakeEligibility(makeState({
+            openingDeal: {
+                sequenceId: 'opening-1',
+                status: 'not_replayable',
+                completed: true,
+                replayable: false,
+                steps: []
+            }
+        }), 'p1');
+
+        expect(eligibility).toMatchObject({
+            openingDealCompleted: true,
             isEligible: true,
             sequenceId: 'opening-1'
         });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { gameWebSocket } from '../../services/websocket';
 import Lobby from './index';
@@ -221,39 +221,42 @@ describe('Lobby character set selection', () => {
         );
     });
 
-    test('npc mode renders canonical AI difficulty labels and descriptions only', async () => {
+    test('npc mode renders canonical AI difficulty dropdown labels and descriptions only', async () => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
 
-        const difficultyGroup = screen.getByRole('radiogroup', { name: 'AI 難度' });
-        const difficultyRadios = within(difficultyGroup).getAllByRole('radio');
+        const difficultySelect = screen.getByRole('combobox', { name: 'AI 難度' });
+        const difficultyOptions = Array.from(difficultySelect.querySelectorAll('option'));
 
-        expect(difficultyRadios).toHaveLength(AI_DIFFICULTY_OPTIONS.length);
-        expect(difficultyRadios.map((radio) => radio.getAttribute('value'))).toEqual(
+        expect(difficultyOptions).toHaveLength(AI_DIFFICULTY_OPTIONS.length);
+        expect(difficultyOptions.map((option) => option.getAttribute('value'))).toEqual(
             AI_DIFFICULTY_OPTIONS.map((option) => option.value)
         );
 
         AI_DIFFICULTY_OPTIONS.forEach((option) => {
-            expect(within(difficultyGroup).getByText(option.label)).toBeInTheDocument();
-            expect(within(difficultyGroup).getByText(option.description)).toBeInTheDocument();
+            expect(screen.getByRole('option', { name: `${option.label} - ${option.description}` })).toBeInTheDocument();
         });
+        expect(difficultySelect).toHaveValue('easy');
+        expect(screen.getByText('適合初次體驗')).toBeInTheDocument();
 
         ['しぐれうい', '大空スバル', '兎田ぺこら', '猫又おかゆ', 'ときのそら'].forEach((personName) => {
-            expect(within(difficultyGroup).queryByText(personName)).not.toBeInTheDocument();
+            expect(screen.queryByText(personName)).not.toBeInTheDocument();
         });
     });
 
-    test('npc difficulty control supports keyboard selection', async () => {
+    test('npc difficulty control supports compact selection', async () => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
 
-        const hardDifficulty = screen.getByRole('radio', { name: /偏強/ });
-        hardDifficulty.focus();
-        await userEvent.keyboard(' ');
+        const difficultySelect = screen.getByRole('combobox', { name: 'AI 難度' });
+        difficultySelect.focus();
+        await userEvent.selectOptions(difficultySelect, 'hard');
 
-        expect(hardDifficulty).toBeChecked();
+        expect(difficultySelect).toHaveFocus();
+        expect(difficultySelect).toHaveValue('hard');
+        expect(screen.getByText('需要穩定判斷')).toBeInTheDocument();
     });
 
     test('untouched npc room creation still uses default Ginza set', async () => {
@@ -279,7 +282,7 @@ describe('Lobby character set selection', () => {
     test('online mode does not render active AI difficulty content', async () => {
         renderLobby();
 
-        expect(screen.queryByRole('radiogroup', { name: 'AI 難度' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('combobox', { name: 'AI 難度' })).not.toBeInTheDocument();
         expect(screen.queryByText('適合初次體驗')).not.toBeInTheDocument();
     });
 
@@ -287,22 +290,22 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.click(screen.getByRole('radio', { name: /地獄/ }));
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'hell');
 
-        expect(screen.getByRole('radio', { name: /地獄/ })).toBeChecked();
+        expect(screen.getByRole('combobox', { name: 'AI 難度' })).toHaveValue('hell');
 
         await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
-        expect(screen.queryByRole('radiogroup', { name: 'AI 難度' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('combobox', { name: 'AI 難度' })).not.toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        expect(screen.getByRole('radio', { name: /地獄/ })).toBeChecked();
+        expect(screen.getByRole('combobox', { name: 'AI 難度' })).toHaveValue('hell');
     });
 
     test.each(AI_DIFFICULTY_OPTIONS)('npc room creation maps displayed $label difficulty to $value', async (option) => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.click(screen.getByRole('radio', { name: new RegExp(option.label) }));
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), option.value);
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), `npc-${option.value}`);
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
@@ -322,7 +325,7 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.click(screen.getByRole('radio', { name: /超強/ }));
+        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'expert');
         await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'online-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
@@ -381,6 +384,17 @@ describe('Lobby character set selection', () => {
         expect(screen.getByRole('button', { name: '系統診斷' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeInTheDocument();
+    });
+
+    test('join room block stays in the right lobby panel while achievements stay on the hero side', () => {
+        const { container } = renderLobby();
+
+        const lobbyPanel = container.querySelector('.lobby-panel');
+        const lobbyHero = container.querySelector('.lobby-hero');
+
+        expect(lobbyPanel).toContainElement(screen.getByRole('button', { name: '🚪 加入房間' }));
+        expect(lobbyHero).not.toContainElement(screen.getByRole('button', { name: '🚪 加入房間' }));
+        expect(lobbyHero).toContainElement(screen.getByRole('button', { name: /成就/ }));
     });
 
     test('temporarily unavailable sets stay visible but disabled', () => {

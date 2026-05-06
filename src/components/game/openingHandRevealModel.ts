@@ -55,7 +55,7 @@ export const getOpeningHandTakeEligibility = (
     const openingDealCompleted = Boolean(
         state.openingDeal
         && state.openingDeal.completed
-        && state.openingDeal.status === 'completed'
+        && state.openingDeal.status !== 'pending'
     );
     const phaseIsPlaying = state.phase === 'playing';
     const ownHandCount = currentPlayer?.hand.length ?? 0;

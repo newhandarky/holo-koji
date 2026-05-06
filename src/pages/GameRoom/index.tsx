@@ -37,7 +37,7 @@ import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
 import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
-import { getGeishaCharmById, getItemCardImage } from '../../utils/gameData';
+import { getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';
 
 // 建立玩家初始行動指示物
@@ -972,7 +972,6 @@ const GameRoom: React.FC = () => {
                                                                             style={{ backgroundImage: `url(${getItemCardImage(card, activeGeishaSet)})` }}
                                                                         >
                                                                             <div className="item-card__overlay" />
-                                                                            <div className="item-card__badge">魅力 {getGeishaCharmById(card.geishaId)}</div>
                                                                         </div>
                                                                     ))}
                                                                 </div>

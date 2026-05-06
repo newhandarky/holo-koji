@@ -2,10 +2,11 @@ import React from 'react';
 
 interface LobbyBrandSurfaceProps {
     onOpenDiagnostics: () => void;
+    heroAside?: React.ReactNode;
     children: React.ReactNode;
 }
 
-const LobbyBrandSurface: React.FC<LobbyBrandSurfaceProps> = ({ onOpenDiagnostics, children }) => (
+const LobbyBrandSurface: React.FC<LobbyBrandSurfaceProps> = ({ onOpenDiagnostics, heroAside, children }) => (
     <div className="lobby-shell">
         <section className="lobby-hero" aria-label="銀座十字路品牌首頁">
             <div className="lobby-hero__eyebrow">Ginza Crossroads</div>
@@ -18,6 +19,11 @@ const LobbyBrandSurface: React.FC<LobbyBrandSurfaceProps> = ({ onOpenDiagnostics
                 <span>房間對戰</span>
                 <span>NPC 練習</span>
             </div>
+            {heroAside && (
+                <div className="lobby-hero__aside">
+                    {heroAside}
+                </div>
+            )}
             <button
                 type="button"
                 className="lobby-hero__diagnostics"

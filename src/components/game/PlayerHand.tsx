@@ -1,7 +1,7 @@
 // src/components/game/PlayerHand.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ItemCard, GeishaSet } from "game-shared-types"
-import { getItemCardImage, getItemCardLabel, getGeishaCharmById } from '../../utils/gameData';
+import { getItemCardImage, getItemCardLabel } from '../../utils/gameData';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import type { OpeningHandRevealModel } from './openingHandRevealModel';
 
@@ -297,9 +297,6 @@ const PlayerHand: React.FC<Props> = ({
                                     )}
                                     {!isConcealedCard && !isDrawBackVisible && !hasCardImage && (
                                         <div className="item-card__fallback-label">{fallbackLabel}</div>
-                                    )}
-                                    {!isConcealedCard && !isDrawBackVisible && (
-                                        <div className="item-card__badge">魅力 {getCharmByGeishaId?.(card.geishaId) ?? getGeishaCharmById(card.geishaId)}</div>
                                     )}
                                     {isSelected && (
                                         <div className="item-card__selected-check" aria-hidden="true">✓</div>

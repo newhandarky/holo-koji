@@ -1,4 +1,6 @@
 /* 全局重置與字體設定 */
+@import './components/game/OpeningDealModal.css';
+
 :root {
   --ginza-bg:
     radial-gradient(circle at 28% 22%, rgba(184, 28, 42, 0.42) 0, rgba(184, 28, 42, 0) 34%),

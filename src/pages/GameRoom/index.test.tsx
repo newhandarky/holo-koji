@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { OpeningDealSummary } from 'game-shared-types';
 import GameRoom from './index';
@@ -130,6 +130,25 @@ jest.mock('../../components/game/gameMotion', () => {
 });
 
 const mockShareRoomInvite = shareRoomInvite as jest.MockedFunction<typeof shareRoomInvite>;
+const { usePrefersReducedMotion } = jest.requireMock('../../components/game/gameMotion') as {
+    usePrefersReducedMotion: jest.Mock;
+};
+
+const makeOpeningDeal = (overrides: Partial<OpeningDealSummary> = {}): OpeningDealSummary => ({
+    sequenceId: 'opening-room-1-round-1',
+    status: 'completed',
+    completed: true,
+    replayable: true,
+    steps: [
+        { type: 'BURN_HIDDEN_CARD', order: 0, targetZone: 'hidden-reserve' },
+        ...Array.from({ length: 6 }, (_, index) => ([
+            { type: 'DEAL_CARD_BACK' as const, order: index * 2 + 1, targetPlayerId: 'p1', cardIndex: index + 1 },
+            { type: 'DEAL_CARD_BACK' as const, order: index * 2 + 2, targetPlayerId: 'p2', cardIndex: index + 1 }
+        ])).flat(),
+        { type: 'OPENING_DEAL_COMPLETE', order: 13 }
+    ],
+    ...overrides
+});
 
 describe('GameRoom character set room surface', () => {
     beforeEach(() => {
@@ -170,6 +189,8 @@ describe('GameRoom character set room surface', () => {
         mockShareRoomInvite.mockReset();
         mockHookState.consumeDealEvent.mockReset();
         mockHookState.consumeDrawEvent.mockReset();
+        usePrefersReducedMotion.mockReturnValue(false);
+        delete (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal;
     });
 
     afterEach(() => {
@@ -229,23 +250,118 @@ describe('GameRoom character set room surface', () => {
         expect(mockHookState.consumeDealEvent).toHaveBeenCalled();
     });
 
-    test('tolerates optional server opening deal summary without changing current UI flow', () => {
-        const openingDeal: OpeningDealSummary = {
-            sequenceId: 'opening-room-1-round-1',
-            status: 'completed',
-            completed: true,
-            replayable: true,
-            steps: [
-                { type: 'BURN_HIDDEN_CARD', order: 0, targetZone: 'hidden-reserve' },
-                { type: 'OPENING_DEAL_COMPLETE', order: 1 }
-            ]
-        };
+    test('opens opening deal modal from replayable safe opening deal summary', () => {
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+
+        render(<GameRoom />);
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+        expect(screen.getByLabelText('中央牌堆')).toBeInTheDocument();
+        expect(screen.getByLabelText('隱藏保留牌')).toBeInTheDocument();
+        expect(screen.getByText('先手方向 玩家一（你）')).toBeInTheDocument();
+        expect(screen.getByText('後手方向 玩家二（對手）')).toBeInTheDocument();
+        expect(screen.getByText('先手 6')).toBeInTheDocument();
+        expect(screen.getByText('後手 6')).toBeInTheDocument();
+    });
+
+    test('opening deal modal blocks behind-game actions while visible', () => {
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+
+        render(<GameRoom />);
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
+    });
+
+    test('opening deal modal makes behind-game surface inert and owns keyboard focus', () => {
+        const { rerender } = render(<GameRoom />);
+        const infoTab = screen.getByRole('button', { name: '資訊' });
+        const gameSurface = screen.getByTestId('game-board').parentElement;
+
+        infoTab.focus();
+        expect(document.activeElement).toBe(infoTab);
+
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        rerender(<GameRoom />);
+
+        const dialog = screen.getByRole('dialog', { name: '開局發牌' });
+        expect(dialog).toHaveFocus();
+        expect(gameSurface).toHaveAttribute('inert');
+        expect(gameSurface).toHaveAttribute('aria-hidden', 'true');
+
+        fireEvent.keyDown(dialog, { key: 'Enter' });
+
+        expect(infoTab).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('opening deal modal auto-closes within six seconds without changing existing own-hand visibility', () => {
+        (mockState.players[0] as any).hand = [
+            { id: 'my-card-1', geishaId: 1, type: 'real' } as any
+        ];
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+
+        render(<GameRoom />);
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+
+        act(() => {
+            jest.advanceTimersByTime(6000);
+        });
+
+        expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
+    });
+
+    test('opening deal modal output does not expose forbidden card identity fields', () => {
+        const openingDeal = makeOpeningDeal() as OpeningDealSummary & { removedCard?: unknown };
+        openingDeal.removedCard = { id: 'removed-secret-card', geishaId: 7, itemImageUrl: '/secret.png' };
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = openingDeal;
 
         render(<GameRoom />);
 
-        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
         expect(screen.queryByText('opening-room-1-round-1')).not.toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('removed-secret-card');
+        expect(document.body.textContent).not.toContain('geishaId');
+        expect(document.body.textContent).not.toContain('itemImageUrl');
+    });
+
+    test('reduced motion opening deal modal completes through short path', () => {
+        usePrefersReducedMotion.mockReturnValue(true);
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+
+        render(<GameRoom />);
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+
+        act(() => {
+            jest.advanceTimersByTime(2000);
+        });
+
+        expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
+    });
+
+    test('replayable reconnect restarts opening deal modal from the beginning', () => {
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+
+        const { unmount } = render(<GameRoom />);
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+        unmount();
+
+        render(<GameRoom />);
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+    });
+
+    test('not replayable opening deal skips full modal replay', () => {
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal({
+            status: 'not_replayable',
+            replayable: false
+        });
+
+        render(<GameRoom />);
+
+        expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
 
         delete (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal;
     });

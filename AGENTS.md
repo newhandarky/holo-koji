@@ -59,6 +59,13 @@
 - For each new spec, create and **switch to** the dedicated feature branch before editing code or spec artifacts.
 - Do not continue implementation for a new spec on the current branch just because the branch name was created elsewhere; verify the active branch explicitly first.
 - If the working tree still contains uncommitted changes from a previous spec, stop and resolve that branch hygiene issue before creating or switching to the next spec branch.
+- When running `speckit-clarify`, every clarification prompt MUST visibly include the full question before any recommendation or options. Use this structure exactly:
+  - `## Clarification Question N`
+  - `**Question:** <complete question text>`
+  - `**Recommended:** Option X - <reason>`
+  - options table
+  - reply instruction
+- Do not accept or process a bare option letter, `yes`, `recommended`, or `suggested` unless the immediately preceding assistant message visibly contained `**Question:**` plus the full options. If the question line was omitted, re-render the same question instead of continuing.
 
 ## Implementation Rules
 

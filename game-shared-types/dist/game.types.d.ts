@@ -65,6 +65,26 @@ export interface OrderDecision {
     waitingFor: string[];
     currentPlayer: string;
 }
+export type OpeningDealStep = {
+    type: 'BURN_HIDDEN_CARD';
+    order: number;
+    targetZone: 'hidden-reserve';
+} | {
+    type: 'DEAL_CARD_BACK';
+    order: number;
+    targetPlayerId: string;
+    cardIndex: number;
+} | {
+    type: 'OPENING_DEAL_COMPLETE';
+    order: number;
+};
+export interface OpeningDealSummary {
+    sequenceId: string;
+    status: 'pending' | 'completed' | 'not_replayable';
+    steps: OpeningDealStep[];
+    completed: boolean;
+    replayable: boolean;
+}
 export type GeishaSet = 'default' | 'collaboration' | 'hololive';
 export type RoomSetupMode = 'random' | 'custom';
 export interface CharacterProfile {
@@ -170,6 +190,10 @@ export interface GameState {
     drawPile: ItemCard[];
     discardPile: ItemCard[];
     removedCard?: ItemCard;
+    openingDeal?: OpeningDealSummary;
+    settlement?: {
+        removedCard?: ItemCard;
+    };
     pendingInteraction: PendingInteraction | null;
     lastAction?: {
         playerId: string;

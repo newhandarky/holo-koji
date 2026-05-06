@@ -1,6 +1,7 @@
 import React, { act } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { OpeningDealSummary } from 'game-shared-types';
 import GameRoom from './index';
 import { shareRoomInvite } from '../../utils/lineLiff';
 
@@ -226,6 +227,27 @@ describe('GameRoom character set room surface', () => {
         });
 
         expect(mockHookState.consumeDealEvent).toHaveBeenCalled();
+    });
+
+    test('tolerates optional server opening deal summary without changing current UI flow', () => {
+        const openingDeal: OpeningDealSummary = {
+            sequenceId: 'opening-room-1-round-1',
+            status: 'completed',
+            completed: true,
+            replayable: true,
+            steps: [
+                { type: 'BURN_HIDDEN_CARD', order: 0, targetZone: 'hidden-reserve' },
+                { type: 'OPENING_DEAL_COMPLETE', order: 1 }
+            ]
+        };
+        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = openingDeal;
+
+        render(<GameRoom />);
+
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
+        expect(screen.queryByText('opening-room-1-round-1')).not.toBeInTheDocument();
+
+        delete (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal;
     });
 
     test('draw cue stays local to the receiving player and clears quickly', () => {

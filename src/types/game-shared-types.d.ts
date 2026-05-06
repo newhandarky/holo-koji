@@ -61,6 +61,31 @@ declare module 'game-shared-types' {
         };
     }
 
+    export type OpeningDealStep =
+        | {
+            type: 'BURN_HIDDEN_CARD';
+            order: number;
+            targetZone: 'hidden-reserve';
+        }
+        | {
+            type: 'DEAL_CARD_BACK';
+            order: number;
+            targetPlayerId: string;
+            cardIndex: number;
+        }
+        | {
+            type: 'OPENING_DEAL_COMPLETE';
+            order: number;
+        };
+
+    export interface OpeningDealSummary {
+        sequenceId: string;
+        status: 'pending' | 'completed' | 'not_replayable';
+        steps: OpeningDealStep[];
+        completed: boolean;
+        replayable: boolean;
+    }
+
     export type AchievementId =
         | 'first_completed_match'
         | 'first_win'
@@ -117,6 +142,7 @@ declare module 'game-shared-types' {
 
     export interface GameState {
         geishaSet?: GeishaSetKey;
+        openingDeal?: OpeningDealSummary;
     }
 
     export interface Player {

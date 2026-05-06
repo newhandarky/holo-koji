@@ -36,11 +36,15 @@ const Lobby: React.FC = () => {
     const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
     const [achievementStatus, setAchievementStatus] = useState<AchievementStatusResult | null>(null);
     const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false);
+    const [invitedRoom, setInvitedRoom] = useState<{ roomId: string; source: 'query' | 'liff' } | null>(null);
+    const [inviteRecovery, setInviteRecovery] = useState<{ roomId: string; reason: string; message: string } | null>(null);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
     const accountSyncStartedRef = useRef(false);
+    const pendingJoinRoomRef = useRef<string | null>(null);
+    const invitedRoomRef = useRef<{ roomId: string; source: 'query' | 'liff' } | null>(null);
     const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
     const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
         ? accountSyncResult.guestNotice
@@ -52,6 +56,10 @@ const Lobby: React.FC = () => {
         playerNameRef.current = playerName;
     }, [playerName]);
 
+    useEffect(() => {
+        invitedRoomRef.current = invitedRoom;
+    }, [invitedRoom]);
+
     // 若網址帶 roomId，預填加入房間欄位
     useEffect(() => {
         const { roomId: invitedRoomId, source } = getInviteRoomIdFromLocation();
@@ -60,6 +68,7 @@ const Lobby: React.FC = () => {
         const normalizedRoomId = invitedRoomId.toUpperCase();
         setRoomId(normalizedRoomId);
         setMatchMode('online');
+        setInvitedRoom({ roomId: normalizedRoomId, source: source === 'liff' ? 'liff' : 'query' });
 
         if (source === 'liff') {
             const nextParams = new URLSearchParams(window.location.search);
@@ -245,11 +254,42 @@ const Lobby: React.FC = () => {
         };
 
         // 收到伺服器錯誤時提示使用者
+        const resolveInviteRecovery = (payload: any) => {
+            const code = typeof payload?.code === 'string' ? payload.code : '';
+            const message = typeof payload?.message === 'string' ? payload.message : '無法加入房間';
+            if (code === 'ROOM_NOT_FOUND' || message === '房間不存在') {
+                return { reason: 'missing', message: '找不到這個邀請房間。請確認房號，或請對方重送邀請。' };
+            }
+            if (code === 'ROOM_FULL' || message === '房間已滿') {
+                return { reason: 'full', message: '這個邀請房間已滿。請對方重送邀請，或回到大廳建立新房間。' };
+            }
+            if (code === 'ROOM_ALREADY_STARTED') {
+                return { reason: 'started', message: '這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。' };
+            }
+            if (code === 'INVALID_JOIN_REQUEST' || message === '缺少 roomId 或 playerId') {
+                return { reason: 'invalid', message: '這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。' };
+            }
+            return { reason: 'unknown', message: '目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。' };
+        };
+
         const handleError = (payload: any) => {
             frontendLogger.error('❌ [Lobby] 伺服器錯誤', {
-                message: typeof payload?.message === 'string' ? payload.message : 'unknown'
+                message: typeof payload?.message === 'string' ? payload.message : 'unknown',
+                code: typeof payload?.code === 'string' ? payload.code : undefined
             });
             setIsConnecting(false);
+            const pendingJoinRoom = pendingJoinRoomRef.current;
+            pendingJoinRoomRef.current = null;
+            if (pendingJoinRoom && invitedRoomRef.current?.roomId === pendingJoinRoom) {
+                const recovery = resolveInviteRecovery(payload);
+                setInviteRecovery({
+                    roomId: pendingJoinRoom,
+                    reason: recovery.reason,
+                    message: recovery.message
+                });
+                return;
+            }
+
             alert(`錯誤: ${payload.message}`);
         };
 
@@ -296,6 +336,8 @@ const Lobby: React.FC = () => {
     const joinRoom = () => {
         if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
         setIsConnecting(true);
+        pendingJoinRoomRef.current = roomId;
+        setInviteRecovery(null);
         frontendLogger.diagnostic('🐞 [Lobby] 加入房間摘要', {
             roomId,
             playerId: playerName
@@ -368,6 +410,28 @@ const Lobby: React.FC = () => {
             });
     };
 
+    const invitedRoomNotice = invitedRoom
+        ? `已從邀請連結帶入房間 ${invitedRoom.roomId}，確認玩家名稱後再加入。`
+        : undefined;
+
+    const copyInviteRoomId = async () => {
+        if (!inviteRecovery?.roomId) return;
+        try {
+            await navigator.clipboard.writeText(inviteRecovery.roomId);
+        } catch {
+            const textArea = document.createElement('textarea');
+            textArea.value = inviteRecovery.roomId;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
+    };
+
+    const clearInviteRecovery = () => {
+        setInviteRecovery(null);
+    };
+
     return (
         <div className="lobby-background">
             <div className="container-fluid px-3 px-md-4 py-4 py-md-5">
@@ -430,6 +494,8 @@ const Lobby: React.FC = () => {
                         canJoinRoom={canJoinRoom}
                         hasUnavailableCharacterSet={hasUnavailableCharacterSet}
                         accountGuestNotice={accountGuestNotice}
+                        invitedRoomNotice={invitedRoomNotice}
+                        inviteRecovery={inviteRecovery}
                         onPlayerNameChange={setPlayerName}
                         onRoomIdChange={setRoomId}
                         onMatchModeChange={setMatchMode}
@@ -437,6 +503,8 @@ const Lobby: React.FC = () => {
                         onGeishaSetChange={handleGeishaSetChange}
                         onSetupModeChange={handleSetupModeChange}
                         onCharacterSelectionToggle={toggleCharacterSelection}
+                        onCopyInviteRoomId={copyInviteRoomId}
+                        onClearInviteRecovery={clearInviteRecovery}
                         onCreateRoom={createRoom}
                         onJoinRoom={joinRoom}
                     />

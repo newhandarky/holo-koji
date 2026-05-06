@@ -1,6 +1,8 @@
 import React, { act } from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import GameRoom from './index';
+import { shareRoomInvite } from '../../utils/lineLiff';
 
 const mockNavigate = jest.fn();
 const mockSendGameAction = jest.fn();
@@ -126,10 +128,37 @@ jest.mock('../../components/game/gameMotion', () => {
     };
 });
 
+const mockShareRoomInvite = shareRoomInvite as jest.MockedFunction<typeof shareRoomInvite>;
+
 describe('GameRoom character set room surface', () => {
     beforeEach(() => {
         jest.useFakeTimers();
         localStorage.setItem('currentPlayerId', 'p1');
+        mockState.phase = 'playing';
+        mockState.players = [
+            {
+                id: 'p1',
+                name: '玩家一',
+                avatarUrl: '',
+                hand: [],
+                playedCards: [],
+                secretCards: [],
+                discardedCards: [],
+                actionTokens: [],
+                score: { charm: 0, tokens: 0 }
+            },
+            {
+                id: 'p2',
+                name: '玩家二',
+                avatarUrl: '',
+                hand: [],
+                playedCards: [],
+                secretCards: [],
+                discardedCards: [],
+                actionTokens: [],
+                score: { charm: 0, tokens: 0 }
+            }
+        ];
         mockState.geishaSet = 'hololive';
         mockHookState.isConnected = true;
         mockHookState.error = null;
@@ -137,6 +166,7 @@ describe('GameRoom character set room surface', () => {
         mockHookState.drawQueue = [];
         mockNavigate.mockReset();
         mockSendGameAction.mockReset();
+        mockShareRoomInvite.mockReset();
         mockHookState.consumeDealEvent.mockReset();
         mockHookState.consumeDrawEvent.mockReset();
     });
@@ -225,5 +255,80 @@ describe('GameRoom character set room surface', () => {
 
         expect(screen.getByText('玩家二 抽到了新卡')).toBeInTheDocument();
         expect(screen.queryByText('你抽到一張新牌')).not.toBeInTheDocument();
+    });
+
+    test('active gameplay does not show waiting-room invite controls', () => {
+        render(<GameRoom />);
+
+        expect(screen.queryByRole('button', { name: 'LINE 邀請好友' })).not.toBeInTheDocument();
+    });
+
+    test('waiting room shows sent invite feedback without blocking room actions', async () => {
+        mockState.phase = 'waiting';
+        mockState.players = [mockState.players[0]];
+        mockShareRoomInvite.mockResolvedValue({ mode: 'share', url: 'https://liff.line.me/test?roomId=ROOM01' });
+
+        render(<GameRoom />);
+        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+
+        expect(await screen.findByText('LINE 邀請已送出。')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '複製' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '返回大廳' })).toBeInTheDocument();
+    });
+
+    test('waiting room shows copied invite feedback', async () => {
+        mockState.phase = 'waiting';
+        mockState.players = [mockState.players[0]];
+        mockShareRoomInvite.mockResolvedValue({ mode: 'copy', url: 'https://example.test/?roomId=ROOM01' });
+
+        render(<GameRoom />);
+        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+
+        expect(await screen.findByText('已複製邀請連結，請貼給好友。')).toBeInTheDocument();
+        expect(screen.getByText('https://example.test/?roomId=ROOM01')).toBeInTheDocument();
+    });
+
+    test('waiting room shows cancelled invite feedback and keeps retry available', async () => {
+        mockState.phase = 'waiting';
+        mockState.players = [mockState.players[0]];
+        mockShareRoomInvite.mockResolvedValue({ mode: 'cancelled', url: 'https://liff.line.me/test?roomId=ROOM01' });
+
+        render(<GameRoom />);
+        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+
+        expect(await screen.findByText('已取消 LINE 好友選擇，可以重試或改用連結分享。')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'LINE 邀請好友' })).toBeInTheDocument();
+    });
+
+    test('waiting room shows manual link when invite copy is unavailable', async () => {
+        mockState.phase = 'waiting';
+        mockState.players = [mockState.players[0]];
+        mockShareRoomInvite.mockResolvedValue({
+            mode: 'unavailable',
+            url: 'https://example.test/?roomId=ROOM01',
+            reason: 'clipboard-unavailable'
+        });
+
+        render(<GameRoom />);
+        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+
+        expect(await screen.findByText('目前無法自動複製邀請連結，請手動複製下方連結分享。')).toBeInTheDocument();
+        expect(screen.getByText('https://example.test/?roomId=ROOM01')).toBeInTheDocument();
+    });
+
+    test('waiting room shows failed invite feedback without raw error details', async () => {
+        mockState.phase = 'waiting';
+        mockState.players = [mockState.players[0]];
+        mockShareRoomInvite.mockResolvedValue({
+            mode: 'failed',
+            url: 'https://liff.line.me/test?roomId=ROOM01',
+            reason: 'share-failed'
+        });
+
+        render(<GameRoom />);
+        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+
+        expect(await screen.findByText('LINE 邀請暫時失敗，請改用下方連結分享。')).toBeInTheDocument();
+        expect(screen.queryByText('share-failed')).not.toBeInTheDocument();
     });
 });

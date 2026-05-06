@@ -42,7 +42,10 @@ jest.mock('../../utils/lineLiff', () => ({
         supportedOrigin: false,
         hasSdk: false,
         ready: false,
-        loggedIn: 'unknown'
+        loggedIn: 'unknown',
+        inLineClient: 'unknown',
+        shareTargetPickerAvailable: 'unknown',
+        fallbackAvailable: true
     }))
 }));
 
@@ -77,7 +80,10 @@ describe('DiagnosticsPage', () => {
             supportedOrigin: false,
             hasSdk: false,
             ready: false,
-            loggedIn: 'unknown'
+            loggedIn: 'unknown',
+            inLineClient: 'unknown',
+            shareTargetPickerAvailable: 'unknown',
+            fallbackAvailable: true
         });
         mockGetAccountDiagnosticsSnapshot.mockReturnValue({
             accountSyncStatus: 'guest',
@@ -97,6 +103,9 @@ describe('DiagnosticsPage', () => {
         expect(screen.getByText('BrowserRouter')).toBeInTheDocument();
         expect(screen.getByText('已註冊 Handler 數量')).toBeInTheDocument();
         expect(screen.getByText('4')).toBeInTheDocument();
+        expect(screen.getByText('好友選擇器可用')).toBeInTheDocument();
+        expect(screen.getByText('邀請 fallback')).toBeInTheDocument();
+        expect(screen.getByText('可複製連結')).toBeInTheDocument();
     });
 
     test('does not render hidden game data or payload dumps', () => {
@@ -110,6 +119,27 @@ describe('DiagnosticsPage', () => {
         expect(screen.queryByText(/lineUserId/)).not.toBeInTheDocument();
         expect(screen.queryByText(/raw profile/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/token/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/recipient/i)).not.toBeInTheDocument();
+    });
+
+    test('renders safe invite capability summary without private LINE fields', () => {
+        mockGetLiffDiagnosticsSnapshot.mockReturnValue({
+            supportedOrigin: true,
+            hasSdk: true,
+            ready: true,
+            loggedIn: false,
+            inLineClient: true,
+            shareTargetPickerAvailable: true,
+            fallbackAvailable: true
+        });
+
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByText('LINE App 內開啟')).toBeInTheDocument();
+        expect(screen.getByText('好友選擇器可用')).toBeInTheDocument();
+        expect(screen.getByText('可用')).toBeInTheDocument();
+        expect(screen.getByText('僅顯示能力摘要，不包含好友或 LINE profile 資料。')).toBeInTheDocument();
+        expect(screen.queryByText(/lineUserId|accessToken|raw profile|recipient/i)).not.toBeInTheDocument();
     });
 
     test('renders account sync and temporary persistence status without private account fields', () => {

@@ -5,6 +5,7 @@ import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import GameBoard from '../../components/game/GameBoard';
 import type { FocusSection } from '../../components/game/GameBoard';
+import OpeningDealModal from '../../components/game/OpeningDealModal';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import {
@@ -17,6 +18,7 @@ import {
     OpeningDealCueStep,
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
+import { buildOpeningDealModalModel } from '../../components/game/openingDealModalModel';
 import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
 import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
@@ -127,6 +129,9 @@ const GameRoom: React.FC = () => {
     const canActBeforeBlockingRef = useRef(false);
     const previousCanActRef = useRef(false);
     const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
+    const completedOpeningDealModalSequencesRef = useRef<Set<string>>(new Set());
+    const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
+    const [activeOpeningDealModalSequenceId, setActiveOpeningDealModalSequenceId] = useState<string | null>(null);
     const prefersReducedMotion = usePrefersReducedMotion();
 
     const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
@@ -219,6 +224,11 @@ const GameRoom: React.FC = () => {
             return;
         }
 
+        if (state.openingDeal?.replayable) {
+            consumeDealEvent();
+            return;
+        }
+
         const nextEvent = dealQueue[0];
         const steps = createOpeningDealCueSteps(nextEvent.sequence, currentPlayerId, prefersReducedMotion);
         if (steps.length === 0) {
@@ -236,7 +246,28 @@ const GameRoom: React.FC = () => {
         return () => {
             window.clearTimeout(clearTimer);
         };
-    }, [consumeDealEvent, currentPlayerId, dealQueue, prefersReducedMotion]);
+    }, [consumeDealEvent, currentPlayerId, dealQueue, prefersReducedMotion, state.openingDeal?.replayable]);
+
+    useEffect(() => {
+        const openingDeal = state.openingDeal;
+
+        if (
+            !currentPlayerId
+            || !openingDeal
+            || openingDeal.status === 'not_replayable'
+            || !openingDeal.replayable
+            || openingDeal.steps.length === 0
+        ) {
+            setActiveOpeningDealModalSequenceId(null);
+            return;
+        }
+
+        if (completedOpeningDealModalSequencesRef.current.has(openingDeal.sequenceId)) {
+            return;
+        }
+
+        setActiveOpeningDealModalSequenceId(openingDeal.sequenceId);
+    }, [currentPlayerId, state.openingDeal]);
 
     useEffect(() => {
         if (!currentPlayerId || state.phase !== 'playing') {
@@ -332,7 +363,23 @@ const GameRoom: React.FC = () => {
     const isGameEnded = state.phase === 'ended';
 
     const isWaiting = state.phase === 'waiting' || state.players.length < 2;
-    const isOpeningDealActive = activeOpeningDealSteps.length > 0;
+    const openingDealModalModel = useMemo(() => {
+        const openingDeal = state.openingDeal;
+
+        if (
+            !openingDeal
+            || !activeOpeningDealModalSequenceId
+            || openingDeal.sequenceId !== activeOpeningDealModalSequenceId
+            || openingDeal.status === 'not_replayable'
+            || !openingDeal.replayable
+        ) {
+            return null;
+        }
+
+        return buildOpeningDealModalModel(openingDeal, state.players, currentPlayerId, prefersReducedMotion);
+    }, [activeOpeningDealModalSequenceId, currentPlayerId, prefersReducedMotion, state.openingDeal, state.players]);
+    const isOpeningDealModalActive = Boolean(openingDealModalModel);
+    const isOpeningDealActive = activeOpeningDealSteps.length > 0 || isOpeningDealModalActive;
 
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
@@ -374,6 +421,27 @@ const GameRoom: React.FC = () => {
             setExpandedInfoReplayAction(actionType);
         }
     }, [isReplayEligible]);
+    const handleOpeningDealModalComplete = useCallback(() => {
+        if (activeOpeningDealModalSequenceId) {
+            completedOpeningDealModalSequencesRef.current.add(activeOpeningDealModalSequenceId);
+        }
+
+        setActiveOpeningDealModalSequenceId(null);
+    }, [activeOpeningDealModalSequenceId]);
+
+    useEffect(() => {
+        const surface = gameSurfaceRef.current;
+        if (!surface) {
+            return;
+        }
+
+        if (isOpeningDealModalActive) {
+            surface.setAttribute('inert', '');
+            return;
+        }
+
+        surface.removeAttribute('inert');
+    }, [isOpeningDealModalActive]);
     useEffect(() => {
         if (state.phase !== 'playing') {
             setFocusSection('characterBoard');
@@ -548,7 +616,11 @@ const GameRoom: React.FC = () => {
     return (
         <div className="game-background game-room-page p-3">
             <div className="container-fluid">
-                <div className={`card game-card game-room-surface p-2 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}>
+                <div
+                    ref={gameSurfaceRef}
+                    className={`card game-card game-room-surface p-2 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}
+                    aria-hidden={isOpeningDealModalActive ? true : undefined}
+                >
                     <nav className="game-room-tabs" aria-label="遊戲區塊切換">
                         {SECTION_TABS.map((tab) => {
                             const isActive = focusSection === tab.section;
@@ -689,6 +761,12 @@ const GameRoom: React.FC = () => {
             {recentDraw && (
                 <div className="draw-toast shadow">{recentDraw}</div>
             )}
+
+            <OpeningDealModal
+                isOpen={isOpeningDealModalActive}
+                model={openingDealModalModel}
+                onComplete={handleOpeningDealModalComplete}
+            />
 
             {roundSummary && (
                 <div className="round-summary-overlay">

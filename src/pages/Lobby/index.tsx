@@ -4,8 +4,13 @@ import { AccountSyncResult, AchievementStatusResult, GeishaSet, RoomSetupMode } 
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
-import { getInviteRoomIdFromLocation, getLineProfile, LineProfile } from '../../utils/lineLiff';
-import { getBoundAccountProfile, syncLineAccount } from '../../utils/lineAccount';
+import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils/lineLiff';
+import {
+    beginBrowserLineLogin,
+    getBoundAccountProfile,
+    requestAccountStatus,
+    syncLineAccountWithIdToken
+} from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
@@ -33,8 +38,8 @@ const Lobby: React.FC = () => {
     // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     // LINE 使用者資料（若在 LIFF 內）
-    const [lineProfile, setLineProfile] = useState<LineProfile | null>(null);
     const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
+    const [accountBindingStatus, setAccountBindingStatus] = useState<'idle' | 'binding'>('idle');
     const [achievementStatus, setAchievementStatus] = useState<AchievementStatusResult | null>(null);
     const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false);
     const [invitedRoom, setInvitedRoom] = useState<{ roomId: string; source: 'query' | 'liff' } | null>(null);
@@ -43,14 +48,13 @@ const Lobby: React.FC = () => {
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
-    const accountSyncStartedRef = useRef(false);
     const pendingJoinRoomRef = useRef<string | null>(null);
     const invitedRoomRef = useRef<{ roomId: string; source: 'query' | 'liff' } | null>(null);
     const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
     const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
         ? accountSyncResult.guestNotice
         : undefined;
-    const isAccountSyncPending = Boolean(lineProfile && !accountSyncResult);
+    const isAccountSyncPending = accountBindingStatus === 'binding';
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
@@ -97,85 +101,6 @@ const Lobby: React.FC = () => {
         });
     }, [selectedGeishaSet, setupMode]);
 
-    // 取得 LINE 使用者資料（若在 LIFF 內）
-    useEffect(() => {
-        let isActive = true;
-
-        const loadLineProfile = async () => {
-            try {
-                const profile = await getLineProfile();
-                if (!profile || !isActive) return;
-
-                setLineProfile(profile);
-                localStorage.setItem('lineUserId', profile.userId);
-                if (profile.pictureUrl) {
-                    localStorage.setItem('lineAvatarUrl', profile.pictureUrl);
-                }
-                if (profile.displayName) {
-                    localStorage.setItem('lineDisplayName', profile.displayName);
-                }
-
-                if (!playerNameRef.current) {
-                    setPlayerName(profile.displayName);
-                }
-
-            } catch (error) {
-                frontendLogger.warn('⚠️ 讀取 LINE 使用者資料失敗', {
-                    error: error instanceof Error ? error.message : 'unknown'
-                });
-                setAccountSyncResult({
-                    status: 'sync-failed',
-                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
-                    persistenceStatus: {
-                        mode: 'temporary',
-                        available: true,
-                        message: 'Account profiles are temporary in this environment.'
-                    }
-                });
-            }
-        };
-
-        loadLineProfile();
-
-        return () => {
-            isActive = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!lineProfile || connectionStatus !== 'connected' || accountSyncStartedRef.current) {
-            return;
-        }
-
-        let isActive = true;
-        accountSyncStartedRef.current = true;
-
-        syncLineAccount(lineProfile)
-            .then((syncResult) => {
-                if (!isActive) return;
-                setAccountSyncResult(syncResult);
-            })
-            .catch((error) => {
-                if (!isActive) return;
-                frontendLogger.warn('⚠️ LINE 帳號同步失敗', {
-                    error: error instanceof Error ? error.message : 'unknown'
-                });
-                setAccountSyncResult({
-                    status: 'sync-failed',
-                    guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
-                    persistenceStatus: {
-                        mode: 'temporary',
-                        available: true,
-                        message: 'Account profiles are temporary in this environment.'
-                    }
-                });
-            });
-
-        return () => {
-            isActive = false;
-        };
-    }, [connectionStatus, lineProfile]);
-
     useEffect(() => {
         if (connectionStatus !== 'connected' || isAccountSyncPending) {
             return;
@@ -198,6 +123,24 @@ const Lobby: React.FC = () => {
             isActive = false;
         };
     }, [accountSyncResult, connectionStatus, isAccountSyncPending]);
+
+    useEffect(() => {
+        if (connectionStatus !== 'connected') {
+            return;
+        }
+
+        let isActive = true;
+        requestAccountStatus()
+            .then((result) => {
+                if (!isActive || result.status !== 'bound') return;
+                setAccountSyncResult(result);
+            })
+            .catch(() => undefined);
+
+        return () => {
+            isActive = false;
+        };
+    }, [connectionStatus]);
 
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
@@ -412,6 +355,46 @@ const Lobby: React.FC = () => {
             });
     };
 
+    const bindLineAccount = async () => {
+        if (accountBindingStatus === 'binding' || boundAccountProfile) {
+            return;
+        }
+
+        setAccountBindingStatus('binding');
+
+        try {
+            const verifiedLineProfile = await getVerifiedLineProfile();
+            if (!verifiedLineProfile) {
+                beginBrowserLineLogin();
+                return;
+            }
+
+            const result = await syncLineAccountWithIdToken(
+                verifiedLineProfile.profile,
+                verifiedLineProfile.idToken
+            );
+            setAccountSyncResult(result);
+            if (!playerNameRef.current && result.profile?.displayName) {
+                setPlayerName(result.profile.displayName);
+            }
+        } catch (error) {
+            frontendLogger.warn('⚠️ LINE 帳號綁定失敗', {
+                error: error instanceof Error ? error.message : 'unknown'
+            });
+            setAccountSyncResult({
+                status: 'sync-failed',
+                guestNotice: 'LINE 帳號綁定失敗，請稍後再試。',
+                persistenceStatus: {
+                    mode: 'temporary',
+                    available: true,
+                    message: 'Account profiles are temporary in this environment.'
+                }
+            });
+        } finally {
+            setAccountBindingStatus('idle');
+        }
+    };
+
     const invitedRoomNotice = invitedRoom
         ? `已從邀請連結帶入房間 ${invitedRoom.roomId}，確認玩家名稱後再加入。`
         : undefined;
@@ -482,6 +465,28 @@ const Lobby: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
+                                )}
+                            </section>
+
+                            <section className="lobby-account-card" aria-label="LINE 帳號">
+                                <div>
+                                    <div className="lobby-account-card__kicker">LINE Account</div>
+                                    <div className="lobby-account-card__title">LINE 帳號</div>
+                                    <div className="lobby-account-card__message">
+                                        {boundAccountProfile
+                                            ? `已綁定：${boundAccountProfile.displayName}`
+                                            : '綁定後可保存成就與對局紀錄。'}
+                                    </div>
+                                </div>
+                                {!boundAccountProfile && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-light lobby-account-card__button"
+                                        onClick={bindLineAccount}
+                                        disabled={accountBindingStatus === 'binding' || connectionStatus !== 'connected'}
+                                    >
+                                        {accountBindingStatus === 'binding' ? '綁定中...' : '綁定 LINE 帳號'}
+                                    </button>
                                 )}
                             </section>
 

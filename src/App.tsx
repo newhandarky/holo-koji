@@ -4,6 +4,7 @@ import { GameProvider } from './contexts/GameContext';
 import Lobby from './pages/Lobby';
 import GameRoom from './pages/GameRoom';
 import DiagnosticsPage from './pages/Diagnostics';
+import LineCallbackPage from './pages/LineCallback';
 import { initLiffIfPossible, shouldShowLiffDiagnostics } from './utils/lineLiff';
 import config from './config/environment';
 import { shouldUseHashRouter } from './utils/routerMode';
@@ -17,6 +18,15 @@ function App() {
     v7_relativeSplatPath: true
   } as const;
   const [liffError, setLiffError] = useState<string | null>(null);
+  const [isLineCallbackQuery, setIsLineCallbackQuery] = useState(
+    () => new URLSearchParams(window.location.search).get('lineCallback') === '1'
+  );
+
+  const returnFromLineCallback = () => {
+    const lobbyPath = window.location.pathname.includes('/holo-koji') ? '/holo-koji/' : '/';
+    window.history.replaceState(null, '', lobbyPath);
+    setIsLineCallbackQuery(false);
+  };
 
   useEffect(() => {
     if (!shouldShowLiffDiagnostics()) {
@@ -94,15 +104,22 @@ function App() {
           </div>
         </div>
       )}
+      {isLineCallbackQuery ? (
+        <BrowserRouter future={routerFuture}>
+          <LineCallbackPage onReturnToLobby={returnFromLineCallback} />
+        </BrowserRouter>
+      ) : (
       <Router future={routerFuture}>
         <Routes>
           {/* 大廳頁面 */}
           <Route path="/" element={<Lobby />} />
+          <Route path="/line/callback" element={<LineCallbackPage />} />
           <Route path="/diagnostics" element={<DiagnosticsPage />} />
           {/* 遊戲房間頁面 */}
           <Route path="/game/:roomId" element={<GameRoom />} />
         </Routes>
       </Router>
+      )}
     </GameProvider>
   );
 }

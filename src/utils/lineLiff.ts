@@ -65,6 +65,11 @@ export interface LineProfile {
     pictureUrl?: string;
 }
 
+export interface VerifiedLineProfile {
+    profile: LineProfile;
+    idToken: string;
+}
+
 export type InviteOutcome =
     | { mode: 'share'; url: string }
     | { mode: 'copy'; url: string }
@@ -181,6 +186,41 @@ export const getLineProfile = async (): Promise<LineProfile | null> => {
         userId: profile.userId,
         displayName: profile.displayName,
         pictureUrl: profile.pictureUrl
+    };
+};
+
+export const getVerifiedLineProfile = async (): Promise<VerifiedLineProfile | null> => {
+    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
+        return null;
+    }
+
+    await ensureLiffReady();
+
+    if (!window.liff.isLoggedIn()) {
+        window.liff.login();
+        return null;
+    }
+
+    if (typeof window.liff.getIDToken !== 'function') {
+        return null;
+    }
+
+    const [profile, idToken] = await Promise.all([
+        window.liff.getProfile(),
+        Promise.resolve(window.liff.getIDToken())
+    ]);
+
+    if (!idToken) {
+        return null;
+    }
+
+    return {
+        idToken,
+        profile: {
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl
+        }
     };
 };
 

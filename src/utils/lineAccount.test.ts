@@ -19,7 +19,10 @@ jest.mock('../services/websocket', () => {
 
 const { gameWebSocket } = require('../services/websocket');
 const {
+    consumeLineLoginCallback,
     getAccountDiagnosticsSnapshot,
+    buildAccountSyncRequestFromAuthorizationCode,
+    buildAccountSyncRequestFromLineIdToken,
     resetAccountSyncStateForTests,
     syncLineAccount
 } = require('./lineAccount');
@@ -37,6 +40,9 @@ describe('lineAccount', () => {
         mockGameWebSocket.on.mockClear();
         mockGameWebSocket.off.mockClear();
         mockGameWebSocket.send.mockClear();
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+        window.history.pushState({}, '', '/');
     });
 
     test('syncLineAccount sends public profile request without client-side identity proof', async () => {
@@ -93,6 +99,56 @@ describe('lineAccount', () => {
                 displayName: '銀座玩家'
             }
         });
+    });
+
+    test('builds server-verifiable LINE binding requests without client-submitted identity', () => {
+        const idTokenRequest = buildAccountSyncRequestFromLineIdToken({
+            userId: 'U1234567890',
+            displayName: '銀座玩家',
+            pictureUrl: 'https://example.test/avatar.png'
+        }, 'id-token');
+
+        expect(idTokenRequest).toEqual({
+            idToken: 'id-token',
+            profile: {
+                displayName: '銀座玩家',
+                avatarUrl: 'https://example.test/avatar.png'
+            }
+        });
+        expect(idTokenRequest).not.toHaveProperty('verifiedIdentity');
+        expect(idTokenRequest).not.toHaveProperty('lineUserId');
+
+        expect(buildAccountSyncRequestFromAuthorizationCode('auth-code', 'https://example.test/?lineCallback=1')).toEqual({
+            authorizationCode: 'auth-code',
+            redirectUri: 'https://example.test/?lineCallback=1'
+        });
+    });
+
+    test('consumeLineLoginCallback accepts matching state from localStorage fallback', () => {
+        window.localStorage.setItem('hanamikoji-line-login-flow', JSON.stringify({
+            state: 'saved-state',
+            redirectUri: 'https://example.test/?lineCallback=1',
+            createdAt: Date.now()
+        }));
+        window.history.pushState({}, '', '/?lineCallback=1&code=auth-code&state=saved-state');
+
+        expect(consumeLineLoginCallback()).toEqual({
+            authorizationCode: 'auth-code',
+            redirectUri: 'https://example.test/?lineCallback=1'
+        });
+        expect(window.localStorage.getItem('hanamikoji-line-login-flow')).toBeNull();
+    });
+
+    test('consumeLineLoginCallback rejects expired localStorage fallback state', () => {
+        window.localStorage.setItem('hanamikoji-line-login-flow', JSON.stringify({
+            state: 'saved-state',
+            redirectUri: 'https://example.test/?lineCallback=1',
+            createdAt: Date.now() - (11 * 60 * 1000)
+        }));
+        window.history.pushState({}, '', '/?lineCallback=1&code=auth-code&state=saved-state');
+
+        expect(consumeLineLoginCallback()).toBeNull();
+        expect(window.localStorage.getItem('hanamikoji-line-login-flow')).toBeNull();
     });
 
     test('syncLineAccount returns guest when LINE profile is missing', async () => {

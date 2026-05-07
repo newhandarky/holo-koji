@@ -245,6 +245,67 @@ code {
   color: rgba(255, 247, 236, 0.42);
 }
 
+.lobby-account-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(255, 236, 208, 0.13);
+  border-radius: 8px;
+  background: rgba(16, 8, 10, 0.58);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+}
+
+.lobby-account-card__kicker {
+  color: rgba(255, 236, 208, 0.58);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.lobby-account-card__title {
+  color: var(--ginza-readable-text);
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.lobby-account-card__message {
+  color: var(--ginza-muted-text);
+  line-height: 1.5;
+}
+
+.lobby-account-card__button {
+  justify-self: start;
+}
+
+.line-callback-shell {
+  width: min(92vw, 520px);
+  margin: 12vh auto 0;
+  padding: 28px;
+  border: 1px solid rgba(255, 236, 208, 0.14);
+  border-radius: 8px;
+  background: rgba(16, 8, 10, 0.82);
+  color: var(--ginza-readable-text);
+}
+
+.line-callback-shell__kicker {
+  color: rgba(255, 236, 208, 0.58);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.line-callback-shell__title {
+  margin: 8px 0 12px;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.line-callback-shell__message {
+  color: var(--ginza-muted-text);
+}
+
 .lobby-hero__diagnostics {
   margin-top: 34px;
   padding: 0;

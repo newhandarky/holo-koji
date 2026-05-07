@@ -5,8 +5,8 @@ import { gameWebSocket } from '../../services/websocket';
 import Lobby from './index';
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty } from './aiDifficultyOptions';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
-import { getInviteRoomIdFromLocation, getLineProfile } from '../../utils/lineLiff';
-import { syncLineAccount } from '../../utils/lineAccount';
+import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils/lineLiff';
+import { beginBrowserLineLogin, requestAccountStatus, syncLineAccountWithIdToken } from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 
 const mockNavigate = jest.fn();
@@ -38,12 +38,21 @@ jest.mock('../../services/websocket', () => {
 
 jest.mock('../../utils/lineLiff', () => ({
     getInviteRoomIdFromLocation: jest.fn(() => ({ roomId: '', source: 'none' })),
-    getLineProfile: jest.fn().mockResolvedValue(null)
+    getVerifiedLineProfile: jest.fn().mockResolvedValue(null)
 }));
 
 jest.mock('../../utils/lineAccount', () => ({
+    beginBrowserLineLogin: jest.fn(),
     getBoundAccountProfile: (result: any) => (result?.status === 'bound' ? result.profile : null),
-    syncLineAccount: jest.fn().mockResolvedValue({
+    requestAccountStatus: jest.fn().mockResolvedValue({
+        status: 'guest',
+        persistenceStatus: {
+            mode: 'temporary',
+            available: true,
+            message: 'Account profiles are temporary in this environment.'
+        }
+    }),
+    syncLineAccountWithIdToken: jest.fn().mockResolvedValue({
         status: 'guest',
         persistenceStatus: {
             mode: 'temporary',
@@ -69,8 +78,10 @@ jest.mock('../../utils/achievementAccount', () => ({
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
 const mockGetInviteRoomIdFromLocation = getInviteRoomIdFromLocation as jest.MockedFunction<typeof getInviteRoomIdFromLocation>;
-const mockGetLineProfile = getLineProfile as jest.MockedFunction<typeof getLineProfile>;
-const mockSyncLineAccount = syncLineAccount as jest.MockedFunction<typeof syncLineAccount>;
+const mockGetVerifiedLineProfile = getVerifiedLineProfile as jest.MockedFunction<typeof getVerifiedLineProfile>;
+const mockBeginBrowserLineLogin = beginBrowserLineLogin as jest.MockedFunction<typeof beginBrowserLineLogin>;
+const mockRequestAccountStatus = requestAccountStatus as jest.MockedFunction<typeof requestAccountStatus>;
+const mockSyncLineAccountWithIdToken = syncLineAccountWithIdToken as jest.MockedFunction<typeof syncLineAccountWithIdToken>;
 const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
 const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
 
@@ -86,10 +97,20 @@ describe('Lobby character set selection', () => {
         mockGameWebSocket.send.mockClear();
         mockGetInviteRoomIdFromLocation.mockReset();
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: '', source: 'none' });
-        mockGetLineProfile.mockReset();
-        mockGetLineProfile.mockResolvedValue(null);
-        mockSyncLineAccount.mockReset();
-        mockSyncLineAccount.mockResolvedValue({
+        mockGetVerifiedLineProfile.mockReset();
+        mockGetVerifiedLineProfile.mockResolvedValue(null);
+        mockBeginBrowserLineLogin.mockReset();
+        mockRequestAccountStatus.mockReset();
+        mockRequestAccountStatus.mockResolvedValue({
+            status: 'guest',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
+        mockSyncLineAccountWithIdToken.mockReset();
+        mockSyncLineAccountWithIdToken.mockResolvedValue({
             status: 'guest',
             persistenceStatus: {
                 mode: 'temporary',
@@ -509,13 +530,16 @@ describe('Lobby character set selection', () => {
         expect(debugSpy).not.toHaveBeenCalled();
     });
 
-    test('successful LINE profile sync pre-fills name and sends bound account presentation only', async () => {
-        mockGetLineProfile.mockResolvedValue({
-            userId: 'U1234567890',
-            displayName: 'LINE 玩家',
-            pictureUrl: 'https://example.test/avatar.png'
+    test('explicit LINE binding pre-fills name and sends bound account presentation only', async () => {
+        mockGetVerifiedLineProfile.mockResolvedValue({
+            profile: {
+                userId: 'U1234567890',
+                displayName: 'LINE 玩家',
+                pictureUrl: 'https://example.test/avatar.png'
+            },
+            idToken: 'line-id-token'
         });
-        mockSyncLineAccount.mockResolvedValue({
+        mockSyncLineAccountWithIdToken.mockResolvedValue({
             status: 'bound',
             profile: {
                 lineUserId: 'U1234567890',
@@ -538,18 +562,22 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
+        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
         await waitFor(() => expect(screen.getByPlaceholderText('輸入你的名稱')).toHaveValue('LINE 玩家'));
-        await waitFor(() => expect(mockSyncLineAccount).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mockSyncLineAccountWithIdToken).toHaveBeenCalledTimes(1));
         await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), '房間暱稱');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
         await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
-        expect(mockSyncLineAccount).toHaveBeenCalledWith({
-            userId: 'U1234567890',
-            displayName: 'LINE 玩家',
-            pictureUrl: 'https://example.test/avatar.png'
-        });
+        expect(mockSyncLineAccountWithIdToken).toHaveBeenCalledWith(
+            {
+                userId: 'U1234567890',
+                displayName: 'LINE 玩家',
+                pictureUrl: 'https://example.test/avatar.png'
+            },
+            'line-id-token'
+        );
         await waitFor(() =>
             expect(mockGameWebSocket.send).toHaveBeenCalledWith(
                 'CREATE_ROOM',
@@ -570,7 +598,7 @@ describe('Lobby character set selection', () => {
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
         await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
-        expect(mockSyncLineAccount).not.toHaveBeenCalled();
+        expect(mockSyncLineAccountWithIdToken).not.toHaveBeenCalled();
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
             expect.not.objectContaining({
@@ -580,12 +608,26 @@ describe('Lobby character set selection', () => {
         );
     });
 
+    test('browser LINE binding starts authorization redirect when LIFF id token is unavailable', async () => {
+        mockGetVerifiedLineProfile.mockResolvedValue(null);
+
+        renderLobby();
+
+        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
+
+        await waitFor(() => expect(mockBeginBrowserLineLogin).toHaveBeenCalledTimes(1));
+        expect(mockSyncLineAccountWithIdToken).not.toHaveBeenCalled();
+    });
+
     test('account sync failure shows non-blocking guest notice and still allows room creation', async () => {
-        mockGetLineProfile.mockResolvedValue({
-            userId: 'U1234567890',
-            displayName: 'LINE 玩家'
+        mockGetVerifiedLineProfile.mockResolvedValue({
+            profile: {
+                userId: 'U1234567890',
+                displayName: 'LINE 玩家'
+            },
+            idToken: 'line-id-token'
         });
-        mockSyncLineAccount.mockResolvedValue({
+        mockSyncLineAccountWithIdToken.mockResolvedValue({
             status: 'sync-failed',
             guestNotice: '目前以訪客模式繼續，帳號進度暫時不會保存。',
             persistenceStatus: {
@@ -597,6 +639,7 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
+        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
         expect(await screen.findByText('目前以訪客模式繼續，帳號進度暫時不會保存。')).toBeInTheDocument();
         await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
         await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-after-fail');

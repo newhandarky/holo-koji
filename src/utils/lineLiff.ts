@@ -283,7 +283,7 @@ const writeClipboard = async (value: string) => {
 
 export const shareRoomInvite = async (roomId: string): Promise<InviteOutcome> => {
     const inviteUrl = resolveInviteUrl(roomId);
-    const message = `一起玩花見小路！房間編號：${roomId}。點此加入對戰`;
+    const message = `一起玩銀座十字路！房間編號：${roomId}。點此加入對戰`;
 
     if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
         const copied = await writeClipboard(inviteUrl);
@@ -320,7 +320,7 @@ export const shareRoomInvite = async (roomId: string): Promise<InviteOutcome> =>
     const flexMessage = [
         {
             type: 'flex',
-            altText: '花見小路對戰邀請',
+            altText: '銀座十字路對戰邀請',
             contents: {
                 type: 'bubble',
                 size: 'mega',

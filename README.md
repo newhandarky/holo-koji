@@ -1,4 +1,4 @@
-# 花見小路線上對戰（Hanamikoji）
+# 銀座十字路線上對戰（Hanamikoji）
 
 本專案為花見小路的線上對戰版本，前端使用 React（Create React App），後端使用 Node.js + WebSocket，讓兩位玩家可在房間中進行遊戲。
 
@@ -132,8 +132,3 @@ npm run build
 ```bash
 npm run deploy
 ```
-
-## 補充說明
-
-- 遊戲規則請參考 `docs/0127-花見小路規則.md`。
-- 開發與檢查清單請參考 `docs/0127-花見小路線上遊戲 - 開發與檢查清單.md`。

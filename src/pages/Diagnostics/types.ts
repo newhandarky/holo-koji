@@ -16,6 +16,11 @@ export interface DiagnosticsSnapshot {
     accountPersistenceMode: 'durable' | 'temporary';
     accountPersistenceAvailable: boolean;
     accountPersistenceMessage: string;
+    liffIdConfigured: boolean;
+    lineChannelIdConfigured: boolean;
+    webAppUrlConfigured: boolean;
+    achievementReadinessStatus: 'ready' | 'unavailable';
+    achievementReadinessMessage: string;
 }
 
 export interface DiagnosticsSummaryItem {

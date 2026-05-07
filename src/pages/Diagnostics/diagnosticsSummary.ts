@@ -29,6 +29,7 @@ const formatBooleanUnknown = (value: boolean | 'unknown', trueText: string, fals
 export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
     const liff = getLiffDiagnosticsSnapshot();
     const account = getAccountDiagnosticsSnapshot();
+    const achievementReady = account.accountPersistenceMode === 'durable' && account.accountPersistenceAvailable;
 
     return {
         connectionState: normalizeConnectionState(gameWebSocket.getConnectionState()),
@@ -47,7 +48,14 @@ export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
         accountSyncStatus: account.accountSyncStatus,
         accountPersistenceMode: account.accountPersistenceMode,
         accountPersistenceAvailable: account.accountPersistenceAvailable,
-        accountPersistenceMessage: account.accountPersistenceMessage
+        accountPersistenceMessage: account.accountPersistenceMessage,
+        liffIdConfigured: Boolean(config.liffId),
+        lineChannelIdConfigured: Boolean(config.lineChannelId),
+        webAppUrlConfigured: Boolean(config.webAppUrl),
+        achievementReadinessStatus: achievementReady ? 'ready' : 'unavailable',
+        achievementReadinessMessage: achievementReady
+            ? 'Durable account persistence is available for achievements.'
+            : 'Achievement progress is not production-ready until durable persistence is available.'
     };
 };
 
@@ -133,5 +141,32 @@ export const buildDiagnosticsSummaryItems = (snapshot: DiagnosticsSnapshot): Dia
         helpText: snapshot.accountPersistenceMode === 'temporary'
             ? 'Temporary mode is non-durable and not suitable for persistent achievements.'
             : snapshot.accountPersistenceMessage
+    },
+    {
+        label: 'Production readiness',
+        value: '安全摘要',
+        statusTone: 'neutral',
+        helpText: '僅顯示本機可得的安全狀態與設定存在性，不執行遠端探測或保存歷史。'
+    },
+    {
+        label: 'LIFF ID 設定',
+        value: snapshot.liffIdConfigured ? '已設定' : '未設定',
+        statusTone: snapshot.liffIdConfigured ? 'success' : 'warning'
+    },
+    {
+        label: 'LINE Channel ID 設定',
+        value: snapshot.lineChannelIdConfigured ? '已設定' : '未設定',
+        statusTone: snapshot.lineChannelIdConfigured ? 'success' : 'warning'
+    },
+    {
+        label: 'Web App URL 設定',
+        value: snapshot.webAppUrlConfigured ? '已設定' : '未設定',
+        statusTone: snapshot.webAppUrlConfigured ? 'success' : 'warning'
+    },
+    {
+        label: '成就保存準備',
+        value: snapshot.achievementReadinessStatus === 'ready' ? 'ready' : 'unavailable',
+        statusTone: snapshot.achievementReadinessStatus === 'ready' ? 'success' : 'warning',
+        helpText: snapshot.achievementReadinessMessage
     }
 ];

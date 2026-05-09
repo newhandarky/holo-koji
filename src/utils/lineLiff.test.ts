@@ -173,7 +173,7 @@ describe('lineLiff invite helpers', () => {
             url: 'https://liff.line.me/test-liff?roomId=ROOM01'
         });
         expect(shareTargetPicker).toHaveBeenCalledWith(expect.arrayContaining([
-            expect.objectContaining({ type: 'flex', altText: '花見小路對戰邀請' })
+            expect.objectContaining({ type: 'flex', altText: '銀座十字路對戰邀請' })
         ]));
     });
 

@@ -19,6 +19,9 @@ jest.mock('../../config/environment', () => ({
     default: {
         websocketUrl: 'ws://localhost:3001',
         apiUrl: 'http://localhost:3001',
+        liffId: 'test-liff-id',
+        lineChannelId: 'test-channel-id',
+        webAppUrl: 'https://example.test/holo-koji',
         diagnosticsEnabled: false
     }
 }));
@@ -69,6 +72,9 @@ describe('DiagnosticsPage', () => {
         mockNavigate.mockReset();
         mockConfig.websocketUrl = 'ws://localhost:3001';
         mockConfig.apiUrl = 'http://localhost:3001';
+        mockConfig.liffId = 'test-liff-id';
+        mockConfig.lineChannelId = 'test-channel-id';
+        mockConfig.webAppUrl = 'https://example.test/holo-koji';
         mockConfig.diagnosticsEnabled = false;
         mockGameWebSocket.getConnectionState.mockReturnValue('OPEN');
         mockGameWebSocket.messageHandlers.clear();
@@ -106,6 +112,10 @@ describe('DiagnosticsPage', () => {
         expect(screen.getByText('好友選擇器可用')).toBeInTheDocument();
         expect(screen.getByText('邀請 fallback')).toBeInTheDocument();
         expect(screen.getByText('可複製連結')).toBeInTheDocument();
+        expect(screen.getByText('Production readiness')).toBeInTheDocument();
+        expect(screen.getByText('LIFF ID 設定')).toBeInTheDocument();
+        expect(screen.getByText('LINE Channel ID 設定')).toBeInTheDocument();
+        expect(screen.getByText('Web App URL 設定')).toBeInTheDocument();
     });
 
     test('does not render hidden game data or payload dumps', () => {
@@ -120,6 +130,7 @@ describe('DiagnosticsPage', () => {
         expect(screen.queryByText(/raw profile/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/token/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/recipient/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/redis:\/\/|LINE_CHANNEL_SECRET|authorization code|id token/i)).not.toBeInTheDocument();
     });
 
     test('renders safe invite capability summary without private LINE fields', () => {
@@ -157,6 +168,9 @@ describe('DiagnosticsPage', () => {
         expect(screen.getByText('帳號持久化狀態')).toBeInTheDocument();
         expect(screen.getByText('temporary')).toBeInTheDocument();
         expect(screen.getByText('Temporary mode is non-durable and not suitable for persistent achievements.')).toBeInTheDocument();
+        expect(screen.getByText('成就保存準備')).toBeInTheDocument();
+        expect(screen.getByText('unavailable')).toBeInTheDocument();
+        expect(screen.getByText('Achievement progress is not production-ready until durable persistence is available.')).toBeInTheDocument();
         expect(screen.queryByText('U1234567890')).not.toBeInTheDocument();
     });
 
@@ -173,6 +187,37 @@ describe('DiagnosticsPage', () => {
         expect(screen.getByText('bound')).toBeInTheDocument();
         expect(screen.getByText('durable')).toBeInTheDocument();
         expect(screen.getByText('Account profiles are persistent.')).toBeInTheDocument();
+        expect(screen.getByText('成就保存準備')).toBeInTheDocument();
+        expect(screen.getByText('ready')).toBeInTheDocument();
+        expect(screen.getByText('Durable account persistence is available for achievements.')).toBeInTheDocument();
+    });
+
+    test('renders configuration presence without exposing configured LINE values', () => {
+        mockConfig.liffId = '2009040550-secret-liff';
+        mockConfig.lineChannelId = '2009040550';
+        mockConfig.webAppUrl = 'https://newhandarky.github.io/holo-koji';
+
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByText('LIFF ID 設定')).toBeInTheDocument();
+        expect(screen.getByText('LINE Channel ID 設定')).toBeInTheDocument();
+        expect(screen.getByText('Web App URL 設定')).toBeInTheDocument();
+        expect(screen.getAllByText('已設定')).toHaveLength(3);
+        expect(screen.queryByText('2009040550-secret-liff')).not.toBeInTheDocument();
+        expect(screen.queryByText('2009040550')).not.toBeInTheDocument();
+        expect(screen.queryByText('https://newhandarky.github.io/holo-koji')).not.toBeInTheDocument();
+    });
+
+    test('does not render monitoring, history, or live probe readiness labels', () => {
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByText('僅顯示本機可得的安全狀態與設定存在性，不執行遠端探測或保存歷史。')).toBeInTheDocument();
+        expect(screen.queryByText(/Render \/health probe/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Redis probe/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/status page/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/uptime/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/alert/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/history/i)).not.toBeInTheDocument();
     });
 
     test('navigates back to lobby', async () => {

@@ -29,6 +29,10 @@ function App() {
   };
 
   useEffect(() => {
+    if (isLineCallbackQuery) {
+      return;
+    }
+
     if (!shouldShowLiffDiagnostics()) {
       return;
     }
@@ -91,7 +95,7 @@ function App() {
       window.removeEventListener('error', onWindowError);
       window.removeEventListener('unhandledrejection', onUnhandledRejection);
     };
-  }, []);
+  }, [isLineCallbackQuery]);
 
   return (
     <GameProvider>

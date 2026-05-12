@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
+import config from './config/environment';
 import { resolveRouterMode } from './utils/routerMode';
 
 jest.mock('./pages/Lobby', () => () => <div>Mock Lobby Page</div>);
@@ -15,8 +16,12 @@ jest.mock('./pages/LineCallback', () => ({ onReturnToLobby }: { onReturnToLobby?
 ));
 
 describe('App routing', () => {
+  const originalWebAppUrl = config.webAppUrl;
+
   afterEach(() => {
     window.history.pushState({}, '', '/');
+    config.webAppUrl = originalWebAppUrl;
+    delete window.liff;
   });
 
   test('renders lobby on root route', () => {
@@ -38,6 +43,18 @@ describe('App routing', () => {
     render(<App />);
 
     expect(screen.getByText('Mock Line Callback')).toBeInTheDocument();
+  });
+
+  test('does not initialize LIFF on line login callback query', () => {
+    config.webAppUrl = window.location.origin;
+    const init = jest.fn().mockResolvedValue(undefined);
+    window.liff = { init };
+
+    window.history.pushState({}, '', '/?lineCallback=1&code=abc&state=state');
+    render(<App />);
+
+    expect(screen.getByText('Mock Line Callback')).toBeInTheDocument();
+    expect(init).not.toHaveBeenCalled();
   });
 
   test('returns from callback query to lobby without full page reload', async () => {

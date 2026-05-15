@@ -827,6 +827,18 @@ describe('Lobby character set selection', () => {
         expect(mockGameWebSocket.send).not.toHaveBeenCalledWith('JOIN_ROOM', expect.anything());
     });
 
+    test('returning from game room pre-fills room id and previous player name', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'room01', source: 'query' });
+        window.localStorage.setItem('currentPlayerId', 'p1');
+
+        renderLobby();
+
+        expect(await screen.findByText('已從邀請連結帶入房間 ROOM01，確認玩家名稱後再加入。')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('輸入房間代碼')).toHaveValue('ROOM01');
+        expect(screen.getByPlaceholderText('輸入你的名稱')).toHaveValue('p1');
+        expect(mockGameWebSocket.send).not.toHaveBeenCalledWith('JOIN_ROOM', expect.anything());
+    });
+
     test('invite LIFF state room id is normalized for confirmed join only', async () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'xyz789', source: 'liff' });
         const replaceStateSpy = jest.spyOn(window.history, 'replaceState').mockImplementation(() => undefined);
@@ -913,5 +925,21 @@ describe('Lobby character set selection', () => {
 
         expect(await screen.findByText('目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。')).toBeInTheDocument();
         expect(screen.getByText('UNK001')).toBeInTheDocument();
+    });
+
+    test('taken player id in invited room shows recovery guidance', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'room01', source: 'query' });
+
+        renderLobby();
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'p1');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitServerError({
+            message: '此玩家名稱已在房間中使用，請重新加入或更換名稱。',
+            code: 'PLAYER_ID_TAKEN'
+        });
+
+        expect(await screen.findByText('這個玩家名稱已在房間中使用。請確認名稱，或改用其他名稱重新加入。')).toBeInTheDocument();
+        expect(screen.getByText('ROOM01')).toBeInTheDocument();
     });
 });

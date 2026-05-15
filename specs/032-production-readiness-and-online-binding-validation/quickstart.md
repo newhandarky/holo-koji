@@ -50,12 +50,12 @@ If implementation only changes docs and frontend diagnostics, `npm --prefix serv
 
 | Command | Required | Status | Notes |
 |---|---|---|---|
-| `CI=1 npm test -- --watchAll=false src/pages/Diagnostics/index.test.tsx` | Yes for diagnostics changes | Pass | 8 tests passed on 2026-05-07; existing React act deprecation warning remains. |
-| `CI=1 npm test -- --watchAll=false src/pages/Lobby/index.test.tsx` | Yes for Lobby/account-achievement readiness confidence | Pass | 41 tests passed on 2026-05-07; existing act warnings and intentional server-error log remain. |
-| `CI=1 npm test -- --watchAll=false` | Yes | Pass | 15 suites / 147 tests passed on 2026-05-07; existing act/router warnings remain. |
-| `npm run build` | Yes | Pass | Production build compiled successfully on 2026-05-07. |
-| `npm --prefix server test` | Yes for production-readiness confidence | Pass | 75 server tests passed on 2026-05-07. |
-| 032 readiness gate | Yes | Not Run | Automated validation passed, but production manual smoke rows remain Not Run until user validates real online environment. |
+| `CI=1 npm test -- --watchAll=false src/pages/Diagnostics/index.test.tsx` | Yes for diagnostics changes | Pass | 8 tests passed on 2026-05-15; existing React act deprecation warning remains. |
+| `CI=1 npm test -- --watchAll=false src/pages/Lobby/index.test.tsx` | Yes for Lobby/account-achievement readiness confidence | Pass | 44 tests passed on 2026-05-15; existing act warnings and intentional server-error log remain. |
+| `CI=1 npm test -- --watchAll=false` | Yes | Pass | 17 suites / 157 tests passed on 2026-05-15; existing act/router warnings remain. |
+| `npm run build` | Yes | Pass | Production build compiled successfully on 2026-05-15. |
+| `npm --prefix server test` | Yes for production-readiness confidence | Pass | 78 server tests passed on 2026-05-15 after rerun with local listen permission; sandbox-only run hit `listen EPERM` on `127.0.0.1`. |
+| 032 readiness gate | Yes | Not Run | Automated validation passed on 2026-05-15, but production manual smoke rows remain Not Run until user validates the real online environment. |
 
 ## Manual Production Smoke Checklist
 
@@ -77,7 +77,7 @@ When using `Deferred`, fill in Deferred Reason, Blocking Dependency, Follow-up V
 
 ## Current Readiness Gate Status
 
-Automated validation is passing. The 032 production readiness gate is not closeout-ready yet because manual production smoke rows remain `Not Run`. These rows are intentionally user-owned and should be updated after validating the real GitHub Pages, Render, LINE Developers, LIFF, Redis, and two-client production environment.
+Automated validation is passing as of 2026-05-15. The 032 production readiness gate is not closeout-ready yet because manual production smoke rows remain `Not Run`. These rows are intentionally user-owned and should be updated after validating the real GitHub Pages, Render, LINE Developers, LIFF, Redis, and two-client production environment.
 
 ## Lobby Boundary Notes
 

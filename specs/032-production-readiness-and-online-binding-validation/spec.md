@@ -2,7 +2,7 @@
 
 **Feature Branch**: `032-production-readiness-and-online-binding-validation`  
 **Created**: 2026-05-07  
-**Status**: Draft  
+**Status**: Implemented - pending production manual smoke
 **Input**: User description: "032 線上穩定化與 LINE 綁定驗證"
 
 ## Clarifications

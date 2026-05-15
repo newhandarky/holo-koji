@@ -1,8 +1,8 @@
 # Feature Specification: Room Session Reconnect Hardening
 
-**Feature Branch**: `codex/fix-room-session-reconnect`  
-**Created**: 2026-05-15  
-**Status**: Draft  
+**Feature Branches**: `codex/fix-room-session-reconnect`, `codex/room-session-contract`, `codex/room-session-recovery-ux`
+**Created**: 2026-05-15
+**Status**: Completed
 **Input**: Code review finding: multiplayer room seats can be hijacked by reusing a player name, disconnected players are removed from active games, and restored room snapshots do not rebuild human seats.
 
 ## User Scenarios & Testing
@@ -25,6 +25,12 @@ When a room snapshot is restored after server restart, human player seats are re
 
 **Independent Test**: Restore a room snapshot with human players and session tokens, then join with the original player ID and token and confirm the restored room treats the player as existing.
 
+### User Story 4 - Recover Cleanly From Stale Session Tokens (Priority: P2)
+
+A player whose local room session token is stale receives a clear recovery path instead of being stuck on a generic reconnect failure.
+
+**Independent Test**: Simulate a `PLAYER_ID_TAKEN` response during game-room reconnect, confirm the local token is cleared, then return to the lobby with the room code and previous player name prefilled for retry.
+
 ## Requirements
 
 - **FR-001**: The server MUST issue an opaque room session token to every human player seat created through `CREATE_ROOM` or first-time `JOIN_ROOM`.
@@ -35,10 +41,27 @@ When a room snapshot is restored after server restart, human player seats are re
 - **FR-006**: A reconnect with matching room ID, player ID, and session token MUST reattach the WebSocket and send the player's sanitized `GAME_STATE_UPDATED` snapshot.
 - **FR-007**: Redis room snapshots MUST include human player seat metadata required for token-based reconnect, and restore MUST rebuild those seats with disconnected sockets.
 - **FR-008**: Hidden information protections MUST remain intact: reconnect state sync must still use player-visible game state.
+- **FR-009**: Shared WebSocket payload types MUST model room session token payloads and room ownership error codes used by the frontend/server boundary.
+- **FR-010**: When the frontend receives `PLAYER_ID_TAKEN` during game-room reconnect, it MUST clear only the stale token for that room/player and show a recovery-oriented message.
+- **FR-011**: Returning from a blocked game-room reconnect MUST preserve the room code in the lobby join flow and prefill the previous local player name when available.
 
 ## Out of Scope
 
-- Shared types dependency cleanup.
+- Shared types package dependency source cleanup.
 - Removing tracked nested `node_modules`.
 - New authentication provider or LINE account trust policy changes.
 - Public account/session management UI.
+
+## Validation Summary
+
+- Backend focused session tests: `node --test utils/roomSession.test.js utils/roomSessionReconnect.test.js`
+- Backend full tests: `npm test` in `server/`
+- Backend build: `npm run build` in `server/`
+- Frontend focused tests: `src/utils/roomSession.test.ts`, `src/hooks/useWebSocket.test.tsx`, `src/pages/Lobby/index.test.tsx`, `src/pages/GameRoom/index.test.tsx`
+- Frontend full tests: `CI=1 npm test -- --watchAll=false`
+- Frontend build: `npm run build`
+
+## Residual Risks
+
+- Snapshots created before room session metadata existed cannot provide token-based reconnect guarantees for those legacy rooms.
+- React test output still includes existing `act(...)` and React Router future-flag warnings; they do not currently fail validation.

@@ -8,6 +8,7 @@ import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils/lineLiff';
 import { beginBrowserLineLogin, requestAccountStatus, syncLineAccountWithIdToken } from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
+import { getStoredRoomSessionToken } from '../../utils/roomSession';
 
 const mockNavigate = jest.fn();
 
@@ -204,6 +205,30 @@ describe('Lobby character set selection', () => {
                 customSelection: expect.anything()
             })
         );
+    });
+
+    test('stores room session token when room is created', async () => {
+        renderLobby();
+
+        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'host');
+        await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith('ROOM_CREATED', expect.any(Function)));
+
+        const roomCreatedHandler = [...mockGameWebSocket.on.mock.calls]
+            .reverse()
+            .find(([messageType]) => messageType === 'ROOM_CREATED')?.[1] as ((payload: unknown) => void) | undefined;
+        expect(roomCreatedHandler).toEqual(expect.any(Function));
+
+        act(() => {
+            roomCreatedHandler?.({
+                roomId: 'ABC123',
+                playerId: 'host',
+                roomSessionToken: 'host-token'
+            });
+        });
+
+        expect(window.localStorage.getItem('currentPlayerId')).toBe('host');
+        expect(getStoredRoomSessionToken('ABC123', 'host')).toBe('host-token');
+        expect(mockNavigate).toHaveBeenCalledWith('/game/ABC123');
     });
 
     test('selected character set is preserved when switching between online and npc', async () => {

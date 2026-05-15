@@ -12,6 +12,7 @@ import {
     syncLineAccountWithIdToken
 } from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
+import { saveRoomSessionToken } from '../../utils/roomSession';
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
@@ -175,6 +176,7 @@ const Lobby: React.FC = () => {
 
             // 保存當前玩家ID到localStorage
             localStorage.setItem('currentPlayerId', playerNameRef.current);
+            saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');
@@ -189,6 +191,7 @@ const Lobby: React.FC = () => {
 
             // 保存當前玩家ID到localStorage
             localStorage.setItem('currentPlayerId', playerNameRef.current);
+            saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
 
             gameWebSocket.off('ROOM_CREATED');
             gameWebSocket.off('PLAYER_JOINED');

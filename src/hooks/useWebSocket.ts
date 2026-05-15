@@ -14,6 +14,7 @@ import {
 } from 'game-shared-types';
 import { gameWebSocket } from '../services/websocket';
 import { frontendLogger } from '../utils/runtimeLogger';
+import { getStoredRoomSessionToken } from '../utils/roomSession';
 import config from '../config/environment';
 
 // 連線事件的保留名稱，避免與伺服器事件衝突
@@ -341,7 +342,12 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             safeDispatch({ type: 'CLEAR_ERROR' });
 
             try {
-                gameWebSocket.send('JOIN_ROOM', { roomId: gameId, playerId });
+                const roomSessionToken = getStoredRoomSessionToken(gameId, playerId);
+                gameWebSocket.send('JOIN_ROOM', {
+                    roomId: gameId,
+                    playerId,
+                    ...(roomSessionToken ? { roomSessionToken } : {})
+                });
             } catch (error) {
                 const message = error instanceof Error ? error.message : '無法加入房間';
                 safeDispatch({ type: 'SET_ERROR', payload: { error: message } });

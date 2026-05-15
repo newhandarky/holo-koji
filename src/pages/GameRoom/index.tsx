@@ -346,8 +346,8 @@ const GameRoom: React.FC = () => {
 
     const handleReturnToLobby = useCallback(() => {
         leaveRoom();
-        navigate('/');
-    }, [leaveRoom, navigate]);
+        navigate(roomId ? `/?roomId=${encodeURIComponent(roomId)}` : '/');
+    }, [leaveRoom, navigate, roomId]);
 
     const isGameEnded = state.phase === 'ended';
 

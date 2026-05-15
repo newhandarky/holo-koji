@@ -85,6 +85,10 @@ const Lobby: React.FC = () => {
         setRoomId(normalizedRoomId);
         setMatchMode('online');
         setInvitedRoom({ roomId: normalizedRoomId, source: source === 'liff' ? 'liff' : 'query' });
+        const previousPlayerId = localStorage.getItem('currentPlayerId')?.trim();
+        if (previousPlayerId) {
+            setPlayerName(previousPlayerId);
+        }
 
         if (source === 'liff') {
             const nextParams = new URLSearchParams(window.location.search);
@@ -222,6 +226,9 @@ const Lobby: React.FC = () => {
             }
             if (code === 'ROOM_ALREADY_STARTED') {
                 return { reason: 'started', message: '這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。' };
+            }
+            if (code === 'PLAYER_ID_TAKEN') {
+                return { reason: 'player-id-taken', message: '這個玩家名稱已在房間中使用。請確認名稱，或改用其他名稱重新加入。' };
             }
             if (code === 'INVALID_JOIN_REQUEST' || message === '缺少 roomId 或 playerId') {
                 return { reason: 'invalid', message: '這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。' };

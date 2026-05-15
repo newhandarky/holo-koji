@@ -253,6 +253,17 @@ describe('GameRoom character set room surface', () => {
         expect(screen.queryByText('擅自合作系列')).not.toBeInTheDocument();
     });
 
+    test('returns to lobby with room id when a reconnect error blocks entry', () => {
+        mockHookState.error = '這個房間的重連憑證已失效，請返回大廳重新加入或更換名稱。';
+
+        render(<GameRoom />);
+
+        fireEvent.click(screen.getByRole('button', { name: '返回大廳' }));
+
+        expect(mockHookState.leaveRoom).toHaveBeenCalled();
+        expect(mockNavigate).toHaveBeenCalledWith('/?roomId=ROOM01');
+    });
+
     test('joiner sees the same room geishaSet identity through game-state room content', () => {
         localStorage.setItem('currentPlayerId', 'p2');
 

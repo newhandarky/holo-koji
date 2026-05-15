@@ -4,14 +4,14 @@ import { frontendLogger, summarizeSocketMessage } from '../utils/runtimeLogger';
 // WebSocket 訊息格式
 interface WebSocketMessage {
     type: string;
-    payload: any;
+    payload: unknown;
 }
 
 export class GameWebSocket {
     // WebSocket 連線物件
     private ws: WebSocket | null = null;
     // 訊息處理器表（事件名稱 → 處理函式）
-    public messageHandlers: Map<string, (payload: any) => void> = new Map();
+    public messageHandlers: Map<string, (payload: unknown) => void> = new Map();
     // 重新連線計數
     private reconnectAttempts = 0;
     // 重新連線最大次數
@@ -131,7 +131,7 @@ export class GameWebSocket {
     }
 
     // 發送訊息到伺服器
-    send(type: string, payload: any): void {
+    send(type: string, payload: unknown): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             const message: WebSocketMessage = { type, payload };
             this.ws.send(JSON.stringify(message));
@@ -146,8 +146,8 @@ export class GameWebSocket {
     }
 
     // 註冊事件處理器
-    on(messageType: string, handler: (payload: any) => void): void {
-        this.messageHandlers.set(messageType, handler);
+    on<TPayload = unknown>(messageType: string, handler: (payload: TPayload) => void): void {
+        this.messageHandlers.set(messageType, handler as (payload: unknown) => void);
     }
 
     // 移除事件處理器

@@ -177,6 +177,25 @@ export interface CreateRoomPayload {
     setupMode?: RoomSetupMode;
     customSelection?: CustomCharacterSelection;
 }
+export interface JoinRoomPayload {
+    roomId: string;
+    playerId: string;
+    displayName?: string;
+    lineUserId?: string;
+    avatarUrl?: string;
+    roomSessionToken?: string;
+}
+export interface RoomCreatedPayload {
+    roomId: string;
+    playerId: string;
+    roomSessionToken?: string;
+}
+export interface PlayerJoinedPayload {
+    roomId: string;
+    playerId: string;
+    roomSessionToken?: string;
+}
+export type KnownWebSocketErrorCode = 'INVALID_JOIN_REQUEST' | 'ROOM_RESTORE_FAILED' | 'ROOM_NOT_FOUND' | 'ROOM_CONFIG_INVALID' | 'ROOM_ALREADY_STARTED' | 'PLAYER_ID_TAKEN' | 'ROOM_FULL';
 export interface GameState {
     gameId: string;
     players: Player[];
@@ -301,17 +320,13 @@ export interface RoomInfo {
     gameState: 'waiting' | 'playing' | 'ended';
 }
 export type WebSocketEventType = 'GAME_STATE_SYNC' | 'ORDER_DECISION_STARTED' | 'ORDER_DECISION_COMPLETED' | 'TURN_CHANGED' | 'PLAYER_JOINED' | 'ERROR' | 'ORDER_DECISION_START' | 'GAME_STARTED' | 'GAME_STATE_UPDATED' | 'GAME_STATE_UPDATE' | 'ORDER_CONFIRMATION_UPDATE' | 'ORDER_CONFIRMATIONS_UPDATED' | 'PLAYER_LEFT' | 'ORDER_DECISION_RESULT' | 'TURN_ENDED' | 'GAME_ENDED' | 'ROOM_CREATED' | 'ORDER_CONFIRMED' | 'STATE_CHANGED' | 'DEAL_ANIMATION' | 'CARD_DRAWN' | 'ACTION_EXECUTED' | 'PENDING_INTERACTION' | 'INTERACTION_RESOLVED' | 'ROUND_COMPLETE';
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
     type: WebSocketEventType | string;
     payload: T;
 }
 export interface GameStartedPayload {
     gameState: GameState;
     message?: string;
-}
-export interface PlayerJoinedPayload {
-    player: Player;
-    gameState: GameState;
 }
 export interface OrderDecisionStartPayload {
     players: string[];
@@ -324,7 +339,7 @@ export interface OrderDecisionResultPayload {
     gameState?: GameState;
 }
 export interface ErrorPayload {
-    code: string;
+    code?: KnownWebSocketErrorCode | (string & {});
     message: string;
-    details?: any;
+    details?: unknown;
 }

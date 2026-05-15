@@ -1,4 +1,5 @@
 import {
+    clearRoomSessionToken,
     getStoredRoomSessionToken,
     saveRoomSessionToken
 } from './roomSession';
@@ -24,5 +25,15 @@ describe('roomSession', () => {
 
         expect(window.localStorage.length).toBe(0);
         expect(getStoredRoomSessionToken('ABC123', 'host')).toBeNull();
+    });
+
+    test('clears only the matching room session token', () => {
+        saveRoomSessionToken('ABC123', 'host', 'host-token');
+        saveRoomSessionToken('ABC123', 'guest', 'guest-token');
+
+        clearRoomSessionToken('ABC123', 'host');
+
+        expect(getStoredRoomSessionToken('ABC123', 'host')).toBeNull();
+        expect(getStoredRoomSessionToken('ABC123', 'guest')).toBe('guest-token');
     });
 });

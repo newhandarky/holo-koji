@@ -1,6 +1,16 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
-import { AccountSyncResult, AchievementStatusResult, GeishaSet, RoomSetupMode } from 'game-shared-types';
+import {
+    AccountSyncResult,
+    AchievementStatusResult,
+    CreateRoomPayload,
+    ErrorPayload,
+    GeishaSet,
+    JoinRoomPayload,
+    PlayerJoinedPayload,
+    RoomCreatedPayload,
+    RoomSetupMode
+} from 'game-shared-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';
@@ -171,7 +181,7 @@ const Lobby: React.FC = () => {
         }
 
         // 房間建立成功後處理
-        const handleRoomCreated = (payload: any) => {
+        const handleRoomCreated = (payload: RoomCreatedPayload) => {
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -186,7 +196,7 @@ const Lobby: React.FC = () => {
         };
 
         // 加入房間成功後處理
-        const handlePlayerJoined = (payload: any) => {
+        const handlePlayerJoined = (payload: PlayerJoinedPayload) => {
             setIsConnecting(false);
 
             // 保存當前玩家ID到localStorage
@@ -201,7 +211,7 @@ const Lobby: React.FC = () => {
         };
 
         // 收到伺服器錯誤時提示使用者
-        const resolveInviteRecovery = (payload: any) => {
+        const resolveInviteRecovery = (payload: ErrorPayload) => {
             const code = typeof payload?.code === 'string' ? payload.code : '';
             const message = typeof payload?.message === 'string' ? payload.message : '無法加入房間';
             if (code === 'ROOM_NOT_FOUND' || message === '房間不存在') {
@@ -219,16 +229,23 @@ const Lobby: React.FC = () => {
             return { reason: 'unknown', message: '目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。' };
         };
 
-        const handleError = (payload: any) => {
+        const handleError = (payload: unknown) => {
+            const candidate = payload && typeof payload === 'object'
+                ? payload as Partial<ErrorPayload>
+                : null;
+            const errorPayload: ErrorPayload = {
+                message: typeof candidate?.message === 'string' ? candidate.message : '無法加入房間',
+                code: typeof candidate?.code === 'string' ? candidate.code : undefined
+            };
             frontendLogger.error('❌ [Lobby] 伺服器錯誤', {
-                message: typeof payload?.message === 'string' ? payload.message : 'unknown',
-                code: typeof payload?.code === 'string' ? payload.code : undefined
+                message: errorPayload.message,
+                code: errorPayload.code
             });
             setIsConnecting(false);
             const pendingJoinRoom = pendingJoinRoomRef.current;
             pendingJoinRoomRef.current = null;
             if (pendingJoinRoom && invitedRoomRef.current?.roomId === pendingJoinRoom) {
-                const recovery = resolveInviteRecovery(payload);
+                const recovery = resolveInviteRecovery(errorPayload);
                 setInviteRecovery({
                     roomId: pendingJoinRoom,
                     reason: recovery.reason,
@@ -237,7 +254,7 @@ const Lobby: React.FC = () => {
                 return;
             }
 
-            alert(`錯誤: ${payload.message}`);
+            alert(`錯誤: ${errorPayload.message}`);
         };
 
         gameWebSocket.on('ROOM_CREATED', handleRoomCreated);
@@ -267,7 +284,7 @@ const Lobby: React.FC = () => {
             geishaSet: selectedGeishaSet,
             setupMode
         });
-        gameWebSocket.send('CREATE_ROOM', {
+        const createPayload: CreateRoomPayload = {
             playerId: playerName,
             displayName: playerName,
             lineUserId: boundAccountProfile?.lineUserId,
@@ -277,7 +294,8 @@ const Lobby: React.FC = () => {
             geishaSet: selectedGeishaSet,
             setupMode,
             ...(customSelection ? { customSelection } : {})
-        });
+        };
+        gameWebSocket.send('CREATE_ROOM', createPayload);
     };
 
     // 加入房間請求
@@ -290,13 +308,14 @@ const Lobby: React.FC = () => {
             roomId,
             playerId: playerName
         });
-        gameWebSocket.send('JOIN_ROOM', {
+        const joinPayload: JoinRoomPayload = {
             roomId,
             playerId: playerName,
             displayName: playerName,
             lineUserId: boundAccountProfile?.lineUserId,
             avatarUrl: boundAccountProfile?.avatarUrl
-        });
+        };
+        gameWebSocket.send('JOIN_ROOM', joinPayload);
     };
 
     const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);

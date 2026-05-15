@@ -1,8 +1,8 @@
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { GameProvider } from '../contexts/GameContext';
 import { gameWebSocket } from '../services/websocket';
-import { saveRoomSessionToken } from '../utils/roomSession';
+import { getStoredRoomSessionToken, saveRoomSessionToken } from '../utils/roomSession';
 import { useWebSocket } from './useWebSocket';
 import type { Player } from 'game-shared-types';
 
@@ -75,5 +75,27 @@ describe('useWebSocket', () => {
                 roomSessionToken: 'host-token'
             }
         ));
+    });
+
+    test('clears stale room session token when server rejects player id ownership', async () => {
+        saveRoomSessionToken('ABC123', 'host', 'stale-token');
+
+        const { result } = renderHook(() => useWebSocket('ABC123', player), { wrapper });
+
+        await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith('ERROR', expect.any(Function)));
+        const errorHandler = [...mockGameWebSocket.on.mock.calls]
+            .reverse()
+            .find(([messageType]) => messageType === 'ERROR')?.[1] as ((payload: unknown) => void) | undefined;
+        expect(errorHandler).toEqual(expect.any(Function));
+
+        act(() => {
+            errorHandler?.({
+                code: 'PLAYER_ID_TAKEN',
+                message: '此玩家名稱已在房間中使用，請重新加入或更換名稱。'
+            });
+        });
+
+        expect(getStoredRoomSessionToken('ABC123', 'host')).toBeNull();
+        expect(result.current.error).toBe('這個房間的重連憑證已失效，請返回大廳重新加入或更換名稱。');
     });
 });

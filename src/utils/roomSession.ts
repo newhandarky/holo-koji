@@ -36,3 +36,14 @@ export const getStoredRoomSessionToken = (
     }
     return normalize(window.localStorage.getItem(key));
 };
+
+export const clearRoomSessionToken = (
+    roomId?: string | null,
+    playerId?: string | null
+) => {
+    const key = buildRoomSessionKey(roomId, playerId);
+    if (!key) {
+        return;
+    }
+    window.localStorage.removeItem(key);
+};

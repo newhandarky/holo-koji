@@ -7,6 +7,8 @@ import {
     GameAction,
     GameState,
     ItemCard,
+    ErrorPayload,
+    JoinRoomPayload,
     OrderDecisionResultPayload,
     OrderDecisionStartPayload,
     Player,
@@ -14,12 +16,13 @@ import {
 } from 'game-shared-types';
 import { gameWebSocket } from '../services/websocket';
 import { frontendLogger } from '../utils/runtimeLogger';
-import { getStoredRoomSessionToken } from '../utils/roomSession';
+import { clearRoomSessionToken, getStoredRoomSessionToken } from '../utils/roomSession';
 import config from '../config/environment';
 
 // 連線事件的保留名稱，避免與伺服器事件衝突
 const CONNECTION_OPEN = '__OPEN__';
 const CONNECTION_CLOSE = '__CLOSE__';
+const PLAYER_ID_TAKEN_ERROR = '這個房間的重連憑證已失效，請返回大廳重新加入或更換名稱。';
 
 export interface CardDrawEvent {
     // 抽牌玩家 ID
@@ -223,11 +226,19 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         };
 
         const handleErrorMessage = (payload: unknown) => {
+            const errorPayload = payload && typeof payload === 'object'
+                ? payload as Partial<ErrorPayload>
+                : null;
             const message = typeof payload === 'string'
                 ? payload
-                : (payload && typeof payload === 'object' && 'message' in payload)
-                    ? String((payload as { message: unknown }).message)
+                : (errorPayload && typeof errorPayload.message === 'string')
+                    ? errorPayload.message
                     : '未知錯誤';
+            if (errorPayload?.code === 'PLAYER_ID_TAKEN') {
+                clearRoomSessionToken(gameId, playerId);
+                safeDispatch({ type: 'SET_ERROR', payload: { error: PLAYER_ID_TAKEN_ERROR } });
+                return;
+            }
             safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
         };
 
@@ -343,11 +354,12 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
 
             try {
                 const roomSessionToken = getStoredRoomSessionToken(gameId, playerId);
-                gameWebSocket.send('JOIN_ROOM', {
+                const joinPayload: JoinRoomPayload = {
                     roomId: gameId,
                     playerId,
                     ...(roomSessionToken ? { roomSessionToken } : {})
-                });
+                };
+                gameWebSocket.send('JOIN_ROOM', joinPayload);
             } catch (error) {
                 const message = error instanceof Error ? error.message : '無法加入房間';
                 safeDispatch({ type: 'SET_ERROR', payload: { error: message } });

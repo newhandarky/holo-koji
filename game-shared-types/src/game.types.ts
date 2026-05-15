@@ -332,6 +332,36 @@ export interface CreateRoomPayload {
     customSelection?: CustomCharacterSelection;
 }
 
+export interface JoinRoomPayload {
+    roomId: string;
+    playerId: string;
+    displayName?: string;
+    lineUserId?: string;
+    avatarUrl?: string;
+    roomSessionToken?: string;
+}
+
+export interface RoomCreatedPayload {
+    roomId: string;
+    playerId: string;
+    roomSessionToken?: string;
+}
+
+export interface PlayerJoinedPayload {
+    roomId: string;
+    playerId: string;
+    roomSessionToken?: string;
+}
+
+export type KnownWebSocketErrorCode =
+    | 'INVALID_JOIN_REQUEST'
+    | 'ROOM_RESTORE_FAILED'
+    | 'ROOM_NOT_FOUND'
+    | 'ROOM_CONFIG_INVALID'
+    | 'ROOM_ALREADY_STARTED'
+    | 'PLAYER_ID_TAKEN'
+    | 'ROOM_FULL';
+
 // 遊戲整體狀態
 export interface GameState {
     gameId: string;
@@ -416,7 +446,7 @@ export type WebSocketEventType =
     | 'INTERACTION_RESOLVED'
     | 'ROUND_COMPLETE';
 
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
     type: WebSocketEventType | string;
     payload: T;
 }
@@ -425,11 +455,6 @@ export interface WebSocketMessage<T = any> {
 export interface GameStartedPayload {
     gameState: GameState;
     message?: string;
-}
-
-export interface PlayerJoinedPayload {
-    player: Player;
-    gameState: GameState;
 }
 
 export interface OrderDecisionStartPayload {
@@ -445,7 +470,7 @@ export interface OrderDecisionResultPayload {
 }
 
 export interface ErrorPayload {
-    code: string;
+    code?: KnownWebSocketErrorCode | (string & {});
     message: string;
-    details?: any;
+    details?: unknown;
 }

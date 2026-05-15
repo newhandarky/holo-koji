@@ -3,7 +3,11 @@
 本檔案依目前 git commit 記錄整理，時間戳未完整保留，先以「未標註日期」呈現；後續可依實際提交日期補齊。
 
 ## [Unreleased]
-- 尚未規劃。
+- 強化房間 session 重連：伺服器會發行每位玩家專屬的 room session token，避免同名玩家未授權接管座位。
+- 對局中斷線改為保留玩家座位，支援持有效 token 重新連回同一房間並取得玩家可見狀態。
+- Redis 房間快照會保存並還原玩家 seat metadata，以支援伺服器重啟後的重連。
+- 前端會保存並帶入 room session token；token 失效或玩家名稱已被佔用時會清除 stale token 並顯示可操作的恢復提示。
+- 從遊戲房錯誤頁返回大廳時會保留房號並預填本機玩家名稱，方便重新加入。
 
 ## [0.2.0] - 2026-04-30
 - 導入 speckit / Codex agent workflow，新增 `.agents/skills`、`.specify`、`AGENTS.md` 與版本更新 spec。

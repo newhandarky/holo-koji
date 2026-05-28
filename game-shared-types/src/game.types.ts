@@ -272,6 +272,9 @@ export interface AccountSyncResult {
 
 export interface AccountSyncRequest {
     verifiedIdentity?: VerifiedLineIdentity;
+    idToken?: string;
+    authorizationCode?: string;
+    redirectUri?: string;
     profile?: {
         displayName?: string;
         avatarUrl?: string;
@@ -444,7 +447,12 @@ export type WebSocketEventType =
     | 'ACTION_EXECUTED'
     | 'PENDING_INTERACTION'
     | 'INTERACTION_RESOLVED'
-    | 'ROUND_COMPLETE';
+    | 'ROUND_COMPLETE'
+    | 'READY_CHECK'
+    | 'READY_STATUS'
+    | 'REMATCH_REQUESTED'
+    | 'ACCOUNT_SYNC_RESULT'
+    | 'ACHIEVEMENT_STATUS_RESULT';
 
 export interface WebSocketMessage<T = unknown> {
     type: WebSocketEventType | string;
@@ -474,3 +482,120 @@ export interface ErrorPayload {
     message: string;
     details?: unknown;
 }
+
+export type EmptyPayload = Record<string, never>;
+
+export interface GameActionRequestPayload {
+    gameId: string;
+    playerId: string;
+    action: GameAction;
+}
+
+export interface PlayerRoomRequestPayload {
+    gameId: string;
+    playerId: string;
+}
+
+export interface ReadyStatusPayload {
+    confirmations: string[];
+    waitingFor: string[];
+}
+
+export interface RematchRequestedPayload {
+    confirmations: string[];
+}
+
+export interface CardDrawnPayload {
+    playerId: string;
+    card: ItemCard;
+}
+
+export interface DealAnimationPayload {
+    sequence: Array<{
+        order: number;
+        playerId: string;
+        card: ItemCard;
+    }>;
+}
+
+export interface RoundCompletePayload {
+    round?: number;
+}
+
+export interface GameEndedPayload {
+    winner: string;
+}
+
+export interface ActionExecutedPayload {
+    playerId: string;
+    action: ActionType;
+    cardIds?: string[];
+}
+
+export interface InteractionResolvedPayload {
+    interaction: PendingInteraction['type'];
+    initiatorId: string;
+    targetPlayerId: string;
+    chosenCardId?: string;
+    chosenGroupIndex?: number;
+}
+
+export interface ClientToServerEventMap {
+    ACCOUNT_SYNC: AccountSyncRequest;
+    ACCOUNT_STATUS: EmptyPayload;
+    ACHIEVEMENT_STATUS: EmptyPayload;
+    ACHIEVEMENT_ACK_NEW_UNLOCKS: AchievementAcknowledgeRequest;
+    CREATE_ROOM: CreateRoomPayload;
+    JOIN_ROOM: JoinRoomPayload;
+    CONFIRM_ORDER: PlayerRoomRequestPayload;
+    GAME_ACTION: GameActionRequestPayload;
+    READY_CONFIRM: PlayerRoomRequestPayload;
+    REMATCH_REQUEST: PlayerRoomRequestPayload;
+    LEAVE_ROOM: EmptyPayload;
+}
+
+export interface ServerToClientEventMap {
+    ACCOUNT_SYNC_RESULT: AccountSyncResult;
+    ACHIEVEMENT_STATUS_RESULT: AchievementStatusResult;
+    ERROR: ErrorPayload | string;
+    ROOM_CREATED: RoomCreatedPayload;
+    PLAYER_JOINED: PlayerJoinedPayload;
+    PLAYER_LEFT: { playerId: string };
+    GAME_STARTED: GameState;
+    GAME_STATE_SYNC: GameState;
+    GAME_STATE_UPDATED: GameState;
+    GAME_STATE_UPDATE: GameState;
+    STATE_CHANGED: GameState;
+    ORDER_DECISION_START: OrderDecisionStartPayload;
+    ORDER_DECISION_STARTED: OrderDecisionStartPayload;
+    ORDER_DECISION_RESULT: OrderDecisionResultPayload;
+    ORDER_DECISION_COMPLETED: OrderDecisionResultPayload;
+    ORDER_CONFIRMATION_UPDATE: ReadyStatusPayload;
+    ORDER_CONFIRMATIONS_UPDATED: ReadyStatusPayload;
+    ORDER_CONFIRMED: ReadyStatusPayload;
+    READY_CHECK: ReadyStatusPayload;
+    READY_STATUS: ReadyStatusPayload;
+    REMATCH_REQUESTED: RematchRequestedPayload;
+    DEAL_ANIMATION: DealAnimationPayload;
+    CARD_DRAWN: CardDrawnPayload;
+    ACTION_EXECUTED: ActionExecutedPayload;
+    PENDING_INTERACTION: PendingInteraction;
+    INTERACTION_RESOLVED: InteractionResolvedPayload;
+    ROUND_COMPLETE: RoundCompletePayload;
+    TURN_CHANGED: GameState;
+    TURN_ENDED: GameState;
+    GAME_ENDED: GameEndedPayload | GameState;
+}
+
+export type ClientToServerEventType = keyof ClientToServerEventMap;
+export type ServerToClientEventType = keyof ServerToClientEventMap;
+
+export type TypedWebSocketMessage<TEventMap extends object> = {
+    [K in keyof TEventMap]: {
+        type: K;
+        payload: TEventMap[K];
+    }
+}[keyof TEventMap];
+
+export type ClientToServerMessage = TypedWebSocketMessage<ClientToServerEventMap>;
+export type ServerToClientMessage = TypedWebSocketMessage<ServerToClientEventMap>;

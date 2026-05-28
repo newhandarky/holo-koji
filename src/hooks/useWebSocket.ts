@@ -12,7 +12,9 @@ import {
     OrderDecisionResultPayload,
     OrderDecisionStartPayload,
     Player,
-    WebSocketEventType
+    ReadyStatusPayload,
+    ServerToClientEventMap,
+    ServerToClientEventType
 } from 'game-shared-types';
 import { gameWebSocket } from '../services/websocket';
 import { frontendLogger } from '../utils/runtimeLogger';
@@ -42,11 +44,6 @@ export interface DealAnimationEvent {
 interface RoundCompletePayload {
     // 結算回合數
     round?: number;
-}
-
-interface ReadyStatusPayload {
-    confirmations: string[];
-    waitingFor: string[];
 }
 
 // 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
@@ -163,7 +160,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
 
         let isActive = true; // 確保卸載後不再更新 state
-        const handlerMap: Record<string, (payload: unknown) => void> = {}; // 快速紀錄已註冊的事件
+        const handlerMap: Partial<Record<ServerToClientEventType, (payload: unknown) => void>> = {}; // 快速紀錄已註冊的事件
 
         const safeDispatch = (action: ClientAction) => {
             if (isActive) {
@@ -329,14 +326,17 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             // 明確註冊 no-op handler，避免正常流程被記成「找不到處理器」警告。
         };
 
-        const registerEventHandler = (eventType: WebSocketEventType | string, handler: (payload: unknown) => void) => {
-            handlerMap[eventType] = handler;
-            gameWebSocket.on(eventType, handler);
+        const registerEventHandler = <TType extends ServerToClientEventType>(
+            eventType: TType,
+            handler: (payload: ServerToClientEventMap[TType]) => void
+        ) => {
+            handlerMap[eventType] = handler as (payload: unknown) => void;
+            gameWebSocket.on(eventType, handler as Parameters<typeof gameWebSocket.on<TType>>[1]);
         };
 
         const cleanupHandlers = () => {
             Object.keys(handlerMap).forEach(eventType => {
-                gameWebSocket.off(eventType);
+                gameWebSocket.off(eventType as ServerToClientEventType);
             });
             gameWebSocket.off(CONNECTION_OPEN);
             gameWebSocket.off(CONNECTION_CLOSE);
@@ -488,24 +488,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
     }, [gameId, playerData?.id]);
 
-    // 主動觸發順序決定（目前預留使用）
-    const startOrderDecision = useCallback((players: string[]) => {
-        if (!gameId) {
-            frontendLogger.warn('⚠️ [useWebSocket] 缺少 gameId，無法啟動順序決定');
-            return;
-        }
-
-        try {
-            gameWebSocket.send('START_ORDER_DECISION', {
-                gameId,
-                players
-            });
-        } catch (error) {
-            const message = error instanceof Error ? error.message : '啟動順序決定失敗';
-            clientDispatch({ type: 'SET_ERROR', payload: { error: message } });
-        }
-    }, [gameId]);
-
     // 清除錯誤訊息
     const clearError = useCallback(() => {
         clientDispatch({ type: 'CLEAR_ERROR' });
@@ -536,7 +518,6 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         requestRematch,
         confirmReady,
         confirmOrder,
-        startOrderDecision,
         clearError,
         leaveRoom,
         dealQueue,

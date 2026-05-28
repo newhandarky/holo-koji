@@ -8,7 +8,7 @@ export interface Geisha {
     name: string;                   // 藝妓名稱
     charmPoints: number;            // 魅力值
     imageUrl: string;               // 顯示用人物圖片 URL
-    controlledBy: PlayerId | null; // 控制方
+    controlledBy: string | null; // 控制方
 }
 
 // 物品卡片

@@ -6,7 +6,7 @@ export interface Geisha {
     name: string;
     charmPoints: number;
     imageUrl: string;
-    controlledBy: PlayerId | null;
+    controlledBy: string | null;
 }
 export interface ItemCard {
     id: string;

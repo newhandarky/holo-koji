@@ -7,6 +7,9 @@
 /server/node_modules
 /docs
 
+# 個人學習筆記與教材
+/learning-notes/
+
 # 測試產物
 /coverage
 

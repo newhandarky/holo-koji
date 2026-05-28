@@ -1,17 +1,29 @@
 // src/services/websocket.ts - 強化版本
+import {
+    ClientToServerEventMap,
+    ClientToServerEventType,
+    ServerToClientEventMap,
+    ServerToClientEventType
+} from 'game-shared-types';
 import { frontendLogger, summarizeSocketMessage } from '../utils/runtimeLogger';
 
 // WebSocket 訊息格式
-interface WebSocketMessage {
+interface ParsedWebSocketMessage {
     type: string;
     payload: unknown;
 }
+
+type InternalConnectionEvent = '__OPEN__' | '__CLOSE__';
+type GameWebSocketEventType = ServerToClientEventType | InternalConnectionEvent;
+type GameWebSocketEventPayload<TType extends GameWebSocketEventType> =
+    TType extends ServerToClientEventType ? ServerToClientEventMap[TType] : unknown;
+type MessageHandler = (payload: unknown) => void;
 
 export class GameWebSocket {
     // WebSocket 連線物件
     private ws: WebSocket | null = null;
     // 訊息處理器表（事件名稱 → 處理函式）
-    public messageHandlers: Map<string, (payload: unknown) => void> = new Map();
+    public messageHandlers: Map<string, MessageHandler> = new Map();
     // 重新連線計數
     private reconnectAttempts = 0;
     // 重新連線最大次數
@@ -59,7 +71,7 @@ export class GameWebSocket {
                 // 關鍵：訊息接收處理
                 this.ws.onmessage = (event) => {
                     try {
-                        const message: WebSocketMessage = JSON.parse(event.data);
+                        const message: ParsedWebSocketMessage = JSON.parse(event.data);
 
                         // 查找處理器
                         const handler = this.messageHandlers.get(message.type);
@@ -131,9 +143,9 @@ export class GameWebSocket {
     }
 
     // 發送訊息到伺服器
-    send(type: string, payload: unknown): void {
+    send<TType extends ClientToServerEventType>(type: TType, payload: ClientToServerEventMap[TType]): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            const message: WebSocketMessage = { type, payload };
+            const message = { type, payload };
             this.ws.send(JSON.stringify(message));
             frontendLogger.diagnostic('🐞 [WebSocket] 傳送事件摘要', summarizeSocketMessage(message) ?? undefined);
         } else {
@@ -146,12 +158,15 @@ export class GameWebSocket {
     }
 
     // 註冊事件處理器
-    on<TPayload = unknown>(messageType: string, handler: (payload: TPayload) => void): void {
-        this.messageHandlers.set(messageType, handler as (payload: unknown) => void);
+    on<TType extends GameWebSocketEventType>(
+        messageType: TType,
+        handler: (payload: GameWebSocketEventPayload<TType>) => void
+    ): void {
+        this.messageHandlers.set(messageType, handler as MessageHandler);
     }
 
     // 移除事件處理器
-    off(messageType: string): void {
+    off(messageType: GameWebSocketEventType): void {
         this.messageHandlers.delete(messageType);
     }
 

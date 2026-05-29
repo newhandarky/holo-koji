@@ -11,8 +11,8 @@
 ## Technical Context
 
 **Frontend**: React 18, Create React App, TypeScript  
-**Backend**: Node.js, Express, Socket.IO  
-**Shared Types**: `game-shared-types`  
+**Backend**: Independent Node.js, Express, `ws` server  
+**Shared Types**: `@newhandarky/hanakoji-game-types` from GitHub Packages  
 **Package Manager**: npm  
 **Validation**: `CI=1 npm test -- --watchAll=false`, `npm run build`
 
@@ -28,8 +28,8 @@
 
 ```text
 src/
-server/
-game-shared-types/
+server/ (optional ignored local checkout)
+newhandarky/hanakoji-game-types (independent shared repo)
 specs/[###-feature]/
 ```
 

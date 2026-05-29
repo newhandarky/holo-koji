@@ -1,6 +1,6 @@
 import React, { act } from 'react';
 import { render, screen } from '@testing-library/react';
-import type { OpeningDealSummary, Player } from 'game-shared-types';
+import type { OpeningDealSummary, Player } from '@newhandarky/hanakoji-game-types';
 import OpeningDealModal from './OpeningDealModal';
 import { buildOpeningDealModalModel } from './openingDealModalModel';
 

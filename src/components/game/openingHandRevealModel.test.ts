@@ -1,4 +1,4 @@
-import type { ActionToken, GameState, ItemCard } from 'game-shared-types';
+import type { ActionToken, GameState, ItemCard } from '@newhandarky/hanakoji-game-types';
 import {
     buildOpeningHandRevealModel,
     createOpeningHandRevealSteps,

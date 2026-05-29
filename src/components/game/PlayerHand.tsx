@@ -1,6 +1,6 @@
 // src/components/game/PlayerHand.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ItemCard, GeishaSet } from "game-shared-types"
+import { ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { getItemCardImage, getItemCardLabel } from '../../utils/gameData';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import type { OpeningHandRevealModel } from './openingHandRevealModel';

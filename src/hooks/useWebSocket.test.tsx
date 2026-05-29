@@ -4,7 +4,7 @@ import { GameProvider } from '../contexts/GameContext';
 import { gameWebSocket } from '../services/websocket';
 import { getStoredRoomSessionToken, saveRoomSessionToken } from '../utils/roomSession';
 import { useWebSocket } from './useWebSocket';
-import type { Player } from 'game-shared-types';
+import type { Player } from '@newhandarky/hanakoji-game-types';
 
 jest.mock('../services/websocket', () => {
     const messageHandlers = new Map();

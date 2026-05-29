@@ -1,4 +1,4 @@
-import { GeishaSet } from 'game-shared-types';
+import { GeishaSet } from '@newhandarky/hanakoji-game-types';
 
 export interface LobbyCharacterSetOption {
     key: GeishaSet;

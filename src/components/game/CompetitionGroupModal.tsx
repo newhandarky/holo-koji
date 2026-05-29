@@ -1,5 +1,5 @@
 import React from 'react';
-import { ItemCard, GeishaSet } from 'game-shared-types';
+import { ItemCard, GeishaSet } from '@newhandarky/hanakoji-game-types';
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface CompetitionGroupModalProps {

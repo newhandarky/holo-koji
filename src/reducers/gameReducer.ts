@@ -1,5 +1,5 @@
 // src/contexts/gameReducer.ts - 添加順序決定狀態管理
-import { GameState, GameAction } from "game-shared-types"
+import { GameState, GameAction } from "@newhandarky/hanakoji-game-types"
 import { frontendLogger } from '../utils/runtimeLogger';
 
 // 初始遊戲狀態

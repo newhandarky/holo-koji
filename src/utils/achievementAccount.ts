@@ -1,4 +1,4 @@
-import { AchievementAcknowledgeRequest, AchievementStatusResult } from 'game-shared-types';
+import { AchievementAcknowledgeRequest, AchievementStatusResult } from '@newhandarky/hanakoji-game-types';
 import { gameWebSocket } from '../services/websocket';
 
 const ACHIEVEMENT_TIMEOUT_MS = 3000;

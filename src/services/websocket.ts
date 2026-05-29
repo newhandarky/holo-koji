@@ -4,7 +4,7 @@ import {
     ClientToServerEventType,
     ServerToClientEventMap,
     ServerToClientEventType
-} from 'game-shared-types';
+} from '@newhandarky/hanakoji-game-types';
 import { frontendLogger, summarizeSocketMessage } from '../utils/runtimeLogger';
 
 // WebSocket 訊息格式

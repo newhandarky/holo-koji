@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AccountSyncResult } from 'game-shared-types';
+import { AccountSyncResult } from '@newhandarky/hanakoji-game-types';
 import config from '../../config/environment';
 import { gameWebSocket } from '../../services/websocket';
 import {

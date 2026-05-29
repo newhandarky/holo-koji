@@ -3,6 +3,8 @@
 本檔案依目前 git commit 記錄整理，時間戳未完整保留，先以「未標註日期」呈現；後續可依實際提交日期補齊。
 
 ## [Unreleased]
+- 將 shared types 修復為正式三 repo 架構：`@newhandarky/hanakoji-game-types@1.1.0` 由 GitHub Packages 發布，前端與後端改用固定 package 版本。
+- root repo 移除本地 `game-shared-types/` 與 `server` submodule；`server/` 後續作為獨立後端 repo checkout 使用。
 - 強化房間 session 重連：伺服器會發行每位玩家專屬的 room session token，避免同名玩家未授權接管座位。
 - 對局中斷線改為保留玩家座位，支援持有效 token 重新連回同一房間並取得玩家可見狀態。
 - Redis 房間快照會保存並還原玩家 seat metadata，以支援伺服器重啟後的重連。

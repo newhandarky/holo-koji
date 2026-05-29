@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GameState, ItemCard, PendingInteraction } from 'game-shared-types';
+import { GameState, ItemCard, PendingInteraction } from '@newhandarky/hanakoji-game-types';
 import { getDrawFlipDurationMs } from './drawNotificationModel';
 
 export type MotionCueKind = 'draw' | 'removal' | 'placement' | 'gift-result' | 'competition-result';

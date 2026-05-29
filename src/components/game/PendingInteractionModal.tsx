@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, PendingInteraction, GameAction, Player, GeishaSet } from 'game-shared-types';
+import { ItemCard, PendingInteraction, GameAction, Player, GeishaSet } from '@newhandarky/hanakoji-game-types';
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
 
 interface PendingInteractionModalProps {

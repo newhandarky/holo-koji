@@ -10,7 +10,7 @@ import {
     PlayerJoinedPayload,
     RoomCreatedPayload,
     RoomSetupMode
-} from 'game-shared-types';
+} from '@newhandarky/hanakoji-game-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
 import config from '../../config/environment';

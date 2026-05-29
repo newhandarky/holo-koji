@@ -1,6 +1,6 @@
 // src/contexts/GameContext.tsx - 完整版本
 import React, { createContext, useContext, useReducer } from 'react';
-import { GameState, GameAction } from "game-shared-types"
+import { GameState, GameAction } from "@newhandarky/hanakoji-game-types"
 import { gameReducer, initialState } from "../reducers/gameReducer"
 
 // Context 型別定義（提供全域狀態與派發）

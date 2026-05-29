@@ -1,6 +1,6 @@
 // src/components/game/ActionTokens.tsx
 import React, { useState } from 'react';
-import { ActionToken, ItemCard, GeishaSet } from "game-shared-types"
+import { ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { getItemCardImage } from '../../utils/gameData';
 import { actionIconMap } from '../../utils/actionAssets';
 

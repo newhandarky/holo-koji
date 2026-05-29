@@ -1,4 +1,4 @@
-import type { ItemCard } from 'game-shared-types';
+import type { ItemCard } from '@newhandarky/hanakoji-game-types';
 import type { FocusSection } from './GameBoard';
 
 export const DRAW_NOTIFICATION_TIMEOUT_MS = 5000;

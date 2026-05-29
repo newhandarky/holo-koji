@@ -1,4 +1,4 @@
-import { AccountSyncResult, LineAccountProfile } from 'game-shared-types';
+import { AccountSyncResult, LineAccountProfile } from '@newhandarky/hanakoji-game-types';
 import { gameWebSocket } from '../services/websocket';
 import { LineProfile } from './lineLiff';
 import { frontendLogger } from './runtimeLogger';

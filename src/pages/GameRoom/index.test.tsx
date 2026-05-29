@@ -1,7 +1,7 @@
 import React, { act } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { OpeningDealSummary } from 'game-shared-types';
+import type { OpeningDealSummary } from '@newhandarky/hanakoji-game-types';
 import GameRoom from './index';
 import { shareRoomInvite } from '../../utils/lineLiff';
 

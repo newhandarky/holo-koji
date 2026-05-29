@@ -1,4 +1,4 @@
-import type { OpeningDealSummary, Player } from 'game-shared-types';
+import type { OpeningDealSummary, Player } from '@newhandarky/hanakoji-game-types';
 import { getCardBackTheme } from './cardBackTheme';
 import type {
     OpeningDealModalModel,

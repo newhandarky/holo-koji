@@ -1,4 +1,4 @@
-import { characterProfilesBySet, CharacterProfile, Geisha, GeishaSet, ItemCard } from "game-shared-types"
+import { characterProfilesBySet, CharacterProfile, Geisha, GeishaSet, ItemCard } from "@newhandarky/hanakoji-game-types"
 
 export interface ItemIconDefinition {
     key: string;

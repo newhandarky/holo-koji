@@ -1,7 +1,7 @@
 
 // src/components/game/GeishaCard.tsx
 import React, { CSSProperties, useEffect, useState } from 'react';
-import { Geisha } from "game-shared-types";
+import { Geisha } from "@newhandarky/hanakoji-game-types";
 import { ItemIconDefinition } from '../../utils/gameData';
 import { MotionCue } from './gameMotion';
 

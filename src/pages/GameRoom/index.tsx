@@ -35,7 +35,7 @@ import {
 } from '../../components/game/openingHandRevealModel';
 import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
-import { Player, ActionToken, ItemCard, GeishaSet } from "game-shared-types"
+import { Player, ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
 import { getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';

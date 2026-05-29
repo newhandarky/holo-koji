@@ -11,15 +11,15 @@
 
 - This repository is a Hanamikoji online game.
 - Frontend: React 18, Create React App, TypeScript, Bootstrap.
-- Backend: Node.js, Express, Socket.IO.
-- Shared types: local `game-shared-types` package.
+- Backend: Node.js, Express, `ws`.
+- Shared types: published GitHub Packages package `@newhandarky/hanakoji-game-types`.
 - The server is authoritative for multiplayer game state.
 
 ## Repository Structure
 
-- `src/`: frontend application.
-- `server/`: backend WebSocket/API server.
-- `game-shared-types/`: shared TypeScript types used across client/server boundaries.
+- `src/`: frontend application in this repository.
+- `server/`: optional local checkout of the independent backend repository; root does not track it as a submodule.
+- `newhandarky/hanakoji-game-types`: independent shared TypeScript contract repository published as `@newhandarky/hanakoji-game-types`.
 - `.specify/`: speckit scripts, templates, and constitution.
 - `specs/`: feature and release planning artifacts.
 - `.agents/skills/`: shared Codex skills linked into this project.
@@ -29,7 +29,7 @@
 - Make the smallest change that satisfies the current task.
 - Do not rewrite or reformat unrelated files.
 - Do not overwrite or revert uncommitted user changes unless explicitly requested.
-- Before changing gameplay behavior, identify affected state transitions, Socket.IO events, and UI flows.
+- Before changing gameplay behavior, identify affected state transitions, WebSocket message flow, and UI flows.
 - Treat hidden information as sensitive game state: opponent hand cards, secret cards, and pending choices must not leak through client-visible state.
 
 ## Commit Message Rules
@@ -72,8 +72,8 @@
 - Preserve the existing Create React App structure.
 - Preserve the mobile-first gameplay layout and bottom-sheet interaction style unless the active spec says otherwise.
 - Backend validation must remain explicit for turn order, action availability, card ownership, room membership, pending interactions, and game completion.
-- Socket.IO event or payload changes must update both client and server in the same feature scope.
-- Shared type changes must be reflected in `game-shared-types` and all affected consumers.
+- WebSocket event or payload changes must update shared types, client, and server in the same feature scope.
+- Shared type changes must be made in `newhandarky/hanakoji-game-types`, published as a new package version, and then consumed by frontend/server dependency updates.
 
 ## Verification
 
@@ -97,7 +97,7 @@ For backend-only changes, run the most relevant server command available in `ser
 
 ## Release And Versioning
 
-- Decide whether root, server, and `game-shared-types` versions are synchronized before editing package metadata.
+- Decide whether root, server, and `@newhandarky/hanakoji-game-types` versions are synchronized before editing package metadata.
 - Update `CHANGELOG.md` for release-visible changes.
 - Keep release preparation separate from unrelated gameplay or UI changes unless the active spec includes them.
 - Do not declare a stable `1.0.0` release unless the spec explicitly defines stability criteria and acceptance checks.

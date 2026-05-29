@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ItemCard, GeishaSet } from 'game-shared-types';
+import { ItemCard, GeishaSet } from '@newhandarky/hanakoji-game-types';
 import { getItemCardLabel, getItemCardImage } from '../../utils/gameData';
 
 interface DrawCardModalProps {

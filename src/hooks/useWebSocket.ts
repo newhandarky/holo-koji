@@ -15,7 +15,7 @@ import {
     ReadyStatusPayload,
     ServerToClientEventMap,
     ServerToClientEventType
-} from 'game-shared-types';
+} from '@newhandarky/hanakoji-game-types';
 import { gameWebSocket } from '../services/websocket';
 import { frontendLogger } from '../utils/runtimeLogger';
 import { clearRoomSessionToken, getStoredRoomSessionToken } from '../utils/roomSession';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CharacterProfile, GeishaSet, RoomSetupMode } from 'game-shared-types';
+import { CharacterProfile, GeishaSet, RoomSetupMode } from '@newhandarky/hanakoji-game-types';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { AI_DIFFICULTY_OPTIONS, AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 

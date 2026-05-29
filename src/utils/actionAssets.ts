@@ -1,4 +1,4 @@
-import { ActionToken } from "game-shared-types";
+import { ActionToken } from "@newhandarky/hanakoji-game-types";
 
 export const actionIconMap: Record<ActionToken['type'], string> = {
     secret: 'https://pub-0238f59b333e4bf38dac0e35da86c1a0.r2.dev/uploads/Action/1777803055114-320a8d17-6c9e-4575-9a40-aec696061ef3-ChatGPT-Image-2026-5-3-05_39_56.png',

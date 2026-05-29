@@ -1,4 +1,4 @@
-import type { OpeningDealSummary } from 'game-shared-types';
+import type { OpeningDealSummary } from '@newhandarky/hanakoji-game-types';
 import type { CardBackTheme } from './cardBackTheme';
 
 export type OpeningDealModalStepType = OpeningDealSummary['steps'][number]['type'];

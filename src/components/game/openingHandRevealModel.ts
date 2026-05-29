@@ -1,4 +1,4 @@
-import type { GameState, ItemCard } from 'game-shared-types';
+import type { GameState, ItemCard } from '@newhandarky/hanakoji-game-types';
 
 export type OpeningHandRevealStatus = 'not_eligible' | 'pending_take' | 'revealing' | 'revealed';
 

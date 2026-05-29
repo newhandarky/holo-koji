@@ -1,6 +1,6 @@
 // src/components/game/OrderDecisionModal.tsx
 import React, { useState, useEffect } from 'react';
-import { OrderDecision } from "game-shared-types"
+import { OrderDecision } from "@newhandarky/hanakoji-game-types"
 
 interface OrderDecisionModalProps extends OrderDecision {
     // 玩家按下確認時的回呼

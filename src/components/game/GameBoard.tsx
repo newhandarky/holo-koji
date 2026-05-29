@@ -13,7 +13,7 @@ import {
     GameAction,
     GameState,
     GeishaSet
-} from 'game-shared-types';
+} from '@newhandarky/hanakoji-game-types';
 import { ItemIconDefinition, getItemIconDefinitionByPosition } from '../../utils/gameData';
 
 interface GameBoardProps {

@@ -62,8 +62,9 @@
 ## 專案結構
 
 - `src/`：前端 React 應用
-- `server/`：後端 WebSocket 伺服器
-- `docs/`：規則與開發文件
+- `server/`：可選的獨立後端 repo checkout；root 不追蹤此目錄
+- `specs/`：新功能、版本更新或大型行為調整的 speckit 規劃文件
+- `AGENTS.md` / `.specify/`：專案規則、長期原則與 agent workflow 來源
 
 ## 環境需求
 
@@ -124,7 +125,7 @@ npm run build
 
 - 專案級 agent 規則請參考 `AGENTS.md`。
 - 長期原則與品質門檻位於 `.specify/memory/constitution.md`。
-- 新功能、版本更新或大型行為調整請先在 `specs/` 建立對應 spec，依序維護 `spec.md`、`plan.md`、`tasks.md`。
+- 新功能、版本更新或大型行為調整請先在 `specs/` 建立新的對應 spec，依序維護 `spec.md`、`plan.md`、`tasks.md`。
 - 共用 Codex skills 透過 `.agents/skills/` 連結到本專案。
 
 ## 部署（GitHub Pages）

@@ -3,6 +3,8 @@
 本檔案依目前 git commit 記錄整理，時間戳未完整保留，先以「未標註日期」呈現；後續可依實際提交日期補齊。
 
 ## [Unreleased]
+- 移除過時的本機 `docs/` 文件、舊 Symphony `WORKFLOW.md`，以及不符合現行架構的歷史 `specs/001-*` 到 `specs/056-*` 規格文件。
+- 更新 README 專案結構說明，將正式文件入口收斂到 `AGENTS.md`、`.specify/` 與未來新建的 `specs/`。
 - 清理 active docs 與 Speckit workflow memory，避免後續規劃誤用舊的 local `game-shared-types`、Socket.IO 或 submodule 架構描述。
 - 將 shared types 修復為正式三 repo 架構：`@newhandarky/hanakoji-game-types@1.1.0` 由 GitHub Packages 發布，前端與後端改用固定 package 版本。
 - root repo 移除本地 `game-shared-types/` 與 `server` submodule；`server/` 後續作為獨立後端 repo checkout 使用。

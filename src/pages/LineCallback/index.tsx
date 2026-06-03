@@ -7,6 +7,7 @@ import {
     syncLineAccountWithAuthorizationCode
 } from '../../utils/lineAccount';
 import { frontendLogger } from '../../utils/runtimeLogger';
+import { getLineCallbackOutcome } from './lineCallbackFlow';
 
 let activeCallbackBinding: { search: string; promise: Promise<AccountSyncResult> } | null = null;
 
@@ -18,6 +19,7 @@ const LineCallbackPage: React.FC<LineCallbackPageProps> = ({ onReturnToLobby }) 
     const [message, setMessage] = useState('正在綁定 LINE 帳號...');
     const isMountedRef = useRef(false);
     const bindingStartedRef = useRef(false);
+    const activeEffectRunRef = useRef<symbol | null>(null);
     const returnToLobby = useCallback(() => {
         if (onReturnToLobby) {
             onReturnToLobby();
@@ -29,7 +31,10 @@ const LineCallbackPage: React.FC<LineCallbackPageProps> = ({ onReturnToLobby }) 
     }, [onReturnToLobby]);
 
     useEffect(() => {
+        const effectRunId = Symbol('line-callback-effect');
+        activeEffectRunRef.current = effectRunId;
         isMountedRef.current = true;
+        const isCurrentEffectRun = () => isMountedRef.current && activeEffectRunRef.current === effectRunId;
 
         const bindLineAccount = async () => {
             try {
@@ -62,20 +67,18 @@ const LineCallbackPage: React.FC<LineCallbackPageProps> = ({ onReturnToLobby }) 
 
                 const result = await activeCallbackBinding.promise;
 
-                if (!isMountedRef.current) return;
+                if (!isCurrentEffectRun()) return;
 
-                if (result.status === 'bound') {
-                    setMessage('LINE 帳號綁定完成，正在返回大廳。');
+                const outcome = getLineCallbackOutcome(result);
+                setMessage(outcome.message);
+                if (outcome.shouldReturnToLobby) {
                     window.setTimeout(returnToLobby, 700);
-                    return;
                 }
-
-                setMessage(result.guestNotice ?? 'LINE 帳號綁定失敗，請回到大廳重試。');
             } catch (error) {
                 frontendLogger.warn('⚠️ LINE callback binding failed', {
                     error: error instanceof Error ? error.message : 'unknown'
                 });
-                if (!isMountedRef.current) return;
+                if (!isCurrentEffectRun()) return;
                 setMessage('LINE 帳號綁定失敗，請回到大廳重試。');
             }
         };
@@ -84,6 +87,9 @@ const LineCallbackPage: React.FC<LineCallbackPageProps> = ({ onReturnToLobby }) 
 
         return () => {
             isMountedRef.current = false;
+            if (activeEffectRunRef.current === effectRunId) {
+                activeEffectRunRef.current = null;
+            }
         };
     }, [returnToLobby]);
 

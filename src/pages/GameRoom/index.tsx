@@ -10,58 +10,20 @@ import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import {
     buildMotionSnapshot,
-    createOpeningDealCueSteps,
-    createDrawMotionCue,
     deriveMotionCues,
-    getOpeningDealCueDuration,
     MotionCue,
-    OpeningDealCueStep,
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
-import {
-    classifyDrawEvent,
-    getDrawEventId,
-    getDrawFlipDurationMs,
-    getDrawNotificationTimeoutMs,
-    routeDrawPresentation
-} from '../../components/game/drawNotificationModel';
-import { buildOpeningDealModalModel } from '../../components/game/openingDealModalModel';
-import {
-    buildOpeningHandRevealModel,
-    createOpeningHandRevealSteps,
-    getOpeningHandRevealTotalMs,
-    getOpeningHandTakeEligibility,
-    OpeningHandRevealStatus
-} from '../../components/game/openingHandRevealModel';
 import config from '../../config/environment';
 import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
-import { Player, ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
+import { ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
 import { getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';
-
-// 建立玩家初始行動指示物
-const createInitialActionTokens = (): ActionToken[] => [
-    { type: 'secret', used: false },
-    { type: 'trade-off', used: false },
-    { type: 'gift', used: false },
-    { type: 'competition', used: false },
-];
-
-// 建立玩家本地資料（尚未同步伺服器時使用）
-const createPlayerProfile = (id: string): Player => ({
-    id,
-    name: id,
-    hand: [],
-    playedCards: [],
-    secretCards: [],
-    discardedCards: [],
-    actionTokens: createInitialActionTokens(),
-    score: {
-        charm: 0,
-        tokens: 0
-    }
-});
+import { useGameRoomPlayers } from './useGameRoomPlayers';
+import { copyTextWithFallback, getInviteOutcomeMessage, getInviteOutcomeTone } from './gameRoomInviteModel';
+import { useGameRoomDrawPresentation } from './useGameRoomDrawPresentation';
+import { useGameRoomOpeningPresentation } from './useGameRoomOpeningPresentation';
 
 const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
     { section: 'info', label: '資訊' },
@@ -80,31 +42,20 @@ const GameRoom: React.FC = () => {
     const [currentPlayerId] = useState(() => localStorage.getItem('currentPlayerId') ?? '');
     const [localLineName] = useState(() => localStorage.getItem('lineDisplayName') ?? '');
     const [localLineAvatar] = useState(() => localStorage.getItem('lineAvatarUrl') ?? '');
-    // 房主 ID（用於陣營顏色）
-    const hostId = (state as { hostId?: string }).hostId ?? state.players[0]?.id ?? '';
-    // 玩家資料（以伺服器狀態為主）
-    const currentPlayer = currentPlayerId
-        ? (state.players.find(player => player.id === currentPlayerId) ?? null)
-        : null;
-    const playerProfile = currentPlayerId
-        ? (currentPlayer ?? createPlayerProfile(currentPlayerId))
-        : null;
-    const playersById = useMemo(() => new Map(state.players.map((player) => [player.id, player])), [state.players]);
-    const getPlayerDisplayName = useCallback((playerId?: string) => {
-        if (!playerId) return '未知玩家';
-        const player = playersById.get(playerId);
-        return player?.name
-            || (playerId === currentPlayerId ? localLineName : '')
-            || playerId
-            || '未知玩家';
-    }, [currentPlayerId, localLineName, playersById]);
-    const getPlayerAvatar = useCallback((playerId?: string) => {
-        if (!playerId) return '';
-        const player = playersById.get(playerId);
-        return player?.avatarUrl || (playerId === currentPlayerId ? localLineAvatar : '') || '';
-    }, [currentPlayerId, localLineAvatar, playersById]);
-    const displayName = getPlayerDisplayName(currentPlayerId);
-    const displayAvatar = getPlayerAvatar(currentPlayerId);
+    const {
+        hostId,
+        currentPlayer,
+        playerProfile,
+        getPlayerDisplayName,
+        getPlayerAvatar,
+        displayName,
+        displayAvatar
+    } = useGameRoomPlayers({
+        state,
+        currentPlayerId,
+        localLineName,
+        localLineAvatar
+    });
     const {
         isConnected,
         error,
@@ -123,15 +74,6 @@ const GameRoom: React.FC = () => {
     const activeGeishaSet: GeishaSet = state.geishaSet ?? 'default';
     // 是否顯示房間代碼
     const [showRoomCode, setShowRoomCode] = useState(false);
-    // 抽牌文字提示
-    const [recentDraw, setRecentDraw] = useState<string | null>(null);
-    // 抽牌動畫目標卡片
-    const [drawHighlightCardId, setDrawHighlightCardId] = useState<string | null>(null);
-    // 抽牌動畫是否顯示
-    const [isDrawHighlightActive, setIsDrawHighlightActive] = useState(false);
-    const [activeDrawNotificationEventId, setActiveDrawNotificationEventId] = useState<string | null>(null);
-    const [activeDrawAnimationEventId, setActiveDrawAnimationEventId] = useState<string | null>(null);
-    const [activeOpeningDealSteps, setActiveOpeningDealSteps] = useState<OpeningDealCueStep[]>([]);
     // 再來一場送出狀態
     const [isRematchRequested, setIsRematchRequested] = useState(false);
     // 結算底部視窗是否收合
@@ -145,20 +87,8 @@ const GameRoom: React.FC = () => {
     const canActBeforeBlockingRef = useRef(false);
     const previousCanActRef = useRef(false);
     const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
-    const completedOpeningDealModalSequencesRef = useRef<Set<string>>(new Set());
-    const completedOpeningHandRevealSequencesRef = useRef<Set<string>>(new Set());
-    const completedDrawEventIdsRef = useRef<Set<string>>(new Set());
-    const openingHandRevealTimersRef = useRef<number[]>([]);
     const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
-    const [activeOpeningDealModalSequenceId, setActiveOpeningDealModalSequenceId] = useState<string | null>(null);
-    const [openingHandRevealStatus, setOpeningHandRevealStatus] = useState<OpeningHandRevealStatus>('not_eligible');
-    const [openingHandRevealedCount, setOpeningHandRevealedCount] = useState(0);
     const prefersReducedMotion = usePrefersReducedMotion();
-
-    const clearOpeningHandRevealTimers = useCallback(() => {
-        openingHandRevealTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-        openingHandRevealTimersRef.current = [];
-    }, []);
 
     const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
         if (cues.length === 0) {
@@ -209,56 +139,6 @@ const GameRoom: React.FC = () => {
     }, [state.phase]);
 
     useEffect(() => {
-        if (!currentPlayerId || dealQueue.length === 0) {
-            return;
-        }
-
-        if (state.openingDeal?.replayable) {
-            consumeDealEvent();
-            return;
-        }
-
-        const nextEvent = dealQueue[0];
-        const steps = createOpeningDealCueSteps(nextEvent.sequence, currentPlayerId, prefersReducedMotion);
-        if (steps.length === 0) {
-            consumeDealEvent();
-            return;
-        }
-
-        setActiveOpeningDealSteps(steps);
-        const totalDuration = getOpeningDealCueDuration(steps);
-        const clearTimer = window.setTimeout(() => {
-            setActiveOpeningDealSteps([]);
-            consumeDealEvent();
-        }, totalDuration + 120);
-
-        return () => {
-            window.clearTimeout(clearTimer);
-        };
-    }, [consumeDealEvent, currentPlayerId, dealQueue, prefersReducedMotion, state.openingDeal?.replayable]);
-
-    useEffect(() => {
-        const openingDeal = state.openingDeal;
-
-        if (
-            !currentPlayerId
-            || !openingDeal
-            || openingDeal.status === 'not_replayable'
-            || !openingDeal.replayable
-            || openingDeal.steps.length === 0
-        ) {
-            setActiveOpeningDealModalSequenceId(null);
-            return;
-        }
-
-        if (completedOpeningDealModalSequencesRef.current.has(openingDeal.sequenceId)) {
-            return;
-        }
-
-        setActiveOpeningDealModalSequenceId(openingDeal.sequenceId);
-    }, [currentPlayerId, state.openingDeal]);
-
-    useEffect(() => {
         if (!currentPlayerId || state.phase !== 'playing') {
             previousMotionSnapshotRef.current = buildMotionSnapshot(state, currentPlayerId);
             return;
@@ -288,42 +168,8 @@ const GameRoom: React.FC = () => {
     // 複製房間代碼到剪貼簿
     const copyRoomCode = async () => {
         if (!roomId) return;
-
-        try {
-            await navigator.clipboard.writeText(roomId);
-            alert('房間代碼已複製到剪貼簿！');
-        } catch {
-            const textArea = document.createElement('textarea');
-            textArea.value = roomId;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            alert('房間代碼已複製到剪貼簿！');
-        }
-    };
-
-    const getInviteOutcomeMessage = (outcome: InviteOutcome) => {
-        switch (outcome.mode) {
-            case 'share':
-                return 'LINE 邀請已送出。';
-            case 'copy':
-                return '已複製邀請連結，請貼給好友。';
-            case 'cancelled':
-                return '已取消 LINE 好友選擇，可以重試或改用連結分享。';
-            case 'unavailable':
-                return '目前無法自動複製邀請連結，請手動複製下方連結分享。';
-            case 'failed':
-                return 'LINE 邀請暫時失敗，請改用下方連結分享。';
-            default:
-                return '邀請狀態已更新。';
-        }
-    };
-
-    const getInviteOutcomeTone = (outcome: InviteOutcome) => {
-        if (outcome.mode === 'share' || outcome.mode === 'copy') return 'success';
-        if (outcome.mode === 'cancelled' || outcome.mode === 'unavailable') return 'warning';
-        return 'danger';
+        await copyTextWithFallback(roomId);
+        alert('房間代碼已複製到剪貼簿！');
     };
 
     const handleShareRoomInvite = async () => {
@@ -352,49 +198,25 @@ const GameRoom: React.FC = () => {
     const isGameEnded = state.phase === 'ended';
 
     const isWaiting = state.phase === 'waiting' || state.players.length < 2;
-    const openingDealModalModel = useMemo(() => {
-        const openingDeal = state.openingDeal;
-
-        if (
-            !openingDeal
-            || !activeOpeningDealModalSequenceId
-            || openingDeal.sequenceId !== activeOpeningDealModalSequenceId
-            || openingDeal.status === 'not_replayable'
-            || !openingDeal.replayable
-        ) {
-            return null;
-        }
-
-        return buildOpeningDealModalModel(openingDeal, state.players, currentPlayerId, prefersReducedMotion);
-    }, [activeOpeningDealModalSequenceId, currentPlayerId, prefersReducedMotion, state.openingDeal, state.players]);
-    const isOpeningDealModalActive = Boolean(openingDealModalModel);
-    const isOpeningDealActive = activeOpeningDealSteps.length > 0 || isOpeningDealModalActive;
-    const openingHandEligibility = useMemo(
-        () => getOpeningHandTakeEligibility(state, currentPlayerId),
-        [currentPlayerId, state]
-    );
-    const openingHandRevealSequenceId = openingHandEligibility.sequenceId
-        ?? (roomId && currentPlayerId ? `${roomId}-${state.round}-${currentPlayerId}` : null);
-    const openingHandRevealModel = useMemo(() => buildOpeningHandRevealModel({
-        eligibility: {
-            ...openingHandEligibility,
-            isEligible: openingHandEligibility.isEligible && !isOpeningDealActive,
-            sequenceId: openingHandRevealSequenceId
-        },
-        cards: currentPlayer?.hand ?? [],
-        status: openingHandRevealStatus,
-        reducedMotion: prefersReducedMotion,
-        revealedCount: openingHandRevealedCount
-    }), [
-        currentPlayer?.hand,
-        openingHandEligibility,
-        openingHandRevealSequenceId,
-        openingHandRevealStatus,
-        openingHandRevealedCount,
+    const {
+        activeOpeningDealSteps,
+        openingDealModalModel,
+        isOpeningDealModalActive,
         isOpeningDealActive,
-        prefersReducedMotion
-    ]);
-    const isOpeningHandRevealBlocking = openingHandRevealModel.isInteractionBlocked;
+        openingHandRevealModel,
+        isOpeningHandRevealBlocking,
+        handleOpeningDealModalComplete,
+        handleTakeOpeningHand
+    } = useGameRoomOpeningPresentation({
+        state,
+        roomId,
+        currentPlayerId,
+        currentPlayer,
+        dealQueue,
+        consumeDealEvent,
+        prefersReducedMotion,
+        setFocusSection
+    });
 
     const pendingInteraction = state.pendingInteraction;
     const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
@@ -414,21 +236,26 @@ const GameRoom: React.FC = () => {
         && !isOpeningHandRevealBlocking
         && !state.orderDecision.isOpen;
     const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
-    const activeDrawQueueEvent = drawQueue[0] ?? null;
-    const activeDrawEventId = activeDrawQueueEvent ? getDrawEventId(activeDrawQueueEvent) : null;
-    const isActiveSelfDrawNotification = Boolean(
-        activeDrawEventId
-        && activeDrawNotificationEventId === activeDrawEventId
-        && activeDrawQueueEvent?.playerId === currentPlayerId
-        && activeDrawQueueEvent.card.type !== 'hidden'
-    );
-    const shouldHoldFocusForSelfDraw = Boolean(
-        activeDrawEventId
-        && !completedDrawEventIdsRef.current.has(activeDrawEventId)
-        && activeDrawQueueEvent?.playerId === currentPlayerId
-        && activeDrawQueueEvent.card.type !== 'hidden'
-        && focusSection !== 'handActions'
-    );
+    const {
+        recentDraw,
+        drawHighlightCardId,
+        isDrawHighlightActive,
+        isActiveSelfDrawNotification,
+        shouldHoldFocusForSelfDraw,
+        handleDrawNotificationDismiss,
+        handleDrawNotificationViewNow,
+        handleDrawNotificationKeyDown
+    } = useGameRoomDrawPresentation({
+        drawQueue,
+        consumeDrawEvent,
+        currentPlayerId,
+        focusSection,
+        setFocusSection,
+        isInteractionLocked,
+        getPlayerDisplayName,
+        enqueueMotionCues,
+        prefersReducedMotion
+    });
     const localActionTokenMap = useMemo(
         () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
         [currentPlayer?.actionTokens]
@@ -454,226 +281,6 @@ const GameRoom: React.FC = () => {
             setExpandedInfoReplayAction(actionType);
         }
     }, [isReplayEligible]);
-
-    const consumeActiveDrawEvent = useCallback((eventId: string) => {
-        completedDrawEventIdsRef.current.add(eventId);
-        setRecentDraw(null);
-        setActiveDrawNotificationEventId((currentId) => currentId === eventId ? null : currentId);
-        setActiveDrawAnimationEventId((currentId) => currentId === eventId ? null : currentId);
-        setIsDrawHighlightActive(false);
-        setDrawHighlightCardId(null);
-        consumeDrawEvent();
-    }, [consumeDrawEvent]);
-
-    const startDrawFlipPresentation = useCallback((eventId: string, card: ItemCard) => {
-        if (activeDrawAnimationEventId === eventId || completedDrawEventIdsRef.current.has(eventId)) {
-            return;
-        }
-
-        setRecentDraw(null);
-        setActiveDrawNotificationEventId(null);
-        setActiveDrawAnimationEventId(eventId);
-        setDrawHighlightCardId(card.id);
-        setIsDrawHighlightActive(true);
-        enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
-
-        window.setTimeout(() => {
-            consumeActiveDrawEvent(eventId);
-        }, getDrawFlipDurationMs(prefersReducedMotion) + 120);
-    }, [
-        activeDrawAnimationEventId,
-        consumeActiveDrawEvent,
-        enqueueMotionCues,
-        prefersReducedMotion
-    ]);
-
-    const handleDrawNotificationDismiss = useCallback(() => {
-        if (!activeDrawEventId) {
-            return;
-        }
-
-        consumeActiveDrawEvent(activeDrawEventId);
-    }, [activeDrawEventId, consumeActiveDrawEvent]);
-
-    const handleDrawNotificationViewNow = useCallback(() => {
-        if (!activeDrawQueueEvent || !activeDrawEventId || activeDrawQueueEvent.card.type === 'hidden') {
-            return;
-        }
-
-        setFocusSection('handActions');
-        startDrawFlipPresentation(activeDrawEventId, activeDrawQueueEvent.card);
-    }, [activeDrawEventId, activeDrawQueueEvent, startDrawFlipPresentation]);
-
-    const handleDrawNotificationKeyDown = useCallback((
-        event: React.KeyboardEvent<HTMLButtonElement>,
-        action: 'dismiss' | 'view_now'
-    ) => {
-        if (event.key !== 'Enter' && event.key !== ' ') {
-            return;
-        }
-
-        event.preventDefault();
-        if (action === 'dismiss') {
-            handleDrawNotificationDismiss();
-            return;
-        }
-
-        handleDrawNotificationViewNow();
-    }, [handleDrawNotificationDismiss, handleDrawNotificationViewNow]);
-
-    useEffect(() => {
-        if (!activeDrawQueueEvent || !activeDrawEventId) {
-            setRecentDraw(null);
-            setActiveDrawNotificationEventId(null);
-            setActiveDrawAnimationEventId(null);
-            setIsDrawHighlightActive(false);
-            setDrawHighlightCardId(null);
-            completedDrawEventIdsRef.current.clear();
-            return;
-        }
-
-        if (completedDrawEventIdsRef.current.has(activeDrawEventId)) {
-            return;
-        }
-
-        const drawReviewEvent = classifyDrawEvent(activeDrawQueueEvent, currentPlayerId);
-        const route = routeDrawPresentation(drawReviewEvent, focusSection, isInteractionLocked);
-
-        if (route === 'defer') {
-            setRecentDraw(null);
-            setActiveDrawNotificationEventId(null);
-            return;
-        }
-
-        if (route === 'opponent') {
-            const label = `${getPlayerDisplayName(activeDrawQueueEvent.playerId)} 抽到了新卡`;
-            setRecentDraw(label);
-            setActiveDrawNotificationEventId(null);
-
-            const timer = window.setTimeout(() => {
-                consumeActiveDrawEvent(activeDrawEventId);
-            }, prefersReducedMotion ? 520 : 700);
-
-            return () => window.clearTimeout(timer);
-        }
-
-        if (route === 'notify') {
-            setRecentDraw(null);
-            setActiveDrawNotificationEventId(activeDrawEventId);
-
-            const timer = window.setTimeout(() => {
-                consumeActiveDrawEvent(activeDrawEventId);
-            }, getDrawNotificationTimeoutMs());
-
-            return () => window.clearTimeout(timer);
-        }
-
-        if (drawReviewEvent.cardReference) {
-            startDrawFlipPresentation(activeDrawEventId, drawReviewEvent.cardReference);
-        }
-    }, [
-        activeDrawEventId,
-        activeDrawQueueEvent,
-        consumeActiveDrawEvent,
-        currentPlayerId,
-        focusSection,
-        getPlayerDisplayName,
-        isInteractionLocked,
-        prefersReducedMotion,
-        startDrawFlipPresentation
-    ]);
-    const handleOpeningDealModalComplete = useCallback(() => {
-        if (activeOpeningDealModalSequenceId) {
-            completedOpeningDealModalSequencesRef.current.add(activeOpeningDealModalSequenceId);
-        }
-
-        setActiveOpeningDealModalSequenceId(null);
-    }, [activeOpeningDealModalSequenceId]);
-
-    useEffect(() => {
-        if (!openingHandRevealModel.isEligible || !openingHandRevealSequenceId) {
-            clearOpeningHandRevealTimers();
-            setOpeningHandRevealStatus('not_eligible');
-            setOpeningHandRevealedCount(0);
-            return;
-        }
-
-        if (completedOpeningHandRevealSequencesRef.current.has(openingHandRevealSequenceId)) {
-            setOpeningHandRevealStatus('revealed');
-            setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
-            return;
-        }
-
-        setOpeningHandRevealStatus((currentStatus) => {
-            if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
-                return currentStatus;
-            }
-
-            return 'pending_take';
-        });
-        setOpeningHandRevealedCount(0);
-        setFocusSection('handActions');
-    }, [
-        clearOpeningHandRevealTimers,
-        currentPlayer?.hand.length,
-        openingHandRevealModel.isEligible,
-        openingHandRevealSequenceId
-    ]);
-
-    useEffect(() => () => {
-        clearOpeningHandRevealTimers();
-    }, [clearOpeningHandRevealTimers]);
-
-    const completeOpeningHandReveal = useCallback(() => {
-        if (openingHandRevealSequenceId) {
-            completedOpeningHandRevealSequencesRef.current.add(openingHandRevealSequenceId);
-        }
-
-        clearOpeningHandRevealTimers();
-        setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
-        setOpeningHandRevealStatus('revealed');
-        setFocusSection('handActions');
-    }, [clearOpeningHandRevealTimers, currentPlayer?.hand.length, openingHandRevealSequenceId]);
-
-    const handleTakeOpeningHand = useCallback(() => {
-        if (
-            openingHandRevealStatus !== 'pending_take'
-            || !openingHandRevealModel.isEligible
-            || !currentPlayer
-        ) {
-            return;
-        }
-
-        clearOpeningHandRevealTimers();
-
-        if (prefersReducedMotion) {
-            completeOpeningHandReveal();
-            return;
-        }
-
-        const steps = createOpeningHandRevealSteps(currentPlayer.hand, false);
-        setOpeningHandRevealStatus('revealing');
-        setOpeningHandRevealedCount(0);
-
-        steps.forEach((step, index) => {
-            const timerId = window.setTimeout(() => {
-                setOpeningHandRevealedCount(index + 1);
-            }, step.delayMs + step.durationMs);
-            openingHandRevealTimersRef.current.push(timerId);
-        });
-
-        const completeTimerId = window.setTimeout(() => {
-            completeOpeningHandReveal();
-        }, getOpeningHandRevealTotalMs(steps, false));
-        openingHandRevealTimersRef.current.push(completeTimerId);
-    }, [
-        clearOpeningHandRevealTimers,
-        completeOpeningHandReveal,
-        currentPlayer,
-        openingHandRevealModel.isEligible,
-        openingHandRevealStatus,
-        prefersReducedMotion
-    ]);
 
     useEffect(() => {
         const surface = gameSurfaceRef.current;

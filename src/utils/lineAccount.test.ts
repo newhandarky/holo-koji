@@ -6,10 +6,26 @@ jest.mock('../services/websocket', () => {
         gameWebSocket: {
             isConnected: jest.fn(() => true),
             on: jest.fn((type, handler) => {
-                mockMessageHandlers.set(type, handler);
+                const handlers = mockMessageHandlers.get(type) ?? new Set();
+                handlers.add(handler);
+                mockMessageHandlers.set(type, handlers);
+                return () => {
+                    handlers.delete(handler);
+                    if (handlers.size === 0) {
+                        mockMessageHandlers.delete(type);
+                    }
+                };
             }),
-            off: jest.fn((type) => {
-                mockMessageHandlers.delete(type);
+            off: jest.fn((type, handler) => {
+                if (!handler) {
+                    mockMessageHandlers.delete(type);
+                    return;
+                }
+                const handlers = mockMessageHandlers.get(type);
+                handlers?.delete(handler);
+                if (handlers?.size === 0) {
+                    mockMessageHandlers.delete(type);
+                }
             }),
             send: jest.fn(),
             messageHandlers: mockMessageHandlers
@@ -24,11 +40,21 @@ const {
     buildAccountSyncRequestFromAuthorizationCode,
     buildAccountSyncRequestFromLineIdToken,
     resetAccountSyncStateForTests,
+    requestAccountStatus,
     syncLineAccount
 } = require('./lineAccount');
 
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const messageHandlers = mockGameWebSocket.messageHandlers;
+
+const emitAccountSyncResult = (payload: unknown) => {
+    const handlerCall = [...mockGameWebSocket.on.mock.calls]
+        .reverse()
+        .find(([type]: [string, (payload: unknown) => void]) => type === 'ACCOUNT_SYNC_RESULT');
+    const handler = handlerCall?.[1] as ((payload: unknown) => void) | undefined;
+    expect(handler).toEqual(expect.any(Function));
+    handler?.(payload);
+};
 
 describe('lineAccount', () => {
     beforeEach(() => {
@@ -68,10 +94,7 @@ describe('lineAccount', () => {
         expect(payload).not.toHaveProperty('token');
         expect(payload).not.toHaveProperty('rawProfile');
 
-        const accountSyncHandler = mockGameWebSocket.on.mock.calls.find(
-            ([type]: [string, (payload: any) => void]) => type === 'ACCOUNT_SYNC_RESULT'
-        )?.[1];
-        accountSyncHandler?.({
+        emitAccountSyncResult({
             status: 'bound',
             profile: {
                 lineUserId: 'U1234567890',
@@ -185,10 +208,7 @@ describe('lineAccount', () => {
             displayName: '銀座玩家'
         });
 
-        const accountSyncHandler = mockGameWebSocket.on.mock.calls.find(
-            ([type]: [string, (payload: any) => void]) => type === 'ACCOUNT_SYNC_RESULT'
-        )?.[1];
-        accountSyncHandler?.({
+        emitAccountSyncResult({
             status: 'bound',
             profile: {
                 lineUserId: 'U1234567890',
@@ -216,6 +236,59 @@ describe('lineAccount', () => {
             accountPersistenceMessage: 'Account profiles are persistent.'
         });
         expect(getAccountDiagnosticsSnapshot()).not.toHaveProperty('lineUserId');
+    });
+
+    test('serializes account response requests on the shared response channel', async () => {
+        const syncPromise = syncLineAccount({
+            userId: 'U1234567890',
+            displayName: '銀座玩家'
+        });
+        const statusPromise = requestAccountStatus();
+
+        expect(mockGameWebSocket.send).toHaveBeenCalledTimes(1);
+        expect(mockGameWebSocket.send).toHaveBeenNthCalledWith(
+            1,
+            'ACCOUNT_SYNC',
+            expect.objectContaining({
+                profile: expect.objectContaining({ displayName: '銀座玩家' })
+            })
+        );
+
+        emitAccountSyncResult({
+            status: 'bound',
+            profile: {
+                lineUserId: 'U1234567890',
+                displayName: '銀座玩家',
+                createdAt: '2026-05-05T12:00:00.000Z',
+                updatedAt: '2026-05-05T12:00:00.000Z',
+                counters: {
+                    gamesPlayed: 0,
+                    wins: 0,
+                    lastPlayedAt: null
+                }
+            },
+            persistenceStatus: {
+                mode: 'durable',
+                available: true,
+                message: 'Account profiles are persistent.'
+            }
+        });
+
+        await expect(syncPromise).resolves.toMatchObject({ status: 'bound' });
+        await Promise.resolve();
+        expect(mockGameWebSocket.send).toHaveBeenCalledTimes(2);
+        expect(mockGameWebSocket.send).toHaveBeenNthCalledWith(2, 'ACCOUNT_STATUS', {});
+
+        emitAccountSyncResult({
+            status: 'guest',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
+
+        await expect(statusPromise).resolves.toMatchObject({ status: 'guest' });
     });
 });
 

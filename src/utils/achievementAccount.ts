@@ -13,29 +13,69 @@ const unavailableResult: AchievementStatusResult = {
     }
 };
 
+let achievementResponseQueue: Promise<unknown> | null = null;
+
 const waitForAchievementResult = () => new Promise<AchievementStatusResult>((resolve) => {
+    let settled = false;
+    let unsubscribe: () => void = () => undefined;
+    const cleanup = (timeoutId: ReturnType<typeof setTimeout>) => {
+        clearTimeout(timeoutId);
+        unsubscribe();
+    };
     const timeoutId = setTimeout(() => {
-        gameWebSocket.off('ACHIEVEMENT_STATUS_RESULT');
+        if (settled) return;
+        settled = true;
+        cleanup(timeoutId);
         resolve(unavailableResult);
     }, ACHIEVEMENT_TIMEOUT_MS);
 
-    gameWebSocket.on('ACHIEVEMENT_STATUS_RESULT', (payload: AchievementStatusResult) => {
-        clearTimeout(timeoutId);
-        gameWebSocket.off('ACHIEVEMENT_STATUS_RESULT');
+    const handleAchievementResult = (payload: AchievementStatusResult) => {
+        if (settled) return;
+        settled = true;
+        cleanup(timeoutId);
         resolve(payload);
-    });
+    };
+    const maybeUnsubscribe = gameWebSocket.on('ACHIEVEMENT_STATUS_RESULT', handleAchievementResult);
+    unsubscribe = typeof maybeUnsubscribe === 'function'
+        ? maybeUnsubscribe
+        : () => gameWebSocket.off('ACHIEVEMENT_STATUS_RESULT', handleAchievementResult);
 });
 
+const runExclusiveAchievementResponseRequest = async <T>(request: () => Promise<T>): Promise<T> => {
+    const previousRequest = achievementResponseQueue;
+    const runRequest = (async () => {
+        if (previousRequest) {
+            await previousRequest.catch(() => undefined);
+        }
+        return request();
+    })();
+    const trackedRequest = runRequest.finally(() => {
+        if (achievementResponseQueue === trackedRequest) {
+            achievementResponseQueue = null;
+        }
+    });
+    achievementResponseQueue = trackedRequest;
+    return runRequest;
+};
+
+export const resetAchievementAccountStateForTests = () => {
+    achievementResponseQueue = null;
+};
+
 export const requestAchievementStatus = async () => {
-    const resultPromise = waitForAchievementResult();
-    gameWebSocket.send('ACHIEVEMENT_STATUS', {});
-    return resultPromise;
+    return runExclusiveAchievementResponseRequest(async () => {
+        const resultPromise = waitForAchievementResult();
+        gameWebSocket.send('ACHIEVEMENT_STATUS', {});
+        return resultPromise;
+    });
 };
 
 export const acknowledgeAchievementUnlocks = async (payload: AchievementAcknowledgeRequest = {}) => {
-    const resultPromise = waitForAchievementResult();
-    gameWebSocket.send('ACHIEVEMENT_ACK_NEW_UNLOCKS', {
-        achievementIds: payload.achievementIds ?? []
+    return runExclusiveAchievementResponseRequest(async () => {
+        const resultPromise = waitForAchievementResult();
+        gameWebSocket.send('ACHIEVEMENT_ACK_NEW_UNLOCKS', {
+            achievementIds: payload.achievementIds ?? []
+        });
+        return resultPromise;
     });
-    return resultPromise;
 };

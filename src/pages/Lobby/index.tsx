@@ -1,34 +1,27 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    AccountSyncResult,
-    AchievementStatusResult,
-    CreateRoomPayload,
-    ErrorPayload,
     GeishaSet,
-    JoinRoomPayload,
-    PlayerJoinedPayload,
-    RoomCreatedPayload,
     RoomSetupMode
 } from '@newhandarky/hanakoji-game-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
-import config from '../../config/environment';
-import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils/lineLiff';
-import {
-    beginBrowserLineLogin,
-    getBoundAccountProfile,
-    requestAccountStatus,
-    syncLineAccountWithIdToken
-} from '../../utils/lineAccount';
-import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
-import { saveRoomSessionToken } from '../../utils/roomSession';
+import { getInviteRoomIdFromLocation } from '../../utils/lineLiff';
 import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 import LobbyBrandSurface from './LobbyBrandSurface';
 import LobbyPlayControls from './LobbyPlayControls';
+import {
+    buildInvitedRoomNotice,
+    copyTextWithTextareaFallback,
+    InvitedRoom,
+    InviteRecoveryNotice
+} from './lobbyInviteFlow';
+import { buildCreateRoomPayload, buildJoinRoomPayload, isCustomSelectionReady } from './lobbyRoomPayloads';
+import { useLobbyAccountAchievements } from './useLobbyAccountAchievements';
+import { useLobbyRoomLifecycle } from './useLobbyRoomLifecycle';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -49,23 +42,31 @@ const Lobby: React.FC = () => {
     // 連線狀態顯示
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     // LINE 使用者資料（若在 LIFF 內）
-    const [accountSyncResult, setAccountSyncResult] = useState<AccountSyncResult | null>(null);
-    const [accountBindingStatus, setAccountBindingStatus] = useState<'idle' | 'binding'>('idle');
-    const [achievementStatus, setAchievementStatus] = useState<AchievementStatusResult | null>(null);
-    const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false);
-    const [invitedRoom, setInvitedRoom] = useState<{ roomId: string; source: 'query' | 'liff' } | null>(null);
-    const [inviteRecovery, setInviteRecovery] = useState<{ roomId: string; reason: string; message: string } | null>(null);
+    const [invitedRoom, setInvitedRoom] = useState<InvitedRoom | null>(null);
+    const [inviteRecovery, setInviteRecovery] = useState<InviteRecoveryNotice | null>(null);
     // 路由導向工具
     const navigate = useNavigate();
     // 最新玩家名稱（避免事件回呼讀到舊值）
     const playerNameRef = useRef('');
     const pendingJoinRoomRef = useRef<string | null>(null);
-    const invitedRoomRef = useRef<{ roomId: string; source: 'query' | 'liff' } | null>(null);
-    const boundAccountProfile = accountSyncResult ? getBoundAccountProfile(accountSyncResult) : null;
-    const accountGuestNotice = accountSyncResult?.status === 'sync-failed' || accountSyncResult?.status === 'unverified'
-        ? accountSyncResult.guestNotice
-        : undefined;
-    const isAccountSyncPending = accountBindingStatus === 'binding';
+    const invitedRoomRef = useRef<InvitedRoom | null>(null);
+    const {
+        accountBindingStatus,
+        accountGuestNotice,
+        achievementItems,
+        achievementMessage,
+        achievementNewUnlockCount,
+        achievementStatus,
+        bindLineAccount,
+        boundAccountProfile,
+        isAchievementPanelOpen,
+        isAccountSyncPending,
+        openAchievements
+    } = useLobbyAccountAchievements({
+        connectionStatus,
+        playerNameRef,
+        setPlayerName
+    });
 
     // 同步最新玩家名稱到 ref，避免事件回呼讀到舊值
     useEffect(() => {
@@ -116,174 +117,21 @@ const Lobby: React.FC = () => {
         });
     }, [selectedGeishaSet, setupMode]);
 
-    useEffect(() => {
-        if (connectionStatus !== 'connected' || isAccountSyncPending) {
-            return;
-        }
-
-        let isActive = true;
-        requestAchievementStatus()
-            .then((result) => {
-                if (!isActive) return;
-                setAchievementStatus(result);
-            })
-            .catch((error) => {
-                if (!isActive) return;
-                frontendLogger.warn('⚠️ 成就狀態讀取失敗', {
-                    error: error instanceof Error ? error.message : 'unknown'
-                });
-            });
-
-        return () => {
-            isActive = false;
-        };
-    }, [accountSyncResult, connectionStatus, isAccountSyncPending]);
-
-    useEffect(() => {
-        if (connectionStatus !== 'connected') {
-            return;
-        }
-
-        let isActive = true;
-        requestAccountStatus()
-            .then((result) => {
-                if (!isActive || result.status !== 'bound') return;
-                setAccountSyncResult(result);
-            })
-            .catch(() => undefined);
-
-        return () => {
-            isActive = false;
-        };
-    }, [connectionStatus]);
-
-    // 建立連線與註冊事件（只在首次掛載時執行）
-    useEffect(() => {
-        let isActive = true;
-        const unsubscribeHandlers: Array<() => void> = [];
-        const cleanupLifecycleHandlers = () => {
-            while (unsubscribeHandlers.length > 0) {
-                unsubscribeHandlers.pop()?.();
-            }
-        };
-
-        // 連線 WebSocket（避免重複連線）
-        const connectWS = async () => {
-            setConnectionStatus('connecting');
-            try {
-                await gameWebSocket.connect(config.websocketUrl);
-                if (!isActive) return;
-                setConnectionStatus('connected');
-                frontendLogger.info('✅ [Lobby] WebSocket 連線成功');
-            } catch (error) {
-                if (!isActive) return;
-                setConnectionStatus('disconnected');
-                frontendLogger.error('❌ [Lobby] WebSocket 連線失敗', {
-                    error: error instanceof Error ? error.message : 'unknown'
-                });
-            }
-        };
-
-        if (!gameWebSocket.isConnected()) {
-            connectWS();
-        } else {
-            setConnectionStatus('connected');
-        }
-
-        // 房間建立成功後處理
-        const handleRoomCreated = (payload: RoomCreatedPayload) => {
-            setIsConnecting(false);
-
-            // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerNameRef.current);
-            saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
-
-            cleanupLifecycleHandlers();
-
-            navigate(`/game/${payload.roomId}`);
-        };
-
-        // 加入房間成功後處理
-        const handlePlayerJoined = (payload: PlayerJoinedPayload) => {
-            setIsConnecting(false);
-
-            // 保存當前玩家ID到localStorage
-            localStorage.setItem('currentPlayerId', playerNameRef.current);
-            saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
-
-            cleanupLifecycleHandlers();
-
-            navigate(`/game/${payload.roomId}`);
-        };
-
-        // 收到伺服器錯誤時提示使用者
-        const resolveInviteRecovery = (payload: ErrorPayload) => {
-            const code = typeof payload?.code === 'string' ? payload.code : '';
-            const message = typeof payload?.message === 'string' ? payload.message : '無法加入房間';
-            if (code === 'ROOM_NOT_FOUND' || message === '房間不存在') {
-                return { reason: 'missing', message: '找不到這個邀請房間。請確認房號，或請對方重送邀請。' };
-            }
-            if (code === 'ROOM_FULL' || message === '房間已滿') {
-                return { reason: 'full', message: '這個邀請房間已滿。請對方重送邀請，或回到大廳建立新房間。' };
-            }
-            if (code === 'ROOM_ALREADY_STARTED') {
-                return { reason: 'started', message: '這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。' };
-            }
-            if (code === 'PLAYER_ID_TAKEN') {
-                return { reason: 'player-id-taken', message: '這個玩家名稱已在房間中使用。請確認名稱，或改用其他名稱重新加入。' };
-            }
-            if (code === 'INVALID_JOIN_REQUEST' || message === '缺少 roomId 或 playerId') {
-                return { reason: 'invalid', message: '這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。' };
-            }
-            return { reason: 'unknown', message: '目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。' };
-        };
-
-        const handleError = (payload: unknown) => {
-            const candidate = payload && typeof payload === 'object'
-                ? payload as Partial<ErrorPayload>
-                : null;
-            const errorPayload: ErrorPayload = {
-                message: typeof candidate?.message === 'string' ? candidate.message : '無法加入房間',
-                code: typeof candidate?.code === 'string' ? candidate.code : undefined
-            };
-            frontendLogger.error('❌ [Lobby] 伺服器錯誤', {
-                message: errorPayload.message,
-                code: errorPayload.code
-            });
-            setIsConnecting(false);
-            const pendingJoinRoom = pendingJoinRoomRef.current;
-            pendingJoinRoomRef.current = null;
-            if (pendingJoinRoom && invitedRoomRef.current?.roomId === pendingJoinRoom) {
-                const recovery = resolveInviteRecovery(errorPayload);
-                setInviteRecovery({
-                    roomId: pendingJoinRoom,
-                    reason: recovery.reason,
-                    message: recovery.message
-                });
-                return;
-            }
-
-            alert(`錯誤: ${errorPayload.message}`);
-        };
-
-        unsubscribeHandlers.push(gameWebSocket.on('ROOM_CREATED', handleRoomCreated));
-        unsubscribeHandlers.push(gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined));
-        unsubscribeHandlers.push(gameWebSocket.on('ERROR', handleError));
-
-        return () => {
-            isActive = false;
-            cleanupLifecycleHandlers();
-        };
-    }, [navigate]);
+    useLobbyRoomLifecycle({
+        navigate,
+        playerNameRef,
+        invitedRoomRef,
+        pendingJoinRoomRef,
+        setConnectionStatus,
+        setInviteRecovery,
+        setIsConnecting
+    });
 
     // 建立房間請求
     const createRoom = () => {
         if (!canCreateRoom) return;
         setIsConnecting(true);
         const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
-        const customSelection = setupMode === 'custom'
-            ? { characterIds: selectedCharacterIds }
-            : undefined;
         frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
             playerId: playerName,
             mode: matchMode,
@@ -291,17 +139,15 @@ const Lobby: React.FC = () => {
             geishaSet: selectedGeishaSet,
             setupMode
         });
-        const createPayload: CreateRoomPayload = {
-            playerId: playerName,
-            displayName: playerName,
-            lineUserId: boundAccountProfile?.lineUserId,
-            avatarUrl: boundAccountProfile?.avatarUrl,
-            mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
-            geishaSet: selectedGeishaSet,
+        const createPayload = buildCreateRoomPayload({
+            playerName,
+            matchMode,
+            aiDifficulty,
+            selectedGeishaSet,
             setupMode,
-            ...(customSelection ? { customSelection } : {})
-        };
+            selectedCharacterIds,
+            boundAccountProfile
+        });
         gameWebSocket.send('CREATE_ROOM', createPayload);
     };
 
@@ -315,13 +161,11 @@ const Lobby: React.FC = () => {
             roomId,
             playerId: playerName
         });
-        const joinPayload: JoinRoomPayload = {
+        const joinPayload = buildJoinRoomPayload({
             roomId,
-            playerId: playerName,
-            displayName: playerName,
-            lineUserId: boundAccountProfile?.lineUserId,
-            avatarUrl: boundAccountProfile?.avatarUrl
-        };
+            playerName,
+            boundAccountProfile
+        });
         gameWebSocket.send('JOIN_ROOM', joinPayload);
     };
 
@@ -329,14 +173,14 @@ const Lobby: React.FC = () => {
     const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
     const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
     const customSelectionCount = selectedCharacterIds.length;
-    const isCustomSelectionReady = setupMode !== 'custom' || customSelectionCount === 7;
+    const customSelectionIsReady = isCustomSelectionReady(setupMode, selectedCharacterIds);
     const canCreateRoom = Boolean(
         playerName.trim()
         && !isConnecting
         && !isAccountSyncPending
         && connectionStatus === 'connected'
         && selectedGeishaSetOption?.available
-        && isCustomSelectionReady
+        && customSelectionIsReady
     );
     const canJoinRoom = Boolean(
         playerName.trim()
@@ -363,83 +207,11 @@ const Lobby: React.FC = () => {
         });
     };
 
-    const achievementItems = achievementStatus?.items ?? [];
-    const achievementNewUnlockCount = achievementStatus?.newUnlockCount ?? 0;
-    const achievementMessage = achievementStatus?.message;
-
-    const openAchievements = () => {
-        setIsAchievementPanelOpen((current) => !current);
-        if (achievementNewUnlockCount <= 0 || !achievementItems.some((item) => item.isNew)) {
-            return;
-        }
-
-        acknowledgeAchievementUnlocks({
-            achievementIds: achievementItems.filter((item) => item.isNew).map((item) => item.achievementId)
-        })
-            .then(setAchievementStatus)
-            .catch((error) => {
-                frontendLogger.warn('⚠️ 成就提示清除失敗', {
-                    error: error instanceof Error ? error.message : 'unknown'
-                });
-            });
-    };
-
-    const bindLineAccount = async () => {
-        if (accountBindingStatus === 'binding' || boundAccountProfile) {
-            return;
-        }
-
-        setAccountBindingStatus('binding');
-
-        try {
-            const verifiedLineProfile = await getVerifiedLineProfile();
-            if (!verifiedLineProfile) {
-                beginBrowserLineLogin();
-                return;
-            }
-
-            const result = await syncLineAccountWithIdToken(
-                verifiedLineProfile.profile,
-                verifiedLineProfile.idToken
-            );
-            setAccountSyncResult(result);
-            if (!playerNameRef.current && result.profile?.displayName) {
-                setPlayerName(result.profile.displayName);
-            }
-        } catch (error) {
-            frontendLogger.warn('⚠️ LINE 帳號綁定失敗', {
-                error: error instanceof Error ? error.message : 'unknown'
-            });
-            setAccountSyncResult({
-                status: 'sync-failed',
-                guestNotice: 'LINE 帳號綁定失敗，請稍後再試。',
-                persistenceStatus: {
-                    mode: 'temporary',
-                    available: true,
-                    message: 'Account profiles are temporary in this environment.'
-                }
-            });
-        } finally {
-            setAccountBindingStatus('idle');
-        }
-    };
-
-    const invitedRoomNotice = invitedRoom
-        ? `已從邀請連結帶入房間 ${invitedRoom.roomId}，確認玩家名稱後再加入。`
-        : undefined;
+    const invitedRoomNotice = buildInvitedRoomNotice(invitedRoom);
 
     const copyInviteRoomId = async () => {
         if (!inviteRecovery?.roomId) return;
-        try {
-            await navigator.clipboard.writeText(inviteRecovery.roomId);
-        } catch {
-            const textArea = document.createElement('textarea');
-            textArea.value = inviteRecovery.roomId;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-        }
+        await copyTextWithTextareaFallback(inviteRecovery.roomId);
     };
 
     const clearInviteRecovery = () => {

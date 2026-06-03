@@ -1,5 +1,5 @@
 // src/pages/GameRoom/index.tsx - 添加順序決定彈窗
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -9,13 +9,10 @@ import OpeningDealModal from '../../components/game/OpeningDealModal';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
 import PendingInteractionModal from '../../components/game/PendingInteractionModal';
 import {
-    buildMotionSnapshot,
-    deriveMotionCues,
-    MotionCue,
     usePrefersReducedMotion
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
-import { frontendLogger, summarizeGameState } from '../../utils/runtimeLogger';
+import { frontendLogger } from '../../utils/runtimeLogger';
 import { ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
 import { getItemCardImage } from '../../utils/gameData';
@@ -23,6 +20,7 @@ import { actionStatusConfig } from '../../utils/actionAssets';
 import { useGameRoomPlayers } from './useGameRoomPlayers';
 import { copyTextWithFallback, getInviteOutcomeMessage, getInviteOutcomeTone } from './gameRoomInviteModel';
 import { useGameRoomDrawPresentation } from './useGameRoomDrawPresentation';
+import { useGameRoomEventReactions } from './useGameRoomEventReactions';
 import { useGameRoomOpeningPresentation } from './useGameRoomOpeningPresentation';
 
 const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
@@ -78,92 +76,10 @@ const GameRoom: React.FC = () => {
     const [isRematchRequested, setIsRematchRequested] = useState(false);
     // 結算底部視窗是否收合
     const [isEndSheetCollapsed, setIsEndSheetCollapsed] = useState(false);
-    const [activeMotionCues, setActiveMotionCues] = useState<MotionCue[]>([]);
     const [focusSection, setFocusSection] = useState<FocusSection>('characterBoard');
     const [expandedInfoReplayAction, setExpandedInfoReplayAction] = useState<ReplayActionType>(null);
     const [inviteOutcome, setInviteOutcome] = useState<InviteOutcome | null>(null);
-    const previousFocusSectionRef = useRef<FocusSection>('characterBoard');
-    const wasInteractionLockedRef = useRef(false);
-    const canActBeforeBlockingRef = useRef(false);
-    const previousCanActRef = useRef(false);
-    const previousMotionSnapshotRef = useRef<ReturnType<typeof buildMotionSnapshot> | null>(null);
-    const gameSurfaceRef = useRef<HTMLDivElement | null>(null);
     const prefersReducedMotion = usePrefersReducedMotion();
-
-    const enqueueMotionCues = useCallback((cues: MotionCue[]) => {
-        if (cues.length === 0) {
-            return;
-        }
-
-        setActiveMotionCues((previous) => {
-            const next = [...previous, ...cues];
-            const seen = new Set<string>();
-
-            return next.filter((cue) => {
-                if (seen.has(cue.id)) {
-                    return false;
-                }
-
-                seen.add(cue.id);
-                return true;
-            });
-        });
-
-        cues.forEach((cue) => {
-            window.setTimeout(() => {
-                setActiveMotionCues((previous) => previous.filter((currentCue) => currentCue.id !== cue.id));
-            }, cue.durationMs + cue.delayMs + 160);
-        });
-    }, []);
-
-    useEffect(() => {
-        frontendLogger.diagnostic('🐞 [GameRoom] 狀態摘要', {
-            roomId,
-            currentPlayerId,
-            ...summarizeGameState(state)
-        });
-    }, [state, roomId, isConnected, currentPlayerId]);
-
-    // 進入新局時重置再來一場狀態
-    useEffect(() => {
-        if (state.phase !== 'ended' && isRematchRequested) {
-            setIsRematchRequested(false);
-        }
-    }, [state.phase, isRematchRequested]);
-
-    // 新對局時還原結算視窗狀態
-    useEffect(() => {
-        if (state.phase !== 'ended') {
-            setIsEndSheetCollapsed(false);
-        }
-    }, [state.phase]);
-
-    useEffect(() => {
-        if (!currentPlayerId || state.phase !== 'playing') {
-            previousMotionSnapshotRef.current = buildMotionSnapshot(state, currentPlayerId);
-            return;
-        }
-
-        const currentSnapshot = buildMotionSnapshot(state, currentPlayerId);
-        const previousSnapshot = previousMotionSnapshotRef.current;
-
-        if (previousSnapshot) {
-            enqueueMotionCues(deriveMotionCues(previousSnapshot, currentSnapshot, prefersReducedMotion));
-        }
-
-        previousMotionSnapshotRef.current = currentSnapshot;
-    }, [currentPlayerId, enqueueMotionCues, prefersReducedMotion, state]);
-
-    const activePendingMotionKind = useMemo<'gift-result' | 'competition-result' | null>(() => {
-        const cue = activeMotionCues.find((item) => item.kind === 'gift-result' || item.kind === 'competition-result');
-        if (cue?.kind === 'gift-result' || cue?.kind === 'competition-result') {
-            return cue.kind;
-        }
-
-        return null;
-    }, [activeMotionCues]);
-
-
 
     // 複製房間代碼到剪貼簿
     const copyRoomCode = async () => {
@@ -235,6 +151,27 @@ const GameRoom: React.FC = () => {
         && !isOpeningDealActive
         && !isOpeningHandRevealBlocking
         && !state.orderDecision.isOpen;
+    const {
+        activeMotionCues,
+        activePendingMotionKind,
+        enqueueMotionCues,
+        gameSurfaceRef,
+        setShouldHoldFocusForSelfDrawFlag
+    } = useGameRoomEventReactions({
+        state,
+        roomId,
+        currentPlayerId,
+        isConnected,
+        isRematchRequested,
+        setIsRematchRequested,
+        setIsEndSheetCollapsed,
+        focusSection,
+        setFocusSection,
+        canAct,
+        isInteractionLocked,
+        isOpeningDealModalActive,
+        prefersReducedMotion
+    });
     const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
     const {
         recentDraw,
@@ -256,6 +193,7 @@ const GameRoom: React.FC = () => {
         enqueueMotionCues,
         prefersReducedMotion
     });
+    setShouldHoldFocusForSelfDrawFlag(shouldHoldFocusForSelfDraw);
     const localActionTokenMap = useMemo(
         () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
         [currentPlayer?.actionTokens]
@@ -281,47 +219,6 @@ const GameRoom: React.FC = () => {
             setExpandedInfoReplayAction(actionType);
         }
     }, [isReplayEligible]);
-
-    useEffect(() => {
-        const surface = gameSurfaceRef.current;
-        if (!surface) {
-            return;
-        }
-
-        if (isOpeningDealModalActive) {
-            surface.setAttribute('inert', '');
-            return;
-        }
-
-        surface.removeAttribute('inert');
-    }, [isOpeningDealModalActive]);
-    useEffect(() => {
-        if (state.phase !== 'playing') {
-            setFocusSection('characterBoard');
-            previousFocusSectionRef.current = 'characterBoard';
-        }
-    }, [state.phase]);
-
-    useEffect(() => {
-        const wasLocked = wasInteractionLockedRef.current;
-        if (!wasLocked && isInteractionLocked) {
-            previousFocusSectionRef.current = focusSection;
-            canActBeforeBlockingRef.current = canAct;
-        }
-        if (wasLocked && !isInteractionLocked) {
-            const becameActionable = !canActBeforeBlockingRef.current && canAct;
-            setFocusSection(becameActionable && !shouldHoldFocusForSelfDraw ? 'handActions' : previousFocusSectionRef.current);
-        }
-        wasInteractionLockedRef.current = isInteractionLocked;
-    }, [canAct, focusSection, isInteractionLocked, shouldHoldFocusForSelfDraw]);
-
-    useEffect(() => {
-        const wasCanAct = previousCanActRef.current;
-        if (!wasCanAct && canAct && !isInteractionLocked && !shouldHoldFocusForSelfDraw) {
-            setFocusSection('handActions');
-        }
-        previousCanActRef.current = canAct;
-    }, [canAct, isInteractionLocked, shouldHoldFocusForSelfDraw]);
 
     if (!isConnected) {
         return (

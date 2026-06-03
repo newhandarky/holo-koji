@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { OpeningDealSummary } from '@newhandarky/hanakoji-game-types';
 import GameRoom from './index';
 import { shareRoomInvite } from '../../utils/lineLiff';
+import { frontendLogger } from '../../utils/runtimeLogger';
 
 const mockNavigate = jest.fn();
 const mockSendGameAction = jest.fn();
@@ -100,6 +101,16 @@ jest.mock('../../hooks/useWebSocket', () => ({
     useWebSocket: () => ({ ...mockHookState })
 }));
 
+jest.mock('../../utils/runtimeLogger', () => ({
+    frontendLogger: {
+        diagnostic: jest.fn(),
+        error: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn()
+    },
+    summarizeGameState: jest.fn(() => ({}))
+}));
+
 jest.mock('../../components/game/GameBoard', () => (props: any) => (
     <div
         data-testid="game-board"
@@ -145,6 +156,7 @@ jest.mock('../../components/game/gameMotion', () => {
 });
 
 const mockShareRoomInvite = shareRoomInvite as jest.MockedFunction<typeof shareRoomInvite>;
+const mockFrontendLogger = frontendLogger as jest.Mocked<typeof frontendLogger>;
 const { usePrefersReducedMotion } = jest.requireMock('../../components/game/gameMotion') as {
     usePrefersReducedMotion: jest.Mock;
 };
@@ -244,6 +256,10 @@ describe('GameRoom character set room surface', () => {
         mockNavigate.mockReset();
         mockSendGameAction.mockReset();
         mockShareRoomInvite.mockReset();
+        mockFrontendLogger.diagnostic.mockClear();
+        mockFrontendLogger.error.mockClear();
+        mockFrontendLogger.info.mockClear();
+        mockFrontendLogger.warn.mockClear();
         mockHookState.consumeDealEvent.mockReset();
         mockHookState.consumeDrawEvent.mockReset();
         usePrefersReducedMotion.mockReturnValue(false);
@@ -909,5 +925,9 @@ describe('GameRoom character set room surface', () => {
 
         expect(await screen.findByText('LINE 邀請暫時失敗，請改用下方連結分享。')).toBeInTheDocument();
         expect(screen.queryByText('share-failed')).not.toBeInTheDocument();
+        expect(mockFrontendLogger.warn).toHaveBeenCalledWith('⚠️ LINE 邀請失敗', {
+            roomId: 'ROOM01',
+            reason: 'share-failed'
+        });
     });
 });

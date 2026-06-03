@@ -9,6 +9,7 @@ import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils
 import { beginBrowserLineLogin, requestAccountStatus, syncLineAccountWithIdToken } from '../../utils/lineAccount';
 import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 import { getStoredRoomSessionToken } from '../../utils/roomSession';
+import { frontendLogger } from '../../utils/runtimeLogger';
 
 const mockNavigate = jest.fn();
 
@@ -92,6 +93,15 @@ jest.mock('../../utils/achievementAccount', () => ({
     acknowledgeAchievementUnlocks: jest.fn()
 }));
 
+jest.mock('../../utils/runtimeLogger', () => ({
+    frontendLogger: {
+        diagnostic: jest.fn(),
+        error: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn()
+    }
+}));
+
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
 const mockGetInviteRoomIdFromLocation = getInviteRoomIdFromLocation as jest.MockedFunction<typeof getInviteRoomIdFromLocation>;
@@ -101,6 +111,7 @@ const mockRequestAccountStatus = requestAccountStatus as jest.MockedFunction<typ
 const mockSyncLineAccountWithIdToken = syncLineAccountWithIdToken as jest.MockedFunction<typeof syncLineAccountWithIdToken>;
 const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
 const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
+const mockFrontendLogger = frontendLogger as jest.Mocked<typeof frontendLogger>;
 
 const pendingAchievementStatus = () => new Promise<never>(() => undefined);
 
@@ -141,6 +152,13 @@ const emitRegisteredHandler = async (messageType: string, payload: unknown) => {
     act(() => {
         handler?.(payload);
     });
+    if (messageType === 'ERROR' && payload && typeof payload === 'object') {
+        const errorPayload = payload as { message?: unknown; code?: unknown };
+        expect(mockFrontendLogger.error).toHaveBeenLastCalledWith('❌ [Lobby] 伺服器錯誤', {
+            message: typeof errorPayload.message === 'string' ? errorPayload.message : '無法加入房間',
+            code: typeof errorPayload.code === 'string' ? errorPayload.code : undefined
+        });
+    }
 };
 
 describe('Lobby character set selection', () => {
@@ -179,6 +197,10 @@ describe('Lobby character set selection', () => {
         mockRequestAchievementStatus.mockReset();
         mockRequestAchievementStatus.mockImplementation(pendingAchievementStatus);
         mockAcknowledgeAchievementUnlocks.mockReset();
+        mockFrontendLogger.diagnostic.mockClear();
+        mockFrontendLogger.error.mockClear();
+        mockFrontendLogger.info.mockClear();
+        mockFrontendLogger.warn.mockClear();
         mockAcknowledgeAchievementUnlocks.mockResolvedValue({
             status: 'available',
             persistenceStatus: {
@@ -216,6 +238,10 @@ describe('Lobby character set selection', () => {
         expect(errorHandler).toEqual(expect.any(Function));
         act(() => {
             errorHandler?.(payload);
+        });
+        expect(mockFrontendLogger.error).toHaveBeenLastCalledWith('❌ [Lobby] 伺服器錯誤', {
+            message: payload.message,
+            code: payload.code
         });
     };
 

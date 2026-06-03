@@ -1,7 +1,6 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import LineCallbackPage from './index';
 import { gameWebSocket } from '../../services/websocket';
 import {
@@ -9,6 +8,7 @@ import {
     resetAccountSyncStateForTests,
     syncLineAccountWithAuthorizationCode
 } from '../../utils/lineAccount';
+import { renderWithRouter } from '../../test/renderWithRouter';
 
 jest.mock('../../services/websocket', () => {
     const messageHandlers = new Map();
@@ -67,19 +67,11 @@ describe('LineCallbackPage', () => {
         });
         mockSyncLineAccountWithAuthorizationCode.mockReturnValue(new Promise<never>(() => undefined));
 
-        const firstRender = render(
-            <MemoryRouter>
-                <LineCallbackPage />
-            </MemoryRouter>
-        );
+        const firstRender = renderWithRouter(<LineCallbackPage />, { strict: false });
         await waitFor(() => expect(mockSyncLineAccountWithAuthorizationCode).toHaveBeenCalledTimes(1));
         firstRender.unmount();
 
-        render(
-            <MemoryRouter>
-                <LineCallbackPage />
-            </MemoryRouter>
-        );
+        renderWithRouter(<LineCallbackPage />, { strict: false });
 
         expect(screen.getByText('正在綁定 LINE 帳號...')).toBeInTheDocument();
         expect(screen.queryByText('LINE 登入狀態無效，請回到大廳重新綁定。')).not.toBeInTheDocument();
@@ -95,11 +87,7 @@ describe('LineCallbackPage', () => {
         const onReturnToLobby = jest.fn();
         const user = userEvent.setup();
 
-        render(
-            <MemoryRouter>
-                <LineCallbackPage onReturnToLobby={onReturnToLobby} />
-            </MemoryRouter>
-        );
+        renderWithRouter(<LineCallbackPage onReturnToLobby={onReturnToLobby} />);
 
         await user.click(screen.getByRole('button', { name: '回到大廳' }));
 

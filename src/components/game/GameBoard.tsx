@@ -10,11 +10,15 @@ import {
     ItemCard,
     ActionType,
     Geisha,
-    GameAction,
     GameState,
     GeishaSet
 } from '@newhandarky/hanakoji-game-types';
 import { ItemIconDefinition, getItemIconDefinitionByPosition } from '../../utils/gameData';
+import {
+    buildGameRoomActionCommand,
+    buildGameRoomCompetitionAction
+} from '../../pages/GameRoom/gameRoomActionCommands';
+import type { GameAction } from '@newhandarky/hanakoji-game-types';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -230,57 +234,21 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return;
         }
 
-        const selectedIds = selectedCards.map((card) => card.id);
+        const command = buildGameRoomActionCommand(actionType, playerId, selectedCards);
 
-        switch (actionType) {
-            case 'secret': {
-                if (selectedIds.length !== 1) {
-                    alert('請選擇 1 張卡片作為密約');
-                    return;
-                }
-                onSendAction({
-                    type: 'PLAY_SECRET',
-                    payload: { playerId, cardId: selectedIds[0] }
-                });
-                resetSelection();
-                break;
-            }
-            case 'trade-off': {
-                if (selectedIds.length !== 2) {
-                    alert('請選擇 2 張卡片進行取捨');
-                    return;
-                }
-                onSendAction({
-                    type: 'PLAY_TRADE_OFF',
-                    payload: { playerId, cardIds: selectedIds }
-                });
-                resetSelection();
-                break;
-            }
-            case 'gift': {
-                if (selectedIds.length !== 3) {
-                    alert('請選擇 3 張卡片進行贈予');
-                    return;
-                }
-                onSendAction({
-                    type: 'INITIATE_GIFT',
-                    payload: { playerId, cardIds: selectedIds }
-                });
-                resetSelection();
-                break;
-            }
-            case 'competition': {
-                if (selectedIds.length !== 4) {
-                    alert('請選擇 4 張卡片進行競爭');
-                    return;
-                }
-                setCompetitionCards(selectedCards);
-                setIsCompetitionModalOpen(true);
-                break;
-            }
-            default:
-                alert('未知的行動');
+        if (command.kind === 'error') {
+            alert(command.message);
+            return;
         }
+
+        if (command.kind === 'competition') {
+            setCompetitionCards(command.cards);
+            setIsCompetitionModalOpen(true);
+            return;
+        }
+
+        onSendAction(command.action);
+        resetSelection();
     };
 
     // 競爭分組選擇完成後送出行動
@@ -289,13 +257,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return;
         }
 
-        onSendAction({
-            type: 'INITIATE_COMPETITION',
-            payload: {
-                playerId,
-                groups
-            }
-        });
+        onSendAction(buildGameRoomCompetitionAction(playerId, groups));
         setIsCompetitionModalOpen(false);
         setCompetitionCards([]);
         resetSelection();

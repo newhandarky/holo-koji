@@ -221,9 +221,10 @@ describe('DiagnosticsPage', () => {
     });
 
     test('navigates back to lobby', async () => {
+        const user = userEvent.setup();
         render(<DiagnosticsPage />);
 
-        await userEvent.click(screen.getByRole('button', { name: '返回首頁' }));
+        await user.click(screen.getByRole('button', { name: '返回首頁' }));
         expect(mockNavigate).toHaveBeenCalledWith('/');
     });
 });

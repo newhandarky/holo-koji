@@ -1,5 +1,5 @@
-import React, { act } from 'react';
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import config from './config/environment';
@@ -59,10 +59,11 @@ describe('App routing', () => {
 
   test('returns from callback query to lobby without full page reload', async () => {
     window.history.pushState({}, '', '/?lineCallback=1&code=abc&state=state');
+    const user = userEvent.setup();
     render(<App />);
 
     await act(async () => {
-      await userEvent.click(screen.getByRole('button', { name: 'Mock Return' }));
+      await user.click(screen.getByRole('button', { name: 'Mock Return' }));
     });
 
     expect(screen.getByText('Mock Lobby Page')).toBeInTheDocument();

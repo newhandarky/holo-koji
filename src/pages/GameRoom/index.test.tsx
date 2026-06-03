@@ -180,6 +180,19 @@ const makeActionTokens = (usedType?: string) => [
     { type: 'competition', used: usedType === 'competition' }
 ];
 
+const runUserInteraction = async (interaction: () => void | Promise<void>) => {
+    await act(async () => {
+        await interaction();
+    });
+};
+
+const testUser = {
+    click: async (element: Element) => runUserInteraction(() => userEvent.click(element)),
+    keyboard: async (text: string) => runUserInteraction(() => {
+        userEvent.keyboard(text);
+    })
+};
+
 describe('GameRoom character set room surface', () => {
     beforeEach(() => {
         jest.useFakeTimers();
@@ -462,7 +475,7 @@ describe('GameRoom character set room surface', () => {
             jest.advanceTimersByTime(6000);
         });
 
-        await userEvent.click(screen.getByRole('button', { name: '拿取手牌' }));
+        await testUser.click(screen.getByRole('button', { name: '拿取手牌' }));
 
         act(() => {
             jest.advanceTimersByTime(3000);
@@ -486,7 +499,7 @@ describe('GameRoom character set room surface', () => {
 
         const takeButton = screen.getByRole('button', { name: '拿取手牌' });
         takeButton.focus();
-        await userEvent.keyboard('{Enter}');
+        await testUser.keyboard('{Enter}');
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-status', 'revealing');
 
@@ -505,7 +518,7 @@ describe('GameRoom character set room surface', () => {
 
         const secondTakeButton = screen.getByRole('button', { name: '拿取手牌' });
         secondTakeButton.focus();
-        await userEvent.keyboard(' ');
+        await testUser.keyboard(' ');
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-status', 'revealing');
     });
@@ -522,11 +535,11 @@ describe('GameRoom character set room surface', () => {
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-blocked', 'true');
 
-        await userEvent.click(screen.getByRole('button', { name: '資訊' }));
+        await testUser.click(screen.getByRole('button', { name: '資訊' }));
 
         expect(screen.getByRole('button', { name: '資訊' })).toHaveAttribute('aria-pressed', 'true');
 
-        await userEvent.click(screen.getByRole('button', { name: '拿取手牌' }));
+        await testUser.click(screen.getByRole('button', { name: '拿取手牌' }));
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-status', 'revealing');
@@ -562,7 +575,7 @@ describe('GameRoom character set room surface', () => {
             jest.advanceTimersByTime(2000);
         });
 
-        await userEvent.click(screen.getByRole('button', { name: '拿取手牌' }));
+        await testUser.click(screen.getByRole('button', { name: '拿取手牌' }));
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-opening-hand-status', 'revealed');
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'handActions');
@@ -833,7 +846,7 @@ describe('GameRoom character set room surface', () => {
         mockShareRoomInvite.mockResolvedValue({ mode: 'share', url: 'https://liff.line.me/test?roomId=ROOM01' });
 
         render(<GameRoom />);
-        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+        await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('LINE 邀請已送出。')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '複製' })).toBeInTheDocument();
@@ -846,7 +859,7 @@ describe('GameRoom character set room surface', () => {
         mockShareRoomInvite.mockResolvedValue({ mode: 'copy', url: 'https://example.test/?roomId=ROOM01' });
 
         render(<GameRoom />);
-        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+        await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('已複製邀請連結，請貼給好友。')).toBeInTheDocument();
         expect(screen.getByText('https://example.test/?roomId=ROOM01')).toBeInTheDocument();
@@ -858,7 +871,7 @@ describe('GameRoom character set room surface', () => {
         mockShareRoomInvite.mockResolvedValue({ mode: 'cancelled', url: 'https://liff.line.me/test?roomId=ROOM01' });
 
         render(<GameRoom />);
-        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+        await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('已取消 LINE 好友選擇，可以重試或改用連結分享。')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'LINE 邀請好友' })).toBeInTheDocument();
@@ -874,7 +887,7 @@ describe('GameRoom character set room surface', () => {
         });
 
         render(<GameRoom />);
-        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+        await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('目前無法自動複製邀請連結，請手動複製下方連結分享。')).toBeInTheDocument();
         expect(screen.getByText('https://example.test/?roomId=ROOM01')).toBeInTheDocument();
@@ -890,7 +903,7 @@ describe('GameRoom character set room surface', () => {
         });
 
         render(<GameRoom />);
-        await userEvent.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
+        await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('LINE 邀請暫時失敗，請改用下方連結分享。')).toBeInTheDocument();
         expect(screen.queryByText('share-failed')).not.toBeInTheDocument();

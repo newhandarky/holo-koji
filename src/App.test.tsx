@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { act } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
@@ -61,7 +61,9 @@ describe('App routing', () => {
     window.history.pushState({}, '', '/?lineCallback=1&code=abc&state=state');
     render(<App />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Mock Return' }));
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Mock Return' }));
+    });
 
     expect(screen.getByText('Mock Lobby Page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');

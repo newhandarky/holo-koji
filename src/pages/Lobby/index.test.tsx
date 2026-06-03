@@ -102,6 +102,22 @@ const mockSyncLineAccountWithIdToken = syncLineAccountWithIdToken as jest.Mocked
 const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
 const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
 
+const pendingAchievementStatus = () => new Promise<never>(() => undefined);
+
+const runUserInteraction = async (interaction: () => void | Promise<void>) => {
+    await act(async () => {
+        await interaction();
+    });
+};
+
+const testUser = {
+    click: async (element: Element) => runUserInteraction(() => userEvent.click(element)),
+    type: async (element: Element, text: string) => runUserInteraction(() => userEvent.type(element, text)),
+    clear: async (element: Element) => runUserInteraction(() => userEvent.clear(element)),
+    selectOptions: async (element: Element, values: string | string[]) =>
+        runUserInteraction(() => userEvent.selectOptions(element, values))
+};
+
 const emitRegisteredHandler = async (messageType: string, payload: unknown) => {
     await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith(messageType, expect.any(Function)));
     const handlerCall = [...mockGameWebSocket.on.mock.calls]
@@ -148,15 +164,7 @@ describe('Lobby character set selection', () => {
             }
         });
         mockRequestAchievementStatus.mockReset();
-        mockRequestAchievementStatus.mockResolvedValue({
-            status: 'guest',
-            message: '成就需要綁定帳號後才會保存。',
-            persistenceStatus: {
-                mode: 'temporary',
-                available: true,
-                message: 'Account profiles are temporary in this environment.'
-            }
-        });
+        mockRequestAchievementStatus.mockImplementation(pendingAchievementStatus);
         mockAcknowledgeAchievementUnlocks.mockReset();
         mockAcknowledgeAchievementUnlocks.mockResolvedValue({
             status: 'available',
@@ -213,10 +221,10 @@ describe('Lobby character set selection', () => {
     test('untouched room creation uses default Ginza set', async () => {
         renderLobby();
 
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'host');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -238,7 +246,7 @@ describe('Lobby character set selection', () => {
     test('stores room session token when room is created', async () => {
         renderLobby();
 
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'host');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'host');
         await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith('ROOM_CREATED', expect.any(Function)));
 
         const roomCreatedHandler = [...mockGameWebSocket.on.mock.calls]
@@ -263,25 +271,25 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         const selector = screen.getByRole('combobox', { name: '女公關組合' });
-        await userEvent.selectOptions(selector, 'hololive');
+        await testUser.selectOptions(selector, 'hololive');
         expect(selector).toHaveValue('hololive');
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
         expect(selector).toHaveValue('hololive');
 
-        await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
+        await testUser.click(screen.getByRole('radio', { name: '線上玩家' }));
         expect(selector).toHaveValue('hololive');
     });
 
     test('npc room creation sends selected geisha set', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'npc-host');
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'npc-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -298,7 +306,7 @@ describe('Lobby character set selection', () => {
     test('npc mode renders canonical AI difficulty dropdown labels and descriptions only', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
 
         const difficultySelect = screen.getByRole('combobox', { name: 'AI 難度' });
         const difficultyOptions = Array.from(difficultySelect.querySelectorAll('option'));
@@ -322,11 +330,11 @@ describe('Lobby character set selection', () => {
     test('npc difficulty control supports compact selection', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
 
         const difficultySelect = screen.getByRole('combobox', { name: 'AI 難度' });
         difficultySelect.focus();
-        await userEvent.selectOptions(difficultySelect, 'hard');
+        await testUser.selectOptions(difficultySelect, 'hard');
 
         expect(difficultySelect).toHaveFocus();
         expect(difficultySelect).toHaveValue('hard');
@@ -336,11 +344,11 @@ describe('Lobby character set selection', () => {
     test('untouched npc room creation still uses default Ginza set', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'npc-default');
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'npc-default');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -363,27 +371,27 @@ describe('Lobby character set selection', () => {
     test('selected AI difficulty is preserved when switching between npc and online', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'hell');
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'hell');
 
         expect(screen.getByRole('combobox', { name: 'AI 難度' })).toHaveValue('hell');
 
-        await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
+        await testUser.click(screen.getByRole('radio', { name: '線上玩家' }));
         expect(screen.queryByRole('combobox', { name: 'AI 難度' })).not.toBeInTheDocument();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
         expect(screen.getByRole('combobox', { name: 'AI 難度' })).toHaveValue('hell');
     });
 
     test.each(AI_DIFFICULTY_OPTIONS)('npc room creation maps displayed $label difficulty to $value', async (option) => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), option.value);
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), `npc-${option.value}`);
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), option.value);
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), `npc-${option.value}`);
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -398,13 +406,13 @@ describe('Lobby character set selection', () => {
     test('online room creation omits aiDifficulty after npc difficulty changes', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '對戰 NPC' }));
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'expert');
-        await userEvent.click(screen.getByRole('radio', { name: '線上玩家' }));
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'online-host');
+        await testUser.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await testUser.selectOptions(screen.getByRole('combobox', { name: 'AI 難度' }), 'expert');
+        await testUser.click(screen.getByRole('radio', { name: '線上玩家' }));
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'online-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -430,12 +438,12 @@ describe('Lobby character set selection', () => {
     test('join room submission does not depend on selectedGeishaSet', async () => {
         renderLobby();
 
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
-        await userEvent.type(screen.getByPlaceholderText('輸入房間代碼'), 'abc123');
+        await testUser.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入房間代碼'), 'abc123');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'JOIN_ROOM',
@@ -486,11 +494,11 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         const selector = screen.getByRole('combobox', { name: '女公關組合' });
-        await userEvent.selectOptions(selector, 'hololive');
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-player');
+        await testUser.selectOptions(selector, 'hololive');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-player');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
         await emitRegisteredHandler('ERROR', { message: '建立失敗' });
 
         expect(selector).toHaveValue('hololive');
@@ -499,14 +507,14 @@ describe('Lobby character set selection', () => {
     test('custom setup preselects exactly-seven sets and sends selected character IDs', async () => {
         renderLobby();
 
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
-        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await testUser.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'hololive');
+        await testUser.click(screen.getByRole('radio', { name: '自選七位' }));
 
         await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
 
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'custom-host');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'custom-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -533,11 +541,11 @@ describe('Lobby character set selection', () => {
     test('custom setup disables room creation until exactly seven characters are selected', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'needs-seven');
+        await testUser.click(screen.getByRole('radio', { name: '自選七位' }));
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'needs-seven');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: 'エマ' }));
+        await testUser.click(screen.getByRole('button', { name: 'エマ' }));
 
         expect(screen.getByText('已選 6 / 7，請選滿七位')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeDisabled();
@@ -546,10 +554,10 @@ describe('Lobby character set selection', () => {
     test('switching character sets revalidates custom preselection', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await testUser.click(screen.getByRole('radio', { name: '自選七位' }));
         await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
 
-        await userEvent.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
+        await testUser.selectOptions(screen.getByRole('combobox', { name: '女公關組合' }), 'collaboration');
 
         await waitFor(() => expect(screen.getByRole('button', { name: 'ルミナス' })).toHaveAttribute('aria-pressed', 'true'));
         expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument();
@@ -558,12 +566,12 @@ describe('Lobby character set selection', () => {
     test('room creation error keeps custom setup available for correction', async () => {
         renderLobby();
 
-        await userEvent.click(screen.getByRole('radio', { name: '自選七位' }));
+        await testUser.click(screen.getByRole('radio', { name: '自選七位' }));
         await waitFor(() => expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument());
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-custom');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'retry-custom');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
         await emitRegisteredHandler('ERROR', { message: '自訂角色選擇無效，請重新選擇七位同組合角色。' });
 
         expect(screen.getByRole('radio', { name: '自選七位' })).toBeChecked();
@@ -575,10 +583,10 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'quiet-host');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'quiet-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(debugSpy).not.toHaveBeenCalled();
     });
@@ -615,13 +623,13 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
+        await testUser.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
         await waitFor(() => expect(screen.getByPlaceholderText('輸入你的名稱')).toHaveValue('LINE 玩家'));
         await waitFor(() => expect(mockSyncLineAccountWithIdToken).toHaveBeenCalledTimes(1));
-        await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), '房間暱稱');
+        await testUser.clear(screen.getByPlaceholderText('輸入你的名稱'));
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), '房間暱稱');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockSyncLineAccountWithIdToken).toHaveBeenCalledWith(
             {
@@ -647,9 +655,9 @@ describe('Lobby character set selection', () => {
     test('missing LINE profile keeps guest room creation independent from account proof', async () => {
         renderLobby();
 
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-host');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-host');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockSyncLineAccountWithIdToken).not.toHaveBeenCalled();
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
@@ -666,7 +674,7 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
+        await testUser.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
 
         await waitFor(() => expect(mockBeginBrowserLineLogin).toHaveBeenCalledTimes(1));
         expect(mockSyncLineAccountWithIdToken).not.toHaveBeenCalled();
@@ -692,12 +700,12 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
+        await testUser.click(screen.getByRole('button', { name: '綁定 LINE 帳號' }));
         expect(await screen.findByText('目前以訪客模式繼續，帳號進度暫時不會保存。')).toBeInTheDocument();
-        await userEvent.clear(screen.getByPlaceholderText('輸入你的名稱'));
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-after-fail');
+        await testUser.clear(screen.getByPlaceholderText('輸入你的名稱'));
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'guest-after-fail');
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🏠 建立房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'CREATE_ROOM',
@@ -709,9 +717,19 @@ describe('Lobby character set selection', () => {
     });
 
     test('guest achievement entry shows non-persistent message', async () => {
+        mockRequestAchievementStatus.mockResolvedValue({
+            status: 'guest',
+            message: '成就需要綁定帳號後才會保存。',
+            persistenceStatus: {
+                mode: 'temporary',
+                available: true,
+                message: 'Account profiles are temporary in this environment.'
+            }
+        });
+
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+        await testUser.click(screen.getByRole('button', { name: /成就/ }));
 
         expect(await screen.findByText('成就需要綁定帳號後才會保存。')).toBeInTheDocument();
     });
@@ -729,7 +747,7 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+        await testUser.click(screen.getByRole('button', { name: /成就/ }));
 
         expect(await screen.findByText('成就暫時不可用，進度目前無法保存。')).toBeInTheDocument();
     });
@@ -778,7 +796,7 @@ describe('Lobby character set selection', () => {
 
         renderLobby();
 
-        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+        await testUser.click(screen.getByRole('button', { name: /成就/ }));
 
         expect(await screen.findByText('初次花見')).toBeInTheDocument();
         expect(screen.getByText('1 / 1')).toBeInTheDocument();
@@ -837,7 +855,7 @@ describe('Lobby character set selection', () => {
         renderLobby();
 
         expect(await screen.findByText('新解鎖 1')).toBeInTheDocument();
-        await userEvent.click(screen.getByRole('button', { name: /成就/ }));
+        await testUser.click(screen.getByRole('button', { name: /成就/ }));
 
         await waitFor(() => expect(mockAcknowledgeAchievementUnlocks).toHaveBeenCalledWith({
             achievementIds: ['first_completed_match']
@@ -875,9 +893,9 @@ describe('Lobby character set selection', () => {
 
         expect(await screen.findByText('已從邀請連結帶入房間 XYZ789，確認玩家名稱後再加入。')).toBeInTheDocument();
         expect(replaceStateSpy).toHaveBeenCalled();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
 
         expect(mockGameWebSocket.send).toHaveBeenCalledWith(
             'JOIN_ROOM',
@@ -892,9 +910,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'abc123', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({ message: '房間不存在', code: 'ROOM_NOT_FOUND' });
 
         expect(await screen.findByText('找不到這個邀請房間。請確認房號，或請對方重送邀請。')).toBeInTheDocument();
@@ -907,9 +925,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'full01', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({ message: '房間已滿', code: 'ROOM_FULL' });
 
         expect(await screen.findByText('這個邀請房間已滿。請對方重送邀請，或回到大廳建立新房間。')).toBeInTheDocument();
@@ -920,9 +938,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'start1', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({ message: '房間已開始對局', code: 'ROOM_ALREADY_STARTED' });
 
         expect(await screen.findByText('這個邀請房間已經開始對局。請對方重送邀請，或回到大廳建立新房間。')).toBeInTheDocument();
@@ -933,9 +951,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'bad001', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({ message: '缺少 roomId 或 playerId', code: 'INVALID_JOIN_REQUEST' });
 
         expect(await screen.findByText('這個邀請連結資料不完整。請對方重送邀請，或回到一般加入流程。')).toBeInTheDocument();
@@ -946,9 +964,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'unk001', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({ message: 'unknown' });
 
         expect(await screen.findByText('目前無法加入這個邀請房間。請對方重送邀請，或回到一般加入流程。')).toBeInTheDocument();
@@ -959,9 +977,9 @@ describe('Lobby character set selection', () => {
         mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'room01', source: 'query' });
 
         renderLobby();
-        await userEvent.type(screen.getByPlaceholderText('輸入你的名稱'), 'p1');
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'p1');
         await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
-        await userEvent.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
         await emitServerError({
             message: '此玩家名稱已在房間中使用，請重新加入或更換名稱。',
             code: 'PLAYER_ID_TAKEN'

@@ -70,7 +70,7 @@ describe('LineCallbackPage', () => {
             ([messageType]) => messageType === 'ACCOUNT_SYNC_RESULT'
         )?.[1] as ((payload: unknown) => void) | undefined;
         expect(accountSyncHandler).toEqual(expect.any(Function));
-        act(() => {
+        await act(async () => {
             accountSyncHandler?.({
                 status: 'bound',
                 profile: {
@@ -90,6 +90,7 @@ describe('LineCallbackPage', () => {
                     message: 'Account profiles are persistent.'
                 }
             });
+            await Promise.resolve();
         });
 
         expect(await screen.findByText('LINE 帳號綁定完成，正在返回大廳。')).toBeInTheDocument();
@@ -106,7 +107,9 @@ describe('LineCallbackPage', () => {
             </MemoryRouter>
         );
 
-        await userEvent.click(screen.getByRole('button', { name: '回到大廳' }));
+        await act(async () => {
+            await userEvent.click(screen.getByRole('button', { name: '回到大廳' }));
+        });
 
         expect(onReturnToLobby).toHaveBeenCalledTimes(1);
     });

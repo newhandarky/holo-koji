@@ -160,7 +160,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         }
 
         let isActive = true; // 確保卸載後不再更新 state
-        const handlerMap: Partial<Record<ServerToClientEventType, (payload: unknown) => void>> = {}; // 快速紀錄已註冊的事件
+        const unsubscribeHandlers: Array<() => void> = []; // 紀錄本 hook 註冊的 listener，避免清掉其他頁面 listener
 
         const safeDispatch = (action: ClientAction) => {
             if (isActive) {
@@ -330,16 +330,14 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
             eventType: TType,
             handler: (payload: ServerToClientEventMap[TType]) => void
         ) => {
-            handlerMap[eventType] = handler as (payload: unknown) => void;
-            gameWebSocket.on(eventType, handler as Parameters<typeof gameWebSocket.on<TType>>[1]);
+            const unsubscribe = gameWebSocket.on(eventType, handler as Parameters<typeof gameWebSocket.on<TType>>[1]);
+            unsubscribeHandlers.push(unsubscribe);
         };
 
         const cleanupHandlers = () => {
-            Object.keys(handlerMap).forEach(eventType => {
-                gameWebSocket.off(eventType as ServerToClientEventType);
-            });
-            gameWebSocket.off(CONNECTION_OPEN);
-            gameWebSocket.off(CONNECTION_CLOSE);
+            while (unsubscribeHandlers.length > 0) {
+                unsubscribeHandlers.pop()?.();
+            }
 
             if (roundSummaryTimerRef.current) {
                 window.clearTimeout(roundSummaryTimerRef.current);
@@ -391,8 +389,8 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         registerEventHandler('DEAL_ANIMATION', handleDealAnimation);
         registerEventHandler('ACTION_EXECUTED', ignoreLifecycleEvent);
 
-        gameWebSocket.on(CONNECTION_OPEN, handleOpen);
-        gameWebSocket.on(CONNECTION_CLOSE, handleClose);
+        unsubscribeHandlers.push(gameWebSocket.on(CONNECTION_OPEN, handleOpen));
+        unsubscribeHandlers.push(gameWebSocket.on(CONNECTION_CLOSE, handleClose));
 
         if (gameWebSocket.isConnected()) {
             handleOpen();

@@ -31,10 +31,10 @@ jest.mock('../../services/websocket', () => ({
     gameWebSocket: {
         getConnectionState: jest.fn(() => 'OPEN'),
         messageHandlers: new Map([
-            ['ROOM_CREATED', jest.fn()],
-            ['ROOM_JOINED', jest.fn()],
-            ['GAME_STARTED', jest.fn()],
-            ['ERROR', jest.fn()]
+            ['ROOM_CREATED', new Set([jest.fn()])],
+            ['ROOM_JOINED', new Set([jest.fn()])],
+            ['GAME_STARTED', new Set([jest.fn()])],
+            ['ERROR', new Set([jest.fn()])]
         ])
     }
 }));
@@ -78,10 +78,10 @@ describe('DiagnosticsPage', () => {
         mockConfig.diagnosticsEnabled = false;
         mockGameWebSocket.getConnectionState.mockReturnValue('OPEN');
         mockGameWebSocket.messageHandlers.clear();
-        mockGameWebSocket.messageHandlers.set('ROOM_CREATED', jest.fn());
-        mockGameWebSocket.messageHandlers.set('ROOM_JOINED', jest.fn());
-        mockGameWebSocket.messageHandlers.set('GAME_STARTED', jest.fn());
-        mockGameWebSocket.messageHandlers.set('ERROR', jest.fn());
+        mockGameWebSocket.messageHandlers.set('ROOM_CREATED', new Set([jest.fn()]));
+        mockGameWebSocket.messageHandlers.set('ROOM_JOINED', new Set([jest.fn()]));
+        mockGameWebSocket.messageHandlers.set('GAME_STARTED', new Set([jest.fn()]));
+        mockGameWebSocket.messageHandlers.set('ERROR', new Set([jest.fn()]));
         mockGetLiffDiagnosticsSnapshot.mockReturnValue({
             supportedOrigin: false,
             hasSdk: false,

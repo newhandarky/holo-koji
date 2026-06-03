@@ -17,6 +17,7 @@ let latestAccountSyncResult: AccountSyncResult = {
     status: 'guest',
     persistenceStatus: temporaryPersistenceStatus
 };
+let accountResponseQueue: Promise<unknown> | null = null;
 
 export const getLatestAccountSyncResult = () => latestAccountSyncResult;
 
@@ -25,6 +26,7 @@ export const resetAccountSyncStateForTests = () => {
         status: 'guest',
         persistenceStatus: temporaryPersistenceStatus
     };
+    accountResponseQueue = null;
 };
 
 export const getAccountDiagnosticsSnapshot = () => ({
@@ -66,21 +68,46 @@ export const buildAccountSyncRequestFromAuthorizationCode = (authorizationCode: 
 
 const waitForAccountSyncResult = () => new Promise<AccountSyncResult>((resolve) => {
     let settled = false;
+    let unsubscribe: () => void = () => undefined;
+    const cleanup = (timeoutId: number) => {
+        window.clearTimeout(timeoutId);
+        unsubscribe();
+    };
     const timeoutId = window.setTimeout(() => {
         if (settled) return;
         settled = true;
-        gameWebSocket.off('ACCOUNT_SYNC_RESULT');
+        cleanup(timeoutId);
         resolve(toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE));
     }, ACCOUNT_SYNC_TIMEOUT_MS);
 
-    gameWebSocket.on('ACCOUNT_SYNC_RESULT', (payload: AccountSyncResult) => {
+    const handleAccountSyncResult = (payload: AccountSyncResult) => {
         if (settled) return;
         settled = true;
-        window.clearTimeout(timeoutId);
-        gameWebSocket.off('ACCOUNT_SYNC_RESULT');
+        cleanup(timeoutId);
         resolve(payload);
-    });
+    };
+    const maybeUnsubscribe = gameWebSocket.on('ACCOUNT_SYNC_RESULT', handleAccountSyncResult);
+    unsubscribe = typeof maybeUnsubscribe === 'function'
+        ? maybeUnsubscribe
+        : () => gameWebSocket.off('ACCOUNT_SYNC_RESULT', handleAccountSyncResult);
 });
+
+const runExclusiveAccountResponseRequest = async <T>(request: () => Promise<T>): Promise<T> => {
+    const previousRequest = accountResponseQueue;
+    const runRequest = (async () => {
+        if (previousRequest) {
+            await previousRequest.catch(() => undefined);
+        }
+        return request();
+    })();
+    const trackedRequest = runRequest.finally(() => {
+        if (accountResponseQueue === trackedRequest) {
+            accountResponseQueue = null;
+        }
+    });
+    accountResponseQueue = trackedRequest;
+    return runRequest;
+};
 
 export const syncLineAccount = async (profile: LineProfile | null): Promise<AccountSyncResult> => {
     if (!profile) {
@@ -93,16 +120,18 @@ export const syncLineAccount = async (profile: LineProfile | null): Promise<Acco
         return latestAccountSyncResult;
     }
 
-    try {
-        const resultPromise = waitForAccountSyncResult();
-        gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineProfile(profile));
-        latestAccountSyncResult = await resultPromise;
-    } catch (error) {
-        frontendLogger.warn('⚠️ LINE account sync failed', {
-            error: error instanceof Error ? error.message : 'unknown'
-        });
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-    }
+    await runExclusiveAccountResponseRequest(async () => {
+        try {
+            const resultPromise = waitForAccountSyncResult();
+            gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineProfile(profile));
+            latestAccountSyncResult = await resultPromise;
+        } catch (error) {
+            frontendLogger.warn('⚠️ LINE account sync failed', {
+                error: error instanceof Error ? error.message : 'unknown'
+            });
+            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        }
+    });
 
     return latestAccountSyncResult;
 };
@@ -116,16 +145,18 @@ export const syncLineAccountWithIdToken = async (
         return latestAccountSyncResult;
     }
 
-    try {
-        const resultPromise = waitForAccountSyncResult();
-        gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineIdToken(profile, idToken));
-        latestAccountSyncResult = await resultPromise;
-    } catch (error) {
-        frontendLogger.warn('⚠️ LINE account binding failed', {
-            error: error instanceof Error ? error.message : 'unknown'
-        });
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-    }
+    await runExclusiveAccountResponseRequest(async () => {
+        try {
+            const resultPromise = waitForAccountSyncResult();
+            gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineIdToken(profile, idToken));
+            latestAccountSyncResult = await resultPromise;
+        } catch (error) {
+            frontendLogger.warn('⚠️ LINE account binding failed', {
+                error: error instanceof Error ? error.message : 'unknown'
+            });
+            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        }
+    });
 
     return latestAccountSyncResult;
 };
@@ -139,16 +170,18 @@ export const syncLineAccountWithAuthorizationCode = async (
         return latestAccountSyncResult;
     }
 
-    try {
-        const resultPromise = waitForAccountSyncResult();
-        gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromAuthorizationCode(authorizationCode, redirectUri));
-        latestAccountSyncResult = await resultPromise;
-    } catch (error) {
-        frontendLogger.warn('⚠️ LINE callback binding failed', {
-            error: error instanceof Error ? error.message : 'unknown'
-        });
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-    }
+    await runExclusiveAccountResponseRequest(async () => {
+        try {
+            const resultPromise = waitForAccountSyncResult();
+            gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromAuthorizationCode(authorizationCode, redirectUri));
+            latestAccountSyncResult = await resultPromise;
+        } catch (error) {
+            frontendLogger.warn('⚠️ LINE callback binding failed', {
+                error: error instanceof Error ? error.message : 'unknown'
+            });
+            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        }
+    });
 
     return latestAccountSyncResult;
 };
@@ -159,13 +192,15 @@ export const requestAccountStatus = async (): Promise<AccountSyncResult> => {
         return latestAccountSyncResult;
     }
 
-    try {
-        const resultPromise = waitForAccountSyncResult();
-        gameWebSocket.send('ACCOUNT_STATUS', {});
-        latestAccountSyncResult = await resultPromise;
-    } catch {
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-    }
+    await runExclusiveAccountResponseRequest(async () => {
+        try {
+            const resultPromise = waitForAccountSyncResult();
+            gameWebSocket.send('ACCOUNT_STATUS', {});
+            latestAccountSyncResult = await resultPromise;
+        } catch {
+            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        }
+    });
 
     return latestAccountSyncResult;
 };

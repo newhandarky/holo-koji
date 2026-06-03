@@ -18,12 +18,13 @@ type GameWebSocketEventType = ServerToClientEventType | InternalConnectionEvent;
 type GameWebSocketEventPayload<TType extends GameWebSocketEventType> =
     TType extends ServerToClientEventType ? ServerToClientEventMap[TType] : unknown;
 type MessageHandler = (payload: unknown) => void;
+type UnsubscribeHandler = () => void;
 
 export class GameWebSocket {
     // WebSocket 連線物件
     private ws: WebSocket | null = null;
-    // 訊息處理器表（事件名稱 → 處理函式）
-    public messageHandlers: Map<string, MessageHandler> = new Map();
+    // 訊息處理器表（事件名稱 → 多個處理函式）
+    public messageHandlers: Map<string, Set<MessageHandler>> = new Map();
     // 重新連線計數
     private reconnectAttempts = 0;
     // 重新連線最大次數
@@ -55,10 +56,7 @@ export class GameWebSocket {
                 this.ws.onopen = () => {
                     this.connectPromise = null;
                     this.reconnectAttempts = 0;
-                    const openHandler = this.messageHandlers.get('__OPEN__'); // 通知使用端連線事件
-                    if (openHandler) {
-                        openHandler(undefined);
-                    }
+                    this.dispatchMessage('__OPEN__', undefined); // 通知使用端連線事件
                     resolve();
                 };
 
@@ -73,12 +71,8 @@ export class GameWebSocket {
                     try {
                         const message: ParsedWebSocketMessage = JSON.parse(event.data);
 
-                        // 查找處理器
-                        const handler = this.messageHandlers.get(message.type);
-
-                        if (handler) {
-                            handler(message.payload);
-                        } else {
+                        const handled = this.dispatchMessage(message.type, message.payload);
+                        if (!handled) {
                             frontendLogger.warn('⚠️ [WebSocket] 找不到處理器', summarizeSocketMessage(message) ?? undefined);
                         }
 
@@ -91,10 +85,7 @@ export class GameWebSocket {
 
                 this.ws.onclose = (event) => {
                     this.connectPromise = null;
-                    const closeHandler = this.messageHandlers.get('__CLOSE__'); // 通知使用端關閉事件
-                    if (closeHandler) {
-                        closeHandler({ code: event.code, reason: event.reason });
-                    }
+                    this.dispatchMessage('__CLOSE__', { code: event.code, reason: event.reason }); // 通知使用端關閉事件
 
                     if (this.shouldReconnect && !event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
                         this.attemptReconnect(url);
@@ -108,6 +99,26 @@ export class GameWebSocket {
         });
 
         return this.connectPromise;
+    }
+
+    private dispatchMessage(messageType: string, payload: unknown): boolean {
+        const handlers = this.messageHandlers.get(messageType);
+        if (!handlers || handlers.size === 0) {
+            return false;
+        }
+
+        Array.from(handlers).forEach((handler) => {
+            try {
+                handler(payload);
+            } catch (error) {
+                frontendLogger.error('❌ [WebSocket] 處理器執行失敗', {
+                    type: messageType,
+                    error: error instanceof Error ? error.message : 'unknown'
+                });
+            }
+        });
+
+        return true;
     }
 
     private clearReconnectTimer() {
@@ -161,13 +172,36 @@ export class GameWebSocket {
     on<TType extends GameWebSocketEventType>(
         messageType: TType,
         handler: (payload: GameWebSocketEventPayload<TType>) => void
-    ): void {
-        this.messageHandlers.set(messageType, handler as MessageHandler);
+    ): UnsubscribeHandler {
+        const normalizedHandler = handler as MessageHandler;
+        const handlers = this.messageHandlers.get(messageType) ?? new Set<MessageHandler>();
+        handlers.add(normalizedHandler);
+        this.messageHandlers.set(messageType, handlers);
+
+        return () => {
+            this.off(messageType, handler);
+        };
     }
 
     // 移除事件處理器
-    off(messageType: GameWebSocketEventType): void {
-        this.messageHandlers.delete(messageType);
+    off<TType extends GameWebSocketEventType>(
+        messageType: TType,
+        handler?: (payload: GameWebSocketEventPayload<TType>) => void
+    ): void {
+        if (!handler) {
+            this.messageHandlers.delete(messageType);
+            return;
+        }
+
+        const handlers = this.messageHandlers.get(messageType);
+        if (!handlers) {
+            return;
+        }
+
+        handlers.delete(handler as MessageHandler);
+        if (handlers.size === 0) {
+            this.messageHandlers.delete(messageType);
+        }
     }
 
     // 主動關閉連線

@@ -160,6 +160,12 @@ const Lobby: React.FC = () => {
     // 建立連線與註冊事件（只在首次掛載時執行）
     useEffect(() => {
         let isActive = true;
+        const unsubscribeHandlers: Array<() => void> = [];
+        const cleanupLifecycleHandlers = () => {
+            while (unsubscribeHandlers.length > 0) {
+                unsubscribeHandlers.pop()?.();
+            }
+        };
 
         // 連線 WebSocket（避免重複連線）
         const connectWS = async () => {
@@ -192,9 +198,7 @@ const Lobby: React.FC = () => {
             localStorage.setItem('currentPlayerId', playerNameRef.current);
             saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
 
-            gameWebSocket.off('ROOM_CREATED');
-            gameWebSocket.off('PLAYER_JOINED');
-            gameWebSocket.off('ERROR');
+            cleanupLifecycleHandlers();
 
             navigate(`/game/${payload.roomId}`);
         };
@@ -207,9 +211,7 @@ const Lobby: React.FC = () => {
             localStorage.setItem('currentPlayerId', playerNameRef.current);
             saveRoomSessionToken(payload.roomId, payload.playerId ?? playerNameRef.current, payload.roomSessionToken);
 
-            gameWebSocket.off('ROOM_CREATED');
-            gameWebSocket.off('PLAYER_JOINED');
-            gameWebSocket.off('ERROR');
+            cleanupLifecycleHandlers();
 
             navigate(`/game/${payload.roomId}`);
         };
@@ -264,15 +266,13 @@ const Lobby: React.FC = () => {
             alert(`錯誤: ${errorPayload.message}`);
         };
 
-        gameWebSocket.on('ROOM_CREATED', handleRoomCreated);
-        gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined);
-        gameWebSocket.on('ERROR', handleError);
+        unsubscribeHandlers.push(gameWebSocket.on('ROOM_CREATED', handleRoomCreated));
+        unsubscribeHandlers.push(gameWebSocket.on('PLAYER_JOINED', handlePlayerJoined));
+        unsubscribeHandlers.push(gameWebSocket.on('ERROR', handleError));
 
         return () => {
             isActive = false;
-            gameWebSocket.off('ROOM_CREATED');
-            gameWebSocket.off('PLAYER_JOINED');
-            gameWebSocket.off('ERROR');
+            cleanupLifecycleHandlers();
         };
     }, [navigate]);
 

@@ -26,10 +26,26 @@ jest.mock('../../services/websocket', () => {
             connect: jest.fn().mockResolvedValue(undefined),
             isConnected: jest.fn(() => true),
             on: jest.fn((messageType, handler) => {
-                messageHandlers.set(messageType, handler);
+                const handlers = messageHandlers.get(messageType) ?? new Set();
+                handlers.add(handler);
+                messageHandlers.set(messageType, handlers);
+                return () => {
+                    handlers.delete(handler);
+                    if (handlers.size === 0) {
+                        messageHandlers.delete(messageType);
+                    }
+                };
             }),
-            off: jest.fn((messageType) => {
-                messageHandlers.delete(messageType);
+            off: jest.fn((messageType, handler) => {
+                if (!handler) {
+                    messageHandlers.delete(messageType);
+                    return;
+                }
+                const handlers = messageHandlers.get(messageType);
+                handlers?.delete(handler);
+                if (handlers?.size === 0) {
+                    messageHandlers.delete(messageType);
+                }
             }),
             send: jest.fn(),
             messageHandlers
@@ -85,6 +101,18 @@ const mockRequestAccountStatus = requestAccountStatus as jest.MockedFunction<typ
 const mockSyncLineAccountWithIdToken = syncLineAccountWithIdToken as jest.MockedFunction<typeof syncLineAccountWithIdToken>;
 const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
 const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
+
+const emitRegisteredHandler = async (messageType: string, payload: unknown) => {
+    await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith(messageType, expect.any(Function)));
+    const handlerCall = [...mockGameWebSocket.on.mock.calls]
+        .reverse()
+        .find(([registeredMessageType]) => registeredMessageType === messageType);
+    const handler = handlerCall?.[1] as ((payload: unknown) => void) | undefined;
+    expect(handler).toEqual(expect.any(Function));
+    act(() => {
+        handler?.(payload);
+    });
+};
 
 describe('Lobby character set selection', () => {
     beforeEach(() => {
@@ -463,7 +491,7 @@ describe('Lobby character set selection', () => {
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
         await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
-        mockRegisteredHandlers.get('ERROR')?.({ message: '建立失敗' });
+        await emitRegisteredHandler('ERROR', { message: '建立失敗' });
 
         expect(selector).toHaveValue('hololive');
     });
@@ -536,7 +564,7 @@ describe('Lobby character set selection', () => {
         await waitFor(() => expect(screen.getByRole('button', { name: '🏠 建立房間' })).toBeEnabled());
 
         await userEvent.click(screen.getByRole('button', { name: '🏠 建立房間' }));
-        mockRegisteredHandlers.get('ERROR')?.({ message: '自訂角色選擇無效，請重新選擇七位同組合角色。' });
+        await emitRegisteredHandler('ERROR', { message: '自訂角色選擇無效，請重新選擇七位同組合角色。' });
 
         expect(screen.getByRole('radio', { name: '自選七位' })).toBeChecked();
         expect(screen.getByText('已選 7 / 7，可以建立房間')).toBeInTheDocument();

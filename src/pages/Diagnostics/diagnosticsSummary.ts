@@ -26,6 +26,12 @@ const formatBooleanUnknown = (value: boolean | 'unknown', trueText: string, fals
     return value ? trueText : falseText;
 };
 
+const countRegisteredWebSocketHandlers = () => (
+    Array.from(gameWebSocket.messageHandlers.values()).reduce((count, handlers) => (
+        count + (handlers instanceof Set ? handlers.size : 1)
+    ), 0)
+);
+
 export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
     const liff = getLiffDiagnosticsSnapshot();
     const account = getAccountDiagnosticsSnapshot();
@@ -38,7 +44,7 @@ export const buildDiagnosticsSnapshot = (): DiagnosticsSnapshot => {
         routerMode: resolveRouterMode(),
         environmentName: process.env.NODE_ENV ?? 'unknown',
         diagnosticsEnabled: config.diagnosticsEnabled,
-        handlerCount: gameWebSocket.messageHandlers.size,
+        handlerCount: countRegisteredWebSocketHandlers(),
         liffSupportedOrigin: liff.supportedOrigin,
         liffReady: liff.ready,
         lineLoggedIn: liff.loggedIn,

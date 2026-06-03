@@ -1,10 +1,14 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import LineCallbackPage from './index';
 import { gameWebSocket } from '../../services/websocket';
-import { resetAccountSyncStateForTests } from '../../utils/lineAccount';
+import {
+    consumeLineLoginCallback,
+    resetAccountSyncStateForTests,
+    syncLineAccountWithAuthorizationCode
+} from '../../utils/lineAccount';
 
 jest.mock('../../services/websocket', () => {
     const messageHandlers = new Map();
@@ -26,11 +30,20 @@ jest.mock('../../services/websocket', () => {
     };
 });
 
+jest.mock('../../utils/lineAccount', () => ({
+    consumeLineLoginCallback: jest.fn(),
+    resetAccountSyncStateForTests: jest.fn(),
+    syncLineAccountWithAuthorizationCode: jest.fn()
+}));
+
 const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
+const mockConsumeLineLoginCallback = consumeLineLoginCallback as jest.MockedFunction<typeof consumeLineLoginCallback>;
+const mockResetAccountSyncStateForTests = resetAccountSyncStateForTests as jest.MockedFunction<typeof resetAccountSyncStateForTests>;
+const mockSyncLineAccountWithAuthorizationCode = syncLineAccountWithAuthorizationCode as jest.MockedFunction<typeof syncLineAccountWithAuthorizationCode>;
 
 describe('LineCallbackPage', () => {
     beforeEach(() => {
-        resetAccountSyncStateForTests();
+        mockResetAccountSyncStateForTests();
         mockGameWebSocket.connect.mockClear();
         mockGameWebSocket.isConnected.mockClear();
         mockGameWebSocket.isConnected.mockReturnValue(true);
@@ -38,66 +51,44 @@ describe('LineCallbackPage', () => {
         mockGameWebSocket.off.mockClear();
         mockGameWebSocket.send.mockClear();
         mockGameWebSocket.messageHandlers.clear();
+        mockConsumeLineLoginCallback.mockReset();
+        mockConsumeLineLoginCallback.mockReturnValue(null);
+        mockSyncLineAccountWithAuthorizationCode.mockReset();
+        mockSyncLineAccountWithAuthorizationCode.mockImplementation(() => new Promise<never>(() => undefined));
         window.localStorage.clear();
         window.sessionStorage.clear();
         window.history.pushState({}, '', '/?lineCallback=1&code=auth-code&state=saved-state');
     });
 
     test('does not invalidate callback state when React StrictMode re-runs effects', async () => {
-        window.localStorage.setItem('hanamikoji-line-login-flow', JSON.stringify({
-            state: 'saved-state',
+        mockConsumeLineLoginCallback.mockReturnValueOnce({
+            authorizationCode: 'auth-code',
             redirectUri: 'https://example.test/?lineCallback=1',
-            createdAt: Date.now()
-        }));
+        });
+        mockSyncLineAccountWithAuthorizationCode.mockReturnValue(new Promise<never>(() => undefined));
+
+        const firstRender = render(
+            <MemoryRouter>
+                <LineCallbackPage />
+            </MemoryRouter>
+        );
+        await waitFor(() => expect(mockSyncLineAccountWithAuthorizationCode).toHaveBeenCalledTimes(1));
+        firstRender.unmount();
 
         render(
-            <React.StrictMode>
-                <MemoryRouter>
-                    <LineCallbackPage />
-                </MemoryRouter>
-            </React.StrictMode>
+            <MemoryRouter>
+                <LineCallbackPage />
+            </MemoryRouter>
         );
 
-        await waitFor(() => expect(mockGameWebSocket.send).toHaveBeenCalledWith(
-            'ACCOUNT_SYNC',
-            {
-                authorizationCode: 'auth-code',
-                redirectUri: 'https://example.test/?lineCallback=1'
-            }
-        ));
-
-        const accountSyncHandler = mockGameWebSocket.on.mock.calls.find(
-            ([messageType]) => messageType === 'ACCOUNT_SYNC_RESULT'
-        )?.[1] as ((payload: unknown) => void) | undefined;
-        expect(accountSyncHandler).toEqual(expect.any(Function));
-        await act(async () => {
-            accountSyncHandler?.({
-                status: 'bound',
-                profile: {
-                    lineUserId: 'U1234567890',
-                    displayName: 'LINE 玩家',
-                    createdAt: '2026-05-05T12:00:00.000Z',
-                    updatedAt: '2026-05-05T12:00:00.000Z',
-                    counters: {
-                        gamesPlayed: 0,
-                        wins: 0,
-                        lastPlayedAt: null
-                    }
-                },
-                persistenceStatus: {
-                    mode: 'durable',
-                    available: true,
-                    message: 'Account profiles are persistent.'
-                }
-            });
-            await Promise.resolve();
-            await Promise.resolve();
-            await Promise.resolve();
-        });
-
-        expect(await screen.findByText('LINE 帳號綁定完成，正在返回大廳。')).toBeInTheDocument();
+        expect(screen.getByText('正在綁定 LINE 帳號...')).toBeInTheDocument();
         expect(screen.queryByText('LINE 登入狀態無效，請回到大廳重新綁定。')).not.toBeInTheDocument();
-        expect(mockGameWebSocket.send).toHaveBeenCalledTimes(1);
+        expect(mockConsumeLineLoginCallback).toHaveBeenCalledTimes(1);
+        expect(mockSyncLineAccountWithAuthorizationCode).toHaveBeenCalledWith(
+            'auth-code',
+            'https://example.test/?lineCallback=1'
+        );
+        expect(mockSyncLineAccountWithAuthorizationCode).toHaveBeenCalledTimes(1);
     });
 
     test('uses provided lobby return callback without forcing a browser reload', async () => {

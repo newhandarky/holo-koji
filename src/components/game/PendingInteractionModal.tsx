@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ItemCard, PendingInteraction, GameAction, Player, GeishaSet } from '@newhandarky/hanakoji-game-types';
 import { getItemCardImage, getGeishaCharmById } from '../../utils/gameData';
+import {
+    buildGameRoomCompetitionResponseAction,
+    buildGameRoomGiftResponseAction
+} from '../../pages/GameRoom/gameRoomActionCommands';
 
 interface PendingInteractionModalProps {
     // 互動內容（贈予 / 競爭）
@@ -62,10 +66,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
         : '對手執行了競爭，請選擇一組卡牌';
 
     const resolveCompetitionGroup = (chosenGroupIndex: number) => {
-        onResolve({
-            type: 'RESOLVE_COMPETITION',
-            payload: { playerId, chosenGroupIndex }
-        });
+        onResolve(buildGameRoomCompetitionResponseAction(playerId, chosenGroupIndex));
     };
 
     const body = interaction.type === 'GIFT_SELECTION'
@@ -77,10 +78,7 @@ const PendingInteractionModal: React.FC<PendingInteractionModalProps> = ({
                         <button
                             key={card.id}
                             className="gift-selection-card"
-                            onClick={() => onResolve({
-                                type: 'RESOLVE_GIFT',
-                                payload: { playerId, chosenCardId: card.id }
-                            })}
+                            onClick={() => onResolve(buildGameRoomGiftResponseAction(playerId, card.id))}
                         >
                             <span className="gift-selection-card__content">
                                 {renderCard(card, getCharmByGeishaId, geishaSet)}

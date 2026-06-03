@@ -91,6 +91,8 @@ describe('LineCallbackPage', () => {
                 }
             });
             await Promise.resolve();
+            await Promise.resolve();
+            await Promise.resolve();
         });
 
         expect(await screen.findByText('LINE 帳號綁定完成，正在返回大廳。')).toBeInTheDocument();
@@ -100,6 +102,7 @@ describe('LineCallbackPage', () => {
 
     test('uses provided lobby return callback without forcing a browser reload', async () => {
         const onReturnToLobby = jest.fn();
+        const user = userEvent.setup();
 
         render(
             <MemoryRouter>
@@ -107,9 +110,7 @@ describe('LineCallbackPage', () => {
             </MemoryRouter>
         );
 
-        await act(async () => {
-            await userEvent.click(screen.getByRole('button', { name: '回到大廳' }));
-        });
+        await user.click(screen.getByRole('button', { name: '回到大廳' }));
 
         expect(onReturnToLobby).toHaveBeenCalledTimes(1);
     });

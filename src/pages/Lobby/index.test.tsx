@@ -104,18 +104,31 @@ const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.
 
 const pendingAchievementStatus = () => new Promise<never>(() => undefined);
 
-const runUserInteraction = async (interaction: () => void | Promise<void>) => {
-    await act(async () => {
-        await interaction();
-    });
-};
-
 const testUser = {
-    click: async (element: Element) => runUserInteraction(() => userEvent.click(element)),
-    type: async (element: Element, text: string) => runUserInteraction(() => userEvent.type(element, text)),
-    clear: async (element: Element) => runUserInteraction(() => userEvent.clear(element)),
-    selectOptions: async (element: Element, values: string | string[]) =>
-        runUserInteraction(() => userEvent.selectOptions(element, values))
+    click: async (element: Element) => {
+        const user = userEvent.setup();
+        await act(async () => {
+            await user.click(element);
+        });
+    },
+    type: async (element: Element, text: string) => {
+        const user = userEvent.setup();
+        await act(async () => {
+            await user.type(element, text);
+        });
+    },
+    clear: async (element: Element) => {
+        const user = userEvent.setup();
+        await act(async () => {
+            await user.clear(element);
+        });
+    },
+    selectOptions: async (element: Element, values: string | string[]) => {
+        const user = userEvent.setup();
+        await act(async () => {
+            await user.selectOptions(element, values);
+        });
+    }
 };
 
 const emitRegisteredHandler = async (messageType: string, payload: unknown) => {

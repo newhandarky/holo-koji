@@ -180,17 +180,19 @@ const makeActionTokens = (usedType?: string) => [
     { type: 'competition', used: usedType === 'competition' }
 ];
 
-const runUserInteraction = async (interaction: () => void | Promise<void>) => {
-    await act(async () => {
-        await interaction();
-    });
-};
-
 const testUser = {
-    click: async (element: Element) => runUserInteraction(() => userEvent.click(element)),
-    keyboard: async (text: string) => runUserInteraction(() => {
-        userEvent.keyboard(text);
-    })
+    click: async (element: Element) => {
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        await act(async () => {
+            await user.click(element);
+        });
+    },
+    keyboard: async (text: string) => {
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        await act(async () => {
+            await user.keyboard(text);
+        });
+    }
 };
 
 describe('GameRoom character set room surface', () => {

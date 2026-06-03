@@ -13,10 +13,12 @@ import {
 } from '../../components/game/gameMotion';
 import config from '../../config/environment';
 import { frontendLogger } from '../../utils/runtimeLogger';
-import { ActionToken, ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
+import { GeishaSet } from "@newhandarky/hanakoji-game-types"
 import { shareRoomInvite, getLiffInviteUrl, isLineClient, InviteOutcome } from '../../utils/lineLiff';
 import { getItemCardImage } from '../../utils/gameData';
 import { actionStatusConfig } from '../../utils/actionAssets';
+import { buildGameRoomReplayModel, ReplayActionType } from './gameRoomInteractionModel';
+import { buildGameRoomStatusModel } from './gameRoomStatusModel';
 import { useGameRoomPlayers } from './useGameRoomPlayers';
 import { copyTextWithFallback, getInviteOutcomeMessage, getInviteOutcomeTone } from './gameRoomInviteModel';
 import { useGameRoomDrawPresentation } from './useGameRoomDrawPresentation';
@@ -28,8 +30,6 @@ const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
     { section: 'characterBoard', label: '角色' },
     { section: 'handActions', label: '手牌&指令' }
 ];
-
-type ReplayActionType = 'secret' | 'trade-off' | null;
 
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
@@ -111,9 +111,6 @@ const GameRoom: React.FC = () => {
         navigate(roomId ? `/?roomId=${encodeURIComponent(roomId)}` : '/');
     }, [leaveRoom, navigate, roomId]);
 
-    const isGameEnded = state.phase === 'ended';
-
-    const isWaiting = state.phase === 'waiting' || state.players.length < 2;
     const {
         activeOpeningDealSteps,
         openingDealModalModel,
@@ -135,22 +132,14 @@ const GameRoom: React.FC = () => {
     });
 
     const pendingInteraction = state.pendingInteraction;
-    const needsResponse = pendingInteraction?.targetPlayerId === currentPlayerId;
-    const isMyTurn = state.players[state.currentPlayer]?.id === currentPlayerId;
-    const isInteractionLocked = Boolean(pendingInteraction)
-        || isOpeningDealActive
-        || isOpeningHandRevealBlocking
-        || state.orderDecision.isOpen
-        || Boolean(roundSummary)
-        || Boolean(readyStatus)
-        || isGameEnded;
-    const canAct =
-        state.phase === 'playing'
-        && state.players[state.currentPlayer]?.id === currentPlayerId
-        && !pendingInteraction
-        && !isOpeningDealActive
-        && !isOpeningHandRevealBlocking
-        && !state.orderDecision.isOpen;
+    const statusModel = buildGameRoomStatusModel({
+        state,
+        currentPlayerId,
+        isOpeningDealActive,
+        isOpeningHandRevealBlocking,
+        hasRoundSummary: Boolean(roundSummary),
+        hasReadyStatus: Boolean(readyStatus)
+    });
     const {
         activeMotionCues,
         activePendingMotionKind,
@@ -167,12 +156,12 @@ const GameRoom: React.FC = () => {
         setIsEndSheetCollapsed,
         focusSection,
         setFocusSection,
-        canAct,
-        isInteractionLocked,
+        canAct: statusModel.canAct,
+        isInteractionLocked: statusModel.isInteractionLocked,
         isOpeningDealModalActive,
         prefersReducedMotion
     });
-    const activeTurnPlayerName = getPlayerDisplayName(state.players[state.currentPlayer]?.id);
+    const activeTurnPlayerName = getPlayerDisplayName(statusModel.activeTurnPlayerId);
     const {
         recentDraw,
         drawHighlightCardId,
@@ -188,37 +177,26 @@ const GameRoom: React.FC = () => {
         currentPlayerId,
         focusSection,
         setFocusSection,
-        isInteractionLocked,
+        isInteractionLocked: statusModel.isInteractionLocked,
         getPlayerDisplayName,
         enqueueMotionCues,
         prefersReducedMotion
     });
     setShouldHoldFocusForSelfDrawFlag(shouldHoldFocusForSelfDraw);
-    const localActionTokenMap = useMemo(
-        () => new Map((currentPlayer?.actionTokens ?? []).map((token) => [token.type, token])),
-        [currentPlayer?.actionTokens]
-    );
-    const localReplayCardsByAction = useMemo<Record<'secret' | 'trade-off', ItemCard[]>>(() => ({
-        secret: currentPlayer?.secretCards ?? [],
-        'trade-off': currentPlayer?.discardedCards ?? []
-    }), [currentPlayer?.discardedCards, currentPlayer?.secretCards]);
+    const replayModel = useMemo(() => buildGameRoomReplayModel({
+        currentPlayer,
+        currentPlayerId,
+        expandedInfoReplayAction
+    }), [currentPlayer, currentPlayerId, expandedInfoReplayAction]);
 
-    const isReplayEligible = useCallback((playerId: string, actionType: ActionToken['type']) => {
-        if (playerId !== currentPlayerId || (actionType !== 'secret' && actionType !== 'trade-off')) {
-            return false;
-        }
-        const token = localActionTokenMap.get(actionType);
-        return Boolean(token?.used && localReplayCardsByAction[actionType].length > 0);
-    }, [currentPlayerId, localActionTokenMap, localReplayCardsByAction]);
-
-    const handleInfoActionIconClick = useCallback((playerId: string, actionType: ActionToken['type']) => {
-        if (!isReplayEligible(playerId, actionType)) {
+    const handleInfoActionIconClick = useCallback((playerId: string, actionType: Parameters<typeof replayModel.isReplayEligible>[1]) => {
+        if (!replayModel.isReplayEligible(playerId, actionType)) {
             return;
         }
         if (actionType === 'secret' || actionType === 'trade-off') {
             setExpandedInfoReplayAction(actionType);
         }
-    }, [isReplayEligible]);
+    }, [replayModel]);
 
     if (!isConnected) {
         return (
@@ -246,11 +224,11 @@ const GameRoom: React.FC = () => {
         );
     }
 
-    if (isWaiting) {
+    if (statusModel.isWaiting) {
         return (
             <div className="game-background d-flex align-items-center justify-content-center">
                 <div className="card p-4 text-center" style={{ minWidth: 450 }}>
-                    <div className={`turn-status-banner ${isMyTurn ? 'turn-status-banner--active' : ''}`}>
+                    <div className={`turn-status-banner ${statusModel.isMyTurn ? 'turn-status-banner--active' : ''}`}>
                         <div className="d-flex align-items-center gap-2">
                             {displayAvatar && (
                                 <img
@@ -263,7 +241,7 @@ const GameRoom: React.FC = () => {
                                 <strong>{displayName}</strong>
                             </p>
                         </div>
-                        <div>{isMyTurn ? '你的回合' : '等待對手'}</div>
+                        <div>{statusModel.isMyTurn ? '你的回合' : '等待對手'}</div>
                     </div>
                     <div className="spinner-custom mb-3"></div>
                     <h4>等待對手加入</h4>
@@ -368,7 +346,7 @@ const GameRoom: React.FC = () => {
             <div className="container-fluid">
                 <div
                     ref={gameSurfaceRef}
-                    className={`card game-card game-room-surface p-2 ${isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}
+                    className={`card game-card game-room-surface p-2 ${statusModel.isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}
                     aria-hidden={isOpeningDealModalActive ? true : undefined}
                 >
                     <nav className="game-room-tabs" aria-label="遊戲區塊切換">
@@ -411,7 +389,7 @@ const GameRoom: React.FC = () => {
                                         const campClass = player.id === hostId ? 'player-card--host' : 'player-card--guest';
                                         const actionUsedMap = new Map(player.actionTokens.map((token) => [token.type, token.used]));
                                         const isLocalPlayerRow = player.id === currentPlayerId;
-                                        const activeReplayCards = expandedInfoReplayAction ? localReplayCardsByAction[expandedInfoReplayAction] : [];
+                                        const activeReplayCards = isLocalPlayerRow ? replayModel.activeReplayCards : [];
 
                                         return (
                                             <div key={player.id} className="col-md-6 mb-2">
@@ -439,7 +417,7 @@ const GameRoom: React.FC = () => {
                                                         <div className="game-info-action-row mt-2">
                                                             {actionStatusConfig.map((actionItem) => {
                                                                 const used = actionUsedMap.get(actionItem.type) ?? false;
-                                                                const replayEligible = isReplayEligible(player.id, actionItem.type);
+                                                                const replayEligible = replayModel.isReplayEligible(player.id, actionItem.type);
                                                                 const isReplayActive = replayEligible && expandedInfoReplayAction === actionItem.type;
                                                                 const classNames = [
                                                                     'game-info-action',
@@ -496,7 +474,7 @@ const GameRoom: React.FC = () => {
                         playerId={currentPlayerId}
                         hostId={hostId}
                         onSendAction={sendGameAction}
-                        canAct={canAct}
+                        canAct={statusModel.canAct}
                         highlightCardId={drawHighlightCardId}
                         highlightActive={isDrawHighlightActive}
                         motionCues={activeMotionCues}
@@ -606,7 +584,7 @@ const GameRoom: React.FC = () => {
                 </div>
             )}
 
-            {isGameEnded && (
+            {statusModel.isGameEnded && (
                 <div className="bottom-sheet">
                     <div className="bottom-sheet__backdrop" />
                     <div className={`bottom-sheet__panel ${isEndSheetCollapsed ? 'is-collapsed' : ''}`}>
@@ -663,7 +641,7 @@ const GameRoom: React.FC = () => {
                 </div>
             )}
 
-            {needsResponse && pendingInteraction && (
+            {statusModel.needsResponse && pendingInteraction && (
                 <PendingInteractionModal
                     interaction={pendingInteraction}
                     playerId={currentPlayerId}

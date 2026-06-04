@@ -1,249 +1,32 @@
-import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { gameWebSocket } from '../../services/websocket';
-import Lobby from './index';
+import { act, screen, waitFor } from '@testing-library/react';
 import { AI_DIFFICULTY_OPTIONS, normalizeAiDifficulty } from './aiDifficultyOptions';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
-import { getInviteRoomIdFromLocation, getVerifiedLineProfile } from '../../utils/lineLiff';
-import { beginBrowserLineLogin, requestAccountStatus, syncLineAccountWithIdToken } from '../../utils/lineAccount';
-import { acknowledgeAchievementUnlocks, requestAchievementStatus } from '../../utils/achievementAccount';
 import { getStoredRoomSessionToken } from '../../utils/roomSession';
-import { frontendLogger } from '../../utils/runtimeLogger';
-
-const mockNavigate = jest.fn();
-
-jest.mock('react-router-dom', () => ({
-    ...jest.requireActual('react-router-dom'),
-    useNavigate: () => mockNavigate
-}));
-
-jest.mock('../../services/websocket', () => {
-    const messageHandlers = new Map();
-
-    return {
-        __esModule: true,
-        gameWebSocket: {
-            connect: jest.fn().mockResolvedValue(undefined),
-            isConnected: jest.fn(() => true),
-            on: jest.fn((messageType, handler) => {
-                const handlers = messageHandlers.get(messageType) ?? new Set();
-                handlers.add(handler);
-                messageHandlers.set(messageType, handlers);
-                return () => {
-                    handlers.delete(handler);
-                    if (handlers.size === 0) {
-                        messageHandlers.delete(messageType);
-                    }
-                };
-            }),
-            off: jest.fn((messageType, handler) => {
-                if (!handler) {
-                    messageHandlers.delete(messageType);
-                    return;
-                }
-                const handlers = messageHandlers.get(messageType);
-                handlers?.delete(handler);
-                if (handlers?.size === 0) {
-                    messageHandlers.delete(messageType);
-                }
-            }),
-            send: jest.fn(),
-            messageHandlers
-        }
-    };
-});
-
-jest.mock('../../utils/lineLiff', () => ({
-    getInviteRoomIdFromLocation: jest.fn(() => ({ roomId: '', source: 'none' })),
-    getVerifiedLineProfile: jest.fn().mockResolvedValue(null)
-}));
-
-jest.mock('../../utils/lineAccount', () => ({
-    beginBrowserLineLogin: jest.fn(),
-    getBoundAccountProfile: (result: any) => (result?.status === 'bound' ? result.profile : null),
-    requestAccountStatus: jest.fn().mockResolvedValue({
-        status: 'guest',
-        persistenceStatus: {
-            mode: 'temporary',
-            available: true,
-            message: 'Account profiles are temporary in this environment.'
-        }
-    }),
-    syncLineAccountWithIdToken: jest.fn().mockResolvedValue({
-        status: 'guest',
-        persistenceStatus: {
-            mode: 'temporary',
-            available: true,
-            message: 'Account profiles are temporary in this environment.'
-        }
-    })
-}));
-
-jest.mock('../../utils/achievementAccount', () => ({
-    requestAchievementStatus: jest.fn().mockResolvedValue({
-        status: 'guest',
-        message: '成就需要綁定帳號後才會保存。',
-        persistenceStatus: {
-            mode: 'temporary',
-            available: true,
-            message: 'Account profiles are temporary in this environment.'
-        }
-    }),
-    acknowledgeAchievementUnlocks: jest.fn()
-}));
-
-jest.mock('../../utils/runtimeLogger', () => ({
-    frontendLogger: {
-        diagnostic: jest.fn(),
-        error: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn()
-    }
-}));
-
-const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
-const mockRegisteredHandlers = mockGameWebSocket.messageHandlers;
-const mockGetInviteRoomIdFromLocation = getInviteRoomIdFromLocation as jest.MockedFunction<typeof getInviteRoomIdFromLocation>;
-const mockGetVerifiedLineProfile = getVerifiedLineProfile as jest.MockedFunction<typeof getVerifiedLineProfile>;
-const mockBeginBrowserLineLogin = beginBrowserLineLogin as jest.MockedFunction<typeof beginBrowserLineLogin>;
-const mockRequestAccountStatus = requestAccountStatus as jest.MockedFunction<typeof requestAccountStatus>;
-const mockSyncLineAccountWithIdToken = syncLineAccountWithIdToken as jest.MockedFunction<typeof syncLineAccountWithIdToken>;
-const mockRequestAchievementStatus = requestAchievementStatus as jest.MockedFunction<typeof requestAchievementStatus>;
-const mockAcknowledgeAchievementUnlocks = acknowledgeAchievementUnlocks as jest.MockedFunction<typeof acknowledgeAchievementUnlocks>;
-const mockFrontendLogger = frontendLogger as jest.Mocked<typeof frontendLogger>;
-
-const pendingAchievementStatus = () => new Promise<never>(() => undefined);
-
-const testUser = {
-    click: async (element: Element) => {
-        const user = userEvent.setup();
-        await act(async () => {
-            await user.click(element);
-        });
-    },
-    type: async (element: Element, text: string) => {
-        const user = userEvent.setup();
-        await act(async () => {
-            await user.type(element, text);
-        });
-    },
-    clear: async (element: Element) => {
-        const user = userEvent.setup();
-        await act(async () => {
-            await user.clear(element);
-        });
-    },
-    selectOptions: async (element: Element, values: string | string[]) => {
-        const user = userEvent.setup();
-        await act(async () => {
-            await user.selectOptions(element, values);
-        });
-    }
-};
-
-const emitRegisteredHandler = async (messageType: string, payload: unknown) => {
-    await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith(messageType, expect.any(Function)));
-    const handlerCall = [...mockGameWebSocket.on.mock.calls]
-        .reverse()
-        .find(([registeredMessageType]) => registeredMessageType === messageType);
-    const handler = handlerCall?.[1] as ((payload: unknown) => void) | undefined;
-    expect(handler).toEqual(expect.any(Function));
-    act(() => {
-        handler?.(payload);
-    });
-    if (messageType === 'ERROR' && payload && typeof payload === 'object') {
-        const errorPayload = payload as { message?: unknown; code?: unknown };
-        expect(mockFrontendLogger.error).toHaveBeenLastCalledWith('❌ [Lobby] 伺服器錯誤', {
-            message: typeof errorPayload.message === 'string' ? errorPayload.message : '無法加入房間',
-            code: typeof errorPayload.code === 'string' ? errorPayload.code : undefined
-        });
-    }
-};
+import {
+    emitRegisteredHandler,
+    emitServerError,
+    mockAcknowledgeAchievementUnlocks,
+    mockBeginBrowserLineLogin,
+    mockFrontendLogger,
+    mockGameWebSocket,
+    mockGetInviteRoomIdFromLocation,
+    mockGetVerifiedLineProfile,
+    mockNavigate,
+    mockRequestAchievementStatus,
+    mockSyncLineAccountWithIdToken,
+    renderLobby,
+    resetLobbyTestHarness,
+    testUser
+} from './lobbyTestHarness';
 
 describe('Lobby character set selection', () => {
     beforeEach(() => {
-        mockNavigate.mockReset();
-        mockRegisteredHandlers.clear();
-        mockGameWebSocket.connect.mockClear();
-        mockGameWebSocket.isConnected.mockClear();
-        mockGameWebSocket.isConnected.mockReturnValue(true);
-        mockGameWebSocket.on.mockClear();
-        mockGameWebSocket.off.mockClear();
-        mockGameWebSocket.send.mockClear();
-        mockGetInviteRoomIdFromLocation.mockReset();
-        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: '', source: 'none' });
-        mockGetVerifiedLineProfile.mockReset();
-        mockGetVerifiedLineProfile.mockResolvedValue(null);
-        mockBeginBrowserLineLogin.mockReset();
-        mockRequestAccountStatus.mockReset();
-        mockRequestAccountStatus.mockResolvedValue({
-            status: 'guest',
-            persistenceStatus: {
-                mode: 'temporary',
-                available: true,
-                message: 'Account profiles are temporary in this environment.'
-            }
-        });
-        mockSyncLineAccountWithIdToken.mockReset();
-        mockSyncLineAccountWithIdToken.mockResolvedValue({
-            status: 'guest',
-            persistenceStatus: {
-                mode: 'temporary',
-                available: true,
-                message: 'Account profiles are temporary in this environment.'
-            }
-        });
-        mockRequestAchievementStatus.mockReset();
-        mockRequestAchievementStatus.mockImplementation(pendingAchievementStatus);
-        mockAcknowledgeAchievementUnlocks.mockReset();
-        mockFrontendLogger.diagnostic.mockClear();
-        mockFrontendLogger.error.mockClear();
-        mockFrontendLogger.info.mockClear();
-        mockFrontendLogger.warn.mockClear();
-        mockAcknowledgeAchievementUnlocks.mockResolvedValue({
-            status: 'available',
-            persistenceStatus: {
-                mode: 'durable',
-                available: true,
-                message: 'Account profiles are persistent.'
-            },
-            newUnlockCount: 0,
-            items: [],
-            generatedAt: '2026-05-05T12:00:00.000Z'
-        });
-        window.localStorage.clear();
-        jest.spyOn(window, 'alert').mockImplementation(() => undefined);
-        Object.defineProperty(navigator, 'clipboard', {
-            configurable: true,
-            value: { writeText: jest.fn().mockResolvedValue(undefined) }
-        });
-        CHARACTER_SET_OPTIONS.forEach((option) => {
-            option.available = true;
-            option.disabledReason = undefined;
-        });
+        resetLobbyTestHarness();
     });
 
     afterEach(() => {
         jest.restoreAllMocks();
     });
-
-    const renderLobby = () => render(<Lobby />);
-    const emitServerError = async (payload: { message: string; code?: string }) => {
-        await waitFor(() => expect(mockGameWebSocket.on).toHaveBeenCalledWith('ERROR', expect.any(Function)));
-        const errorHandlerCall = [...mockGameWebSocket.on.mock.calls]
-            .reverse()
-            .find(([messageType]) => messageType === 'ERROR');
-        const errorHandler = errorHandlerCall?.[1] as ((payload: unknown) => void) | undefined;
-        expect(errorHandler).toEqual(expect.any(Function));
-        act(() => {
-            errorHandler?.(payload);
-        });
-        expect(mockFrontendLogger.error).toHaveBeenLastCalledWith('❌ [Lobby] 伺服器錯誤', {
-            message: payload.message,
-            code: payload.code
-        });
-    };
 
     test('renders Ginza-branded homepage without homepage diagnostics block', () => {
         renderLobby();

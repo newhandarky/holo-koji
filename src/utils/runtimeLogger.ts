@@ -2,6 +2,54 @@ import config from '../config/environment';
 
 type SafePrimitive = string | number | boolean | null;
 type RuntimeLogContext = Record<string, SafePrimitive | undefined>;
+type SafeRecord = Record<string, unknown>;
+
+type UnknownSocketMessage = {
+    type?: unknown;
+    payload?: unknown;
+} | null | undefined;
+
+type UnknownGameStateSummaryInput = {
+    gameId?: unknown;
+    geishaSet?: unknown;
+    setupMode?: unknown;
+    phase?: unknown;
+    round?: unknown;
+    players?: unknown;
+    accountPersistenceStatus?: unknown;
+    pendingInteraction?: unknown;
+} | null | undefined;
+
+const isRecord = (value: unknown): value is SafeRecord => (
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+);
+
+const getRecord = (record: SafeRecord, key: string) => {
+    const value = record[key];
+    return isRecord(value) ? value : undefined;
+};
+
+const getString = (record: SafeRecord, key: string) => {
+    const value = record[key];
+    return typeof value === 'string' ? value : undefined;
+};
+
+const getNumber = (record: SafeRecord, key: string) => {
+    const value = record[key];
+    return typeof value === 'number' ? value : undefined;
+};
+
+const getPersistenceMode = (record: SafeRecord | undefined) => {
+    const mode = record?.mode;
+    return mode === 'durable' || mode === 'temporary' ? mode : undefined;
+};
+
+const getAchievementStatus = (record: SafeRecord | undefined) => {
+    const status = record?.status;
+    return status === 'available' || status === 'guest' || status === 'unavailable'
+        ? status
+        : undefined;
+};
 
 const sanitizeContext = (context?: RuntimeLogContext) => {
     if (!context) {
@@ -54,39 +102,41 @@ export const frontendLogger = {
     }
 };
 
-export const summarizeSocketMessage = (message: { type?: string; payload?: any } | null | undefined) => {
+export const summarizeSocketMessage = (message: UnknownSocketMessage) => {
     if (!message) {
         return null;
     }
 
-    const payload = message.payload;
-    const payloadType = payload?.action?.type ?? payload?.type ?? null;
+    const payload = isRecord(message.payload) ? message.payload : undefined;
+    const action = payload ? getRecord(payload, 'action') : undefined;
+    const payloadType = action ? getString(action, 'type') : payload ? getString(payload, 'type') : undefined;
+    const persistenceStatus = payload ? getRecord(payload, 'persistenceStatus') : undefined;
 
     return sanitizeContext({
         type: typeof message.type === 'string' ? message.type : 'unknown',
-        roomId: typeof payload?.roomId === 'string' ? payload.roomId : undefined,
-        gameId: typeof payload?.gameId === 'string' ? payload.gameId : undefined,
-        playerId: typeof payload?.playerId === 'string' ? payload.playerId : undefined,
-        accountStatus: message.type === 'ACCOUNT_SYNC_RESULT' && typeof payload?.status === 'string' ? payload.status : undefined,
-        accountPersistenceMode: payload?.persistenceStatus?.mode === 'durable' || payload?.persistenceStatus?.mode === 'temporary'
-            ? payload.persistenceStatus.mode
-            : undefined,
-        achievementStatus: payload?.status === 'available' || payload?.status === 'guest' || payload?.status === 'unavailable'
-            ? payload.status
-            : undefined,
-        achievementNewUnlockCount: typeof payload?.newUnlockCount === 'number' ? payload.newUnlockCount : undefined,
+        roomId: payload ? getString(payload, 'roomId') : undefined,
+        gameId: payload ? getString(payload, 'gameId') : undefined,
+        playerId: payload ? getString(payload, 'playerId') : undefined,
+        accountStatus: message.type === 'ACCOUNT_SYNC_RESULT' && payload ? getString(payload, 'status') : undefined,
+        accountPersistenceMode: getPersistenceMode(persistenceStatus),
+        achievementStatus: getAchievementStatus(payload),
+        achievementNewUnlockCount: payload ? getNumber(payload, 'newUnlockCount') : undefined,
         mode: payload?.mode === 'npc' || payload?.mode === 'online' ? payload.mode : undefined,
-        geishaSet: typeof payload?.geishaSet === 'string' ? payload.geishaSet : undefined,
+        geishaSet: payload ? getString(payload, 'geishaSet') : undefined,
         setupMode: payload?.setupMode === 'random' || payload?.setupMode === 'custom' ? payload.setupMode : undefined,
         actionType: typeof payloadType === 'string' ? payloadType : undefined,
         hasPayload: Boolean(payload)
     });
 };
 
-export const summarizeGameState = (state: any) => {
+export const summarizeGameState = (state: UnknownGameStateSummaryInput) => {
     if (!state) {
         return null;
     }
+
+    const accountPersistenceStatus = isRecord(state.accountPersistenceStatus)
+        ? state.accountPersistenceStatus
+        : undefined;
 
     return sanitizeContext({
         gameId: typeof state.gameId === 'string' ? state.gameId : undefined,
@@ -95,9 +145,7 @@ export const summarizeGameState = (state: any) => {
         phase: typeof state.phase === 'string' ? state.phase : undefined,
         round: typeof state.round === 'number' ? state.round : undefined,
         playerCount: Array.isArray(state.players) ? state.players.length : undefined,
-        accountPersistenceMode: state.accountPersistenceStatus?.mode === 'durable' || state.accountPersistenceStatus?.mode === 'temporary'
-            ? state.accountPersistenceStatus.mode
-            : undefined,
+        accountPersistenceMode: getPersistenceMode(accountPersistenceStatus),
         hasPendingInteraction: Boolean(state.pendingInteraction)
     });
 };

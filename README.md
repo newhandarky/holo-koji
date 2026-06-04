@@ -1,6 +1,6 @@
 # 銀座十字路線上對戰（Hanamikoji）
 
-本專案為花見小路的線上對戰版本，前端使用 React（Create React App），後端使用 Node.js + WebSocket，讓兩位玩家可在房間中進行遊戲。
+本專案為花見小路的線上對戰版本，前端使用 React（Create React App），後端使用 Node.js + WebSocket，讓兩位玩家可在房間中進行遊戲。多人對戰狀態由後端權威控制，前端只消費依玩家視角投影後的安全狀態。
 
 ## 目前進度與已完成功能
 
@@ -61,8 +61,9 @@
 
 ## 專案結構
 
-- `src/`：前端 React 應用
-- `server/`：可選的獨立後端 repo checkout；root 不追蹤此目錄
+- `src/`：root repo 內的前端 React 應用。
+- `server/`：可選的獨立後端 repo checkout；root repo 不追蹤此目錄，也不把它當 submodule。
+- `@newhandarky/hanakoji-game-types`：前後端共用的 published shared types package，作為 WebSocket payload 與遊戲狀態合約來源。
 - `specs/`：新功能、版本更新或大型行為調整的 speckit 規劃文件
 - `AGENTS.md` / `.specify/`：專案規則、長期原則與 agent workflow 來源
 
@@ -120,6 +121,29 @@ npm run build
 ```
 
 輸出會在 `build/` 資料夾。
+
+## 完整驗證流程
+
+前端變更交付前至少執行：
+
+```bash
+CI=1 npm test -- --watchAll=false
+npm run build
+```
+
+若本機有 `server/` checkout，後端變更或 release 前再執行：
+
+```bash
+cd server
+npm test
+npm run verify:deploy
+```
+
+production deploy 或 merge 後可用 health endpoint 確認 Render 服務狀態：
+
+```bash
+curl -fsSL https://holo-koji-server.onrender.com/health
+```
 
 ## 開發流程（speckit / agent）
 

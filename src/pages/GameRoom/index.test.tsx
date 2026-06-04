@@ -1,8 +1,7 @@
 import { act } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import type { OpeningDealSummary } from '@newhandarky/hanakoji-game-types';
 import {
-    GameRoomTestSubject as GameRoom,
     makeActionTokens,
     makeOpeningDeal,
     makeOpeningHand,
@@ -12,6 +11,8 @@ import {
     mockSendGameAction,
     mockShareRoomInvite,
     mockState,
+    renderGameRoom,
+    renderGameRoomElement,
     resetGameRoomTestHarness,
     testUser,
     usePrefersReducedMotion
@@ -31,7 +32,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('uses game-state room content without adding extra character-set labels or selectors', () => {
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-geisha-set', 'hololive');
         expect(screen.queryByRole('combobox', { name: '藝妓組合' })).not.toBeInTheDocument();
@@ -43,7 +44,7 @@ describe('GameRoom character set room surface', () => {
     test('returns to lobby with room id when a reconnect error blocks entry', () => {
         mockHookState.error = '這個房間的重連憑證已失效，請返回大廳重新加入或更換名稱。';
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         fireEvent.click(screen.getByRole('button', { name: '返回大廳' }));
 
@@ -54,7 +55,7 @@ describe('GameRoom character set room surface', () => {
     test('joiner sees the same room geishaSet identity through game-state room content', () => {
         localStorage.setItem('currentPlayerId', 'p2');
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-geisha-set', 'hololive');
         expect(screen.queryByRole('combobox', { name: '藝妓組合' })).not.toBeInTheDocument();
@@ -64,7 +65,7 @@ describe('GameRoom character set room surface', () => {
     test('restore failure shows a simple recovery message and returns to lobby', () => {
         mockHookState.error = '房間資料無效，請重新建立對戰。';
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByText('無法進入對戰')).toBeInTheDocument();
         expect(screen.getByText('房間資料無效，請重新建立對戰。')).toBeInTheDocument();
@@ -79,7 +80,7 @@ describe('GameRoom character set room surface', () => {
             ]
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
 
@@ -93,7 +94,7 @@ describe('GameRoom character set room surface', () => {
     test('opens opening deal modal from replayable safe opening deal summary', () => {
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
         expect(screen.getByLabelText('中央牌堆')).toBeInTheDocument();
@@ -107,14 +108,14 @@ describe('GameRoom character set room surface', () => {
     test('opening deal modal blocks behind-game actions while visible', () => {
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
     });
 
     test('opening deal modal makes behind-game surface inert and owns keyboard focus', () => {
-        const { rerender } = render(<GameRoom />);
+        const { rerender } = renderGameRoom();
         const infoTab = screen.getByRole('button', { name: '資訊' });
         const gameSurface = screen.getByTestId('game-board').parentElement;
 
@@ -122,7 +123,7 @@ describe('GameRoom character set room surface', () => {
         expect(document.activeElement).toBe(infoTab);
 
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
-        rerender(<GameRoom />);
+        rerender(renderGameRoomElement());
 
         const dialog = screen.getByRole('dialog', { name: '開局發牌' });
         expect(dialog).toHaveFocus();
@@ -140,7 +141,7 @@ describe('GameRoom character set room surface', () => {
         ];
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
 
@@ -157,7 +158,7 @@ describe('GameRoom character set room surface', () => {
         openingDeal.removedCard = { id: 'removed-secret-card', geishaId: 7, itemImageUrl: '/secret.png' };
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = openingDeal;
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.queryByText('opening-room-1-round-1')).not.toBeInTheDocument();
         expect(document.body.textContent).not.toContain('removed-secret-card');
@@ -169,7 +170,7 @@ describe('GameRoom character set room surface', () => {
         usePrefersReducedMotion.mockReturnValue(true);
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
 
@@ -183,11 +184,11 @@ describe('GameRoom character set room surface', () => {
     test('replayable reconnect restarts opening deal modal from the beginning', () => {
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
         unmount();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
     });
@@ -198,7 +199,7 @@ describe('GameRoom character set room surface', () => {
             replayable: false
         });
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
@@ -210,7 +211,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         act(() => {
             jest.advanceTimersByTime(6000);
@@ -229,7 +230,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         act(() => {
             jest.advanceTimersByTime(6000);
@@ -244,7 +245,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -266,7 +267,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -285,7 +286,7 @@ describe('GameRoom character set room surface', () => {
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal({
             sequenceId: 'opening-room-1-round-2'
         });
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -301,7 +302,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -327,7 +328,7 @@ describe('GameRoom character set room surface', () => {
         (mockState as any).drawPile = [{ id: 'draw-pile-secret-card', geishaId: 3, itemLabel: '牌堆秘密牌' }];
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -344,7 +345,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(2000);
         });
@@ -359,14 +360,14 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).hand = makeOpeningHand();
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
         expect(screen.getByRole('button', { name: '拿取手牌' })).toBeInTheDocument();
         unmount();
 
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -384,7 +385,7 @@ describe('GameRoom character set room surface', () => {
             replayable: false
         };
 
-        render(<GameRoom />);
+        renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -399,7 +400,7 @@ describe('GameRoom character set room surface', () => {
         (mockState.players[0] as any).actionTokens = makeActionTokens('secret');
         (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
 
-        const { rerender } = render(<GameRoom />);
+        const { rerender } = renderGameRoom();
         act(() => {
             jest.advanceTimersByTime(6000);
         });
@@ -408,7 +409,7 @@ describe('GameRoom character set room surface', () => {
 
         (mockState.players[0] as any).actionTokens = makeActionTokens();
         (mockState.players[0] as any).hand = makeOpeningHand().slice(0, 5);
-        rerender(<GameRoom />);
+        rerender(renderGameRoomElement());
 
         expect(screen.queryByRole('button', { name: '拿取手牌' })).not.toBeInTheDocument();
     });
@@ -419,7 +420,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-99', geishaId: 2, type: 'real' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'characterBoard');
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
@@ -443,7 +444,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-info-1', geishaId: 2, type: 'real' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
         fireEvent.click(screen.getByRole('button', { name: '資訊' }));
 
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'info');
@@ -457,7 +458,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-99', geishaId: 2, type: 'real' }
         }];
 
-        const { unmount } = render(<GameRoom />);
+        const { unmount } = renderGameRoom();
 
         fireEvent.keyDown(screen.getByRole('button', { name: '稍後確認' }), { key: 'Enter' });
         expect(mockHookState.consumeDrawEvent).toHaveBeenCalledTimes(1);
@@ -469,7 +470,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-100', geishaId: 3, type: 'real' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         fireEvent.keyDown(screen.getByRole('button', { name: '現在查看' }), { key: ' ' });
 
@@ -484,7 +485,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-later-1', geishaId: 3, type: 'real' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         fireEvent.click(screen.getByRole('button', { name: '稍後確認' }));
         fireEvent.click(screen.getByRole('button', { name: '手牌&指令' }));
@@ -501,7 +502,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'hidden-p2-1', geishaId: 0, type: 'hidden' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.getByText('玩家二 抽到了新卡')).toBeInTheDocument();
         expect(screen.queryByText('你抽到一張新牌')).not.toBeInTheDocument();
@@ -515,7 +516,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-101', geishaId: 4, type: 'real' }
         }];
 
-        render(<GameRoom />);
+        renderGameRoom();
         fireEvent.click(screen.getByRole('button', { name: '手牌&指令' }));
 
         expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
@@ -538,7 +539,7 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-102', geishaId: 5, type: 'real' }
         }];
 
-        const { rerender } = render(<GameRoom />);
+        const { rerender } = renderGameRoom();
 
         expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
         expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
@@ -551,7 +552,7 @@ describe('GameRoom character set room surface', () => {
             confirmations: [],
             waitingFor: []
         };
-        rerender(<GameRoom />);
+        rerender(renderGameRoomElement());
 
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-focus-section', 'characterBoard');
@@ -567,14 +568,14 @@ describe('GameRoom character set room surface', () => {
             card: { id: 'card-summary-1', geishaId: 5, type: 'real' }
         }];
 
-        const { rerender } = render(<GameRoom />);
+        const { rerender } = renderGameRoom();
 
         expect(screen.getByText('第 1 回合結算完成')).toBeInTheDocument();
         expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
         expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
 
         mockHookState.roundSummary = null;
-        rerender(<GameRoom />);
+        rerender(renderGameRoomElement());
 
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
         expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
@@ -591,7 +592,7 @@ describe('GameRoom character set room surface', () => {
         };
         mockHookState.drawQueue = [firstDraw, secondDraw];
 
-        const { rerender } = render(<GameRoom />);
+        const { rerender } = renderGameRoom();
 
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
         expect(document.body.textContent).not.toContain('card-queue-1');
@@ -600,7 +601,7 @@ describe('GameRoom character set room surface', () => {
         expect(mockHookState.consumeDrawEvent).toHaveBeenCalledTimes(1);
 
         mockHookState.drawQueue = [secondDraw];
-        rerender(<GameRoom />);
+        rerender(renderGameRoomElement());
 
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '現在查看' }));
@@ -609,7 +610,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('active gameplay does not show waiting-room invite controls', () => {
-        render(<GameRoom />);
+        renderGameRoom();
 
         expect(screen.queryByRole('button', { name: 'LINE 邀請好友' })).not.toBeInTheDocument();
     });
@@ -619,7 +620,7 @@ describe('GameRoom character set room surface', () => {
         mockState.players = [mockState.players[0]];
         mockShareRoomInvite.mockResolvedValue({ mode: 'share', url: 'https://liff.line.me/test?roomId=ROOM01' });
 
-        render(<GameRoom />);
+        renderGameRoom();
         await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('LINE 邀請已送出。')).toBeInTheDocument();
@@ -632,7 +633,7 @@ describe('GameRoom character set room surface', () => {
         mockState.players = [mockState.players[0]];
         mockShareRoomInvite.mockResolvedValue({ mode: 'copy', url: 'https://example.test/?roomId=ROOM01' });
 
-        render(<GameRoom />);
+        renderGameRoom();
         await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('已複製邀請連結，請貼給好友。')).toBeInTheDocument();
@@ -644,7 +645,7 @@ describe('GameRoom character set room surface', () => {
         mockState.players = [mockState.players[0]];
         mockShareRoomInvite.mockResolvedValue({ mode: 'cancelled', url: 'https://liff.line.me/test?roomId=ROOM01' });
 
-        render(<GameRoom />);
+        renderGameRoom();
         await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('已取消 LINE 好友選擇，可以重試或改用連結分享。')).toBeInTheDocument();
@@ -660,7 +661,7 @@ describe('GameRoom character set room surface', () => {
             reason: 'clipboard-unavailable'
         });
 
-        render(<GameRoom />);
+        renderGameRoom();
         await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('目前無法自動複製邀請連結，請手動複製下方連結分享。')).toBeInTheDocument();
@@ -676,7 +677,7 @@ describe('GameRoom character set room surface', () => {
             reason: 'share-failed'
         });
 
-        render(<GameRoom />);
+        renderGameRoom();
         await testUser.click(screen.getByRole('button', { name: 'LINE 邀請好友' }));
 
         expect(await screen.findByText('LINE 邀請暫時失敗，請改用下方連結分享。')).toBeInTheDocument();

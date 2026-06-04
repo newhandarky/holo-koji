@@ -1,4 +1,4 @@
-import { act } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { OpeningDealSummary } from '@newhandarky/hanakoji-game-types';
 import GameRoom from './index';
@@ -240,3 +240,7 @@ export const resetGameRoomTestHarness = () => {
 };
 
 export const GameRoomTestSubject = GameRoom;
+
+export const renderGameRoomElement = () => <GameRoom />;
+
+export const renderGameRoom = () => render(renderGameRoomElement());

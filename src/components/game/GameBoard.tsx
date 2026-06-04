@@ -1,5 +1,5 @@
 // src/components/game/GameBoard.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import GeishaCard from './GeishaCard';
 import PlayerHand from './PlayerHand';
 import ActionTokens from './ActionTokens';
@@ -13,12 +13,20 @@ import {
     GameState,
     GeishaSet
 } from '@newhandarky/hanakoji-game-types';
-import { ItemIconDefinition, getItemIconDefinitionByPosition } from '../../utils/gameData';
 import {
     buildGameRoomActionCommand,
     buildGameRoomCompetitionAction
 } from '../../pages/GameRoom/gameRoomActionCommands';
 import type { GameAction } from '@newhandarky/hanakoji-game-types';
+import {
+    buildCharmLookup,
+    buildGeishaItemIconMap,
+    buildPlayedCardCountMap,
+    buildPlayerBoardContext,
+    partitionBoardMotionCues,
+    sortGeishasForBoard
+} from './gameBoardModel';
+import { useGeishaCoverflow } from './useGeishaCoverflow';
 
 interface GameBoardProps {
     // 全域遊戲狀態
@@ -67,17 +75,21 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const [selectedCards, setSelectedCards] = useState<ItemCard[]>([]);
     const [isCompetitionModalOpen, setIsCompetitionModalOpen] = useState(false);
     const [competitionCards, setCompetitionCards] = useState<ItemCard[]>([]);
-    const [activeGeishaIndex, setActiveGeishaIndex] = useState(0);
-    const swipeStateRef = useRef<{ pointerId: number; startX: number; startY: number } | null>(null);
 
     // 取得當前玩家與自己的狀態
-    const currentPlayer = state.players[state.currentPlayer];
-    const myState = state.players.find((player) => player.id === playerId);
-    const isMyTurn = canAct && currentPlayer?.id === playerId;
-    const opponentState = state.players.find((player) => player.id !== playerId) ?? null;
     const isCharacterExpanded = focusSection === 'characterBoard';
     const isHandExpanded = focusSection === 'handActions';
-    const isOpeningHandInteractionBlocked = Boolean(openingHandReveal?.isInteractionBlocked);
+    const {
+        myState,
+        opponentState,
+        isMyTurn,
+        isOpeningHandInteractionBlocked
+    } = buildPlayerBoardContext(
+        state,
+        playerId,
+        canAct,
+        Boolean(openingHandReveal?.isInteractionBlocked)
+    );
 
     // 重置選牌狀態
     const resetSelection = () => setSelectedCards([]);
@@ -89,144 +101,33 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
     // 建立藝妓對應卡數量的索引表（快速查詢）
     const myCountMap = useMemo(() => {
-        const map = new Map<number, number>();
-        myState?.playedCards.forEach((card) => {
-            map.set(card.geishaId, (map.get(card.geishaId) ?? 0) + 1);
-        });
-        return map;
+        return buildPlayedCardCountMap(myState?.playedCards);
     }, [myState?.playedCards]);
 
     const opponentCountMap = useMemo(() => {
-        const map = new Map<number, number>();
-        opponentState?.playedCards.forEach((card) => {
-            map.set(card.geishaId, (map.get(card.geishaId) ?? 0) + 1);
-        });
-        return map;
+        return buildPlayedCardCountMap(opponentState?.playedCards);
     }, [opponentState?.playedCards]);
 
-    const boardMotionCues = useMemo(
-        () => motionCues.filter((cue) => cue.targetZone === 'board' && typeof cue.targetGeishaId === 'number'),
-        [motionCues]
-    );
-    const handMotionCues = useMemo(
-        () => motionCues.filter((cue) => cue.targetZone === 'hand'),
-        [motionCues]
-    );
-    const competitionResultMotionActive = useMemo(
-        () => motionCues.some((cue) => cue.kind === 'competition-result'),
-        [motionCues]
-    );
+    const {
+        boardMotionCues,
+        handMotionCues,
+        competitionResultMotionActive
+    } = useMemo(() => partitionBoardMotionCues(motionCues), [motionCues]);
 
-    const orderedGeishas = useMemo(() => (
-        [...state.geishas].sort((left, right) => {
-            if (left.charmPoints !== right.charmPoints) {
-                return left.charmPoints - right.charmPoints;
-            }
-
-            const leftSlotOrder = left.boardSlotId ?? left.id;
-            const rightSlotOrder = right.boardSlotId ?? right.id;
-            return leftSlotOrder - rightSlotOrder;
-        })
-    ), [state.geishas]);
+    const orderedGeishas = useMemo(() => sortGeishasForBoard(state.geishas), [state.geishas]);
 
     const geishaItemIconMap = useMemo(() => {
-        // 014 clarifications require position-bound icons even when no player owns the item card.
-        const map = new Map<number, ItemIconDefinition>();
-
-        orderedGeishas.forEach((geisha, index) => {
-            const positionIndex = geisha.boardSlotId ?? index + 1;
-            map.set(geisha.id, getItemIconDefinitionByPosition(positionIndex, activeGeishaSet));
-        });
-
-        return map;
+        return buildGeishaItemIconMap(orderedGeishas, activeGeishaSet);
     }, [orderedGeishas, activeGeishaSet]);
 
-    const charmMap = useMemo(() => {
-        const map = new Map<number, number>();
-        state.geishas.forEach((geisha) => {
-            map.set(geisha.id, geisha.charmPoints);
-        });
-        return map;
-    }, [state.geishas]);
-    const getCharmByGeishaId = useCallback((geishaId: number) => charmMap.get(geishaId) ?? 0, [charmMap]);
-    useEffect(() => {
-        setActiveGeishaIndex((currentIndex) => {
-            if (orderedGeishas.length === 0) {
-                return 0;
-            }
-
-            return Math.min(currentIndex, orderedGeishas.length - 1);
-        });
-    }, [orderedGeishas]);
-
-    const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        if (event.pointerType === 'mouse' && event.button !== 0) {
-            return;
-        }
-
-        swipeStateRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY
-        };
-        event.currentTarget.setPointerCapture(event.pointerId);
-    }, []);
-
-    const releasePointerDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        const dragState = swipeStateRef.current;
-
-        if (!dragState || dragState.pointerId !== event.pointerId) {
-            return;
-        }
-
-        swipeStateRef.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-        }
-
-        const deltaX = event.clientX - dragState.startX;
-        const deltaY = event.clientY - dragState.startY;
-        if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY)) {
-            return;
-        }
-        if (orderedGeishas.length === 0) {
-            return;
-        }
-
-        if (deltaX < 0) {
-            setActiveGeishaIndex((current) => (current + 1) % orderedGeishas.length);
-            return;
-        }
-
-        setActiveGeishaIndex((current) => (current - 1 + orderedGeishas.length) % orderedGeishas.length);
-    }, [orderedGeishas.length]);
-
-    const handleCoverflowStep = useCallback((direction: 'prev' | 'next') => {
-        if (orderedGeishas.length === 0) {
-            return;
-        }
-
-        const offset = direction === 'prev' ? -1 : 1;
-        const total = orderedGeishas.length;
-        const nextIndex = (activeGeishaIndex + offset + total) % total;
-
-        setActiveGeishaIndex(nextIndex);
-    }, [activeGeishaIndex, orderedGeishas.length]);
-
-    const getCoverflowOffset = useCallback((index: number) => {
-        const total = orderedGeishas.length;
-        if (total <= 1) {
-            return 0;
-        }
-
-        let offset = index - activeGeishaIndex;
-        if (offset > total / 2) {
-            offset -= total;
-        } else if (offset < -total / 2) {
-            offset += total;
-        }
-        return offset;
-    }, [activeGeishaIndex, orderedGeishas.length]);
+    const getCharmByGeishaId = useMemo(() => buildCharmLookup(state.geishas), [state.geishas]);
+    const {
+        activeGeishaIndex,
+        handleCoverflowStep,
+        handlePointerDown,
+        releasePointerDrag,
+        getCoverflowOffset
+    } = useGeishaCoverflow(orderedGeishas.length);
 
     // 依不同動作類型送出對應行動
     const handleAction = (actionType: ActionType) => {

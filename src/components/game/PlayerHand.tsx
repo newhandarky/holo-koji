@@ -1,9 +1,15 @@
 // src/components/game/PlayerHand.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
-import { getItemCardImage, getItemCardLabel } from '../../utils/gameData';
+import { getItemCardImage } from '../../utils/gameData';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import type { OpeningHandRevealModel } from './openingHandRevealModel';
+import {
+    buildHandCardPresentation,
+    buildRevealVisibleCardIds,
+    splitOpeningDealSteps
+} from './playerHandModel';
+import { usePlayerHandInteraction } from './usePlayerHandInteraction';
 
 /**
  * PlayerHand 組件：顯示玩家手牌並支援選牌
@@ -36,143 +42,27 @@ const PlayerHand: React.FC<Props> = ({
     openingHandReveal = null,
     onTakeOpeningHand
 }) => {
-    // 本地維護選擇狀態
-    const [selected, setSelected] = useState<ItemCard[]>([]);
-    // 本地維護焦點卡片（扇形內局部放大）
-    const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
-    const [drawBackCueIds, setDrawBackCueIds] = useState<Set<string>>(new Set());
-    const previousCardIdsRef = useRef<string[]>([]);
-    // 已選卡片 ID 集合（快速判斷是否選取）
-    const selectedIdSet = useMemo(() => new Set(selected.map(card => card.id)), [selected]);
-    // 手牌 ID 組合鍵（用於偵測手牌變更）
-    const cardIdsKey = useMemo(() => cards.map(card => card.id).join('|'), [cards]);
-    const drawMotionByCardId = useMemo(() => {
-        const map = new Map<string, MotionCue>();
-        motionCues
-            .filter((cue) => cue.kind === 'draw' && cue.cardId)
-            .forEach((cue) => map.set(cue.cardId!, cue));
-        return map;
-    }, [motionCues]);
     const removalCues = useMemo(() => motionCues.filter((cue) => cue.kind === 'removal'), [motionCues]);
-    const selfDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'self'), [openingDealSteps]);
-    const opponentDealSteps = useMemo(() => openingDealSteps.filter((step) => step.owner === 'opponent'), [openingDealSteps]);
+    const { selfDealSteps, opponentDealSteps } = useMemo(() => splitOpeningDealSteps(openingDealSteps), [openingDealSteps]);
     const isOpeningDealActive = openingDealSteps.length > 0;
     const isOpeningHandConcealed = Boolean(openingHandReveal?.isConcealed);
     const isOpeningHandRevealing = openingHandReveal?.status === 'revealing';
     const isOpeningHandInteractionBlocked = Boolean(openingHandReveal?.isInteractionBlocked);
-    const revealVisibleCardIds = useMemo(() => new Set(
-        openingHandReveal?.steps.filter((step) => step.visible).map((step) => step.cardId) ?? []
-    ), [openingHandReveal?.steps]);
-
-    useEffect(() => {
-        const timers: number[] = [];
-
-        motionCues
-            .filter((cue) => cue.kind === 'draw' && cue.cardId && !cue.reducedMotion)
-            .forEach((cue) => {
-                setDrawBackCueIds((previous) => {
-                    if (previous.has(cue.id)) {
-                        return previous;
-                    }
-
-                    const next = new Set(previous);
-                    next.add(cue.id);
-                    return next;
-                });
-
-                const timerId = window.setTimeout(() => {
-                    setDrawBackCueIds((previous) => {
-                        const next = new Set(previous);
-                        next.delete(cue.id);
-                        return next;
-                    });
-                }, Math.min(520, Math.max(260, cue.durationMs / 2)));
-                timers.push(timerId);
-            });
-
-        return () => {
-            timers.forEach((timerId) => window.clearTimeout(timerId));
-        };
-    }, [motionCues]);
-
-    // 當手牌變更時重置選牌狀態，避免選到舊牌
-    useEffect(() => {
-        setSelected([]);
-        onCardSelect([]);
-    }, [cardIdsKey, onCardSelect]);
-
-    // 首次進入手牌時聚焦中間牌；手牌更新時優先保留舊焦點，否則取最接近的牌。
-    useEffect(() => {
-        const previousCardIds = previousCardIdsRef.current;
-
-        if (cards.length === 0) {
-            setFocusedCardId(null);
-            previousCardIdsRef.current = [];
-            return;
-        }
-
-        setFocusedCardId((previousFocusedCardId) => {
-            if (!previousFocusedCardId) {
-                return cards[Math.floor((cards.length - 1) / 2)]?.id ?? null;
-            }
-
-            const existingIndex = cards.findIndex((card) => card.id === previousFocusedCardId);
-            if (existingIndex >= 0) {
-                return previousFocusedCardId;
-            }
-
-            const previousIndex = previousCardIds.indexOf(previousFocusedCardId);
-            if (previousIndex < 0) {
-                return cards[Math.floor((cards.length - 1) / 2)]?.id ?? null;
-            }
-
-            const nearestIndex = Math.min(previousIndex, cards.length - 1);
-            return cards[nearestIndex]?.id ?? cards[cards.length - 1]?.id ?? null;
-        });
-        previousCardIdsRef.current = cards.map((card) => card.id);
-    }, [cards, cardIdsKey]);
-
-    const focusedIndex = useMemo(() => {
-        if (!focusedCardId) {
-            return cards.length > 0 ? Math.floor((cards.length - 1) / 2) : -1;
-        }
-
-        const index = cards.findIndex((card) => card.id === focusedCardId);
-        if (index >= 0) {
-            return index;
-        }
-
-        return cards.length > 0 ? Math.floor((cards.length - 1) / 2) : -1;
-    }, [cards, focusedCardId]);
-
-    const moveFocus = (direction: 'prev' | 'next') => {
-        if (cards.length === 0) {
-            return;
-        }
-
-        const currentIndex = focusedIndex >= 0 ? focusedIndex : Math.floor((cards.length - 1) / 2);
-        const offset = direction === 'prev' ? -1 : 1;
-        const nextIndex = (currentIndex + offset + cards.length) % cards.length;
-        setFocusedCardId(cards[nextIndex]?.id ?? null);
-    };
-
-    // 切換卡片選取狀態（使用 functional setState 避免快速點擊丟更新）
-    const toggleCard = (card: ItemCard) => {
-        if (isOpeningHandInteractionBlocked) {
-            return;
-        }
-
-        setSelected((prevSelected) => {
-            setFocusedCardId(card.id);
-            const exists = prevSelected.some(c => c.id === card.id);
-            const nextSelected = exists
-                ? prevSelected.filter(c => c.id !== card.id)
-                : [...prevSelected, card];
-
-            onCardSelect(nextSelected);
-            return nextSelected;
-        });
-    };
+    const revealVisibleCardIds = useMemo(() => buildRevealVisibleCardIds(openingHandReveal), [openingHandReveal]);
+    const {
+        selectedIdSet,
+        focusedCardId,
+        focusedIndex,
+        drawBackCueIds,
+        drawMotionByCardId,
+        moveFocus,
+        toggleCard
+    } = usePlayerHandInteraction({
+        cards,
+        motionCues,
+        isOpeningHandInteractionBlocked,
+        onCardSelect
+    });
 
     return (
         <div className="player-hand-panel">
@@ -244,24 +134,27 @@ const PlayerHand: React.FC<Props> = ({
                             const absRelative = Math.abs(relativeIndex);
                             const stackLevel = cards.length - Math.round(absRelative);
                             const rotationDeg = relativeIndex * 5;
-                            const cardImage = getItemCardImage(card, geishaSet ?? 'default');
-                            const hasCardImage = cardImage.trim().length > 0;
-                            const fallbackLabel = getItemCardLabel(card, geishaSet ?? 'default');
-                            const isSelected = selectedIdSet.has(card.id);
-                            const isFocused = focusedCardId === card.id;
-                            const isConcealedCard = isOpeningHandConcealed && !revealVisibleCardIds.has(card.id);
-                            const revealStep = openingHandReveal?.steps.find((step) => step.cardId === card.id);
-                            const drawMotionCue = drawMotionByCardId.get(card.id);
-                            const isDrawBackVisible = Boolean(drawMotionCue && drawBackCueIds.has(drawMotionCue.id));
+                            const presentation = buildHandCardPresentation({
+                                card,
+                                index,
+                                geishaSet: geishaSet ?? 'default',
+                                selectedIdSet,
+                                focusedCardId,
+                                isOpeningHandConcealed,
+                                revealVisibleCardIds,
+                                openingHandReveal,
+                                drawMotionByCardId,
+                                drawBackCueIds
+                            });
 
                             return (
                                 <button
                                     key={card.id}
                                     type="button"
                                     className={`item-card item-card--image item-card--hand ${
-                                        isSelected ? 'selected' : ''
+                                        presentation.isSelected ? 'selected' : ''
                                     } ${
-                                        isFocused ? 'item-card--focused' : ''
+                                        presentation.isFocused ? 'item-card--focused' : ''
                                     } ${
                                         highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
                                     } ${
@@ -269,36 +162,36 @@ const PlayerHand: React.FC<Props> = ({
                                     } ${
                                         prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
                                     } ${
-                                        hasCardImage ? '' : 'item-card--missing-artwork'
+                                        presentation.hasCardImage ? '' : 'item-card--missing-artwork'
                                     } ${
-                                        isConcealedCard ? 'item-card--opening-concealed' : ''
+                                        presentation.isConcealedCard ? 'item-card--opening-concealed' : ''
                                     } ${
-                                        isOpeningHandRevealing && !isConcealedCard ? 'item-card--opening-revealed' : ''
+                                        isOpeningHandRevealing && !presentation.isConcealedCard ? 'item-card--opening-revealed' : ''
                                     }`}
                                     disabled={isOpeningHandInteractionBlocked}
-                                    aria-pressed={isSelected}
-                                    aria-label={isConcealedCard || isDrawBackVisible ? `手牌 ${index + 1} 牌背` : undefined}
+                                    aria-pressed={presentation.isSelected}
+                                    aria-label={presentation.ariaLabel}
                                     onClick={() => toggleCard(card)}
                                     style={{
-                                        backgroundImage: isConcealedCard || isDrawBackVisible ? 'none' : hasCardImage ? `url(${cardImage})` : 'none',
+                                        backgroundImage: presentation.backgroundImage,
                                         ['--fan-index' as string]: `${relativeIndex}`,
                                         ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
                                         ['--fan-abs-index' as string]: `${absRelative}`,
                                         ['--fan-z-index' as string]: `${stackLevel}`,
-                                        ['--motion-delay' as string]: `${revealStep?.delayMs ?? drawMotionByCardId.get(card.id)?.delayMs ?? 0}ms`,
-                                        ['--motion-duration' as string]: `${revealStep?.durationMs ?? drawMotionByCardId.get(card.id)?.durationMs ?? 0}ms`
+                                        ['--motion-delay' as string]: `${presentation.revealStep?.delayMs ?? presentation.drawMotionCue?.delayMs ?? 0}ms`,
+                                        ['--motion-duration' as string]: `${presentation.revealStep?.durationMs ?? presentation.drawMotionCue?.durationMs ?? 0}ms`
                                     }}
                                 >
                                     <div className="item-card__overlay" />
-                                    {(isConcealedCard || isDrawBackVisible) && (
+                                    {(presentation.isConcealedCard || presentation.isDrawBackVisible) && (
                                         <div className="item-card__opening-back" aria-hidden="true">
                                             <span />
                                         </div>
                                     )}
-                                    {!isConcealedCard && !isDrawBackVisible && !hasCardImage && (
-                                        <div className="item-card__fallback-label">{fallbackLabel}</div>
+                                    {!presentation.isConcealedCard && !presentation.isDrawBackVisible && !presentation.hasCardImage && (
+                                        <div className="item-card__fallback-label">{presentation.fallbackLabel}</div>
                                     )}
-                                    {isSelected && (
+                                    {presentation.isSelected && (
                                         <div className="item-card__selected-check" aria-hidden="true">✓</div>
                                     )}
                                     {drawMotionByCardId.has(card.id) && (

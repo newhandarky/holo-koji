@@ -1,50 +1,29 @@
-import { AccountSyncResult, LineAccountProfile } from '@newhandarky/hanakoji-game-types';
+import { AccountSyncResult } from '@newhandarky/hanakoji-game-types';
 import { gameWebSocket } from '../services/websocket';
 import { LineProfile } from './lineLiff';
 import { frontendLogger } from './runtimeLogger';
 import config from '../config/environment';
+import { ACCOUNT_GUEST_NOTICE, ACCOUNT_SYNC_TIMEOUT_MS } from './lineAccountTypes';
+import {
+    getLatestAccountSyncResult,
+    resetAccountSyncStateForTests as resetRuntimeAccountSyncStateForTests,
+    setLatestAccountSyncResult,
+    toGuestResult
+} from './lineAccountRuntime';
 
-const ACCOUNT_GUEST_NOTICE = '目前以訪客模式繼續，帳號進度暫時不會保存。';
-const ACCOUNT_SYNC_TIMEOUT_MS = 3000;
-
-const temporaryPersistenceStatus = {
-    mode: 'temporary' as const,
-    available: true,
-    message: 'Account profiles are temporary in this environment.'
-};
-
-let latestAccountSyncResult: AccountSyncResult = {
-    status: 'guest',
-    persistenceStatus: temporaryPersistenceStatus
-};
 let accountResponseQueue: Promise<unknown> | null = null;
 
-export const getLatestAccountSyncResult = () => latestAccountSyncResult;
+export {
+    getAccountDiagnosticsSnapshot,
+    getBoundAccountProfile,
+    getLatestAccountSyncResult,
+    toGuestResult
+} from './lineAccountRuntime';
 
 export const resetAccountSyncStateForTests = () => {
-    latestAccountSyncResult = {
-        status: 'guest',
-        persistenceStatus: temporaryPersistenceStatus
-    };
+    resetRuntimeAccountSyncStateForTests();
     accountResponseQueue = null;
 };
-
-export const getAccountDiagnosticsSnapshot = () => ({
-    accountSyncStatus: latestAccountSyncResult.status,
-    accountPersistenceMode: latestAccountSyncResult.persistenceStatus.mode,
-    accountPersistenceAvailable: latestAccountSyncResult.persistenceStatus.available,
-    accountPersistenceMessage: latestAccountSyncResult.persistenceStatus.message
-});
-
-const toGuestResult = (status: AccountSyncResult['status'] = 'guest', guestNotice?: string): AccountSyncResult => ({
-    status,
-    guestNotice,
-    persistenceStatus: temporaryPersistenceStatus
-});
-
-export const getBoundAccountProfile = (result: AccountSyncResult): LineAccountProfile | null => (
-    result.status === 'bound' && result.profile ? result.profile : null
-);
 
 export const buildAccountSyncRequestFromLineProfile = (profile: LineProfile) => ({
     profile: {
@@ -111,29 +90,31 @@ const runExclusiveAccountResponseRequest = async <T>(request: () => Promise<T>):
 
 export const syncLineAccount = async (profile: LineProfile | null): Promise<AccountSyncResult> => {
     if (!profile) {
-        latestAccountSyncResult = toGuestResult('guest');
-        return latestAccountSyncResult;
+        const result = toGuestResult('guest');
+        setLatestAccountSyncResult(result);
+        return result;
     }
 
     if (!gameWebSocket.isConnected()) {
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-        return latestAccountSyncResult;
+        const result = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        setLatestAccountSyncResult(result);
+        return result;
     }
 
     await runExclusiveAccountResponseRequest(async () => {
         try {
             const resultPromise = waitForAccountSyncResult();
             gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineProfile(profile));
-            latestAccountSyncResult = await resultPromise;
+            setLatestAccountSyncResult(await resultPromise);
         } catch (error) {
             frontendLogger.warn('⚠️ LINE account sync failed', {
                 error: error instanceof Error ? error.message : 'unknown'
             });
-            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+            setLatestAccountSyncResult(toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE));
         }
     });
 
-    return latestAccountSyncResult;
+    return getLatestAccountSyncResult();
 };
 
 export const syncLineAccountWithIdToken = async (
@@ -141,24 +122,25 @@ export const syncLineAccountWithIdToken = async (
     idToken: string
 ): Promise<AccountSyncResult> => {
     if (!gameWebSocket.isConnected()) {
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-        return latestAccountSyncResult;
+        const result = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        setLatestAccountSyncResult(result);
+        return result;
     }
 
     await runExclusiveAccountResponseRequest(async () => {
         try {
             const resultPromise = waitForAccountSyncResult();
             gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromLineIdToken(profile, idToken));
-            latestAccountSyncResult = await resultPromise;
+            setLatestAccountSyncResult(await resultPromise);
         } catch (error) {
             frontendLogger.warn('⚠️ LINE account binding failed', {
                 error: error instanceof Error ? error.message : 'unknown'
             });
-            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+            setLatestAccountSyncResult(toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE));
         }
     });
 
-    return latestAccountSyncResult;
+    return getLatestAccountSyncResult();
 };
 
 export const syncLineAccountWithAuthorizationCode = async (
@@ -166,43 +148,45 @@ export const syncLineAccountWithAuthorizationCode = async (
     redirectUri: string
 ): Promise<AccountSyncResult> => {
     if (!gameWebSocket.isConnected()) {
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-        return latestAccountSyncResult;
+        const result = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        setLatestAccountSyncResult(result);
+        return result;
     }
 
     await runExclusiveAccountResponseRequest(async () => {
         try {
             const resultPromise = waitForAccountSyncResult();
             gameWebSocket.send('ACCOUNT_SYNC', buildAccountSyncRequestFromAuthorizationCode(authorizationCode, redirectUri));
-            latestAccountSyncResult = await resultPromise;
+            setLatestAccountSyncResult(await resultPromise);
         } catch (error) {
             frontendLogger.warn('⚠️ LINE callback binding failed', {
                 error: error instanceof Error ? error.message : 'unknown'
             });
-            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+            setLatestAccountSyncResult(toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE));
         }
     });
 
-    return latestAccountSyncResult;
+    return getLatestAccountSyncResult();
 };
 
 export const requestAccountStatus = async (): Promise<AccountSyncResult> => {
     if (!gameWebSocket.isConnected()) {
-        latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
-        return latestAccountSyncResult;
+        const result = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+        setLatestAccountSyncResult(result);
+        return result;
     }
 
     await runExclusiveAccountResponseRequest(async () => {
         try {
             const resultPromise = waitForAccountSyncResult();
             gameWebSocket.send('ACCOUNT_STATUS', {});
-            latestAccountSyncResult = await resultPromise;
+            setLatestAccountSyncResult(await resultPromise);
         } catch {
-            latestAccountSyncResult = toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE);
+            setLatestAccountSyncResult(toGuestResult('sync-failed', ACCOUNT_GUEST_NOTICE));
         }
     });
 
-    return latestAccountSyncResult;
+    return getLatestAccountSyncResult();
 };
 
 const LINE_LOGIN_STATE_KEY = 'hanamikoji-line-login-state';

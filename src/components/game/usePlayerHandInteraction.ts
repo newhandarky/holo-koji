@@ -28,6 +28,7 @@ export const usePlayerHandInteraction = ({
     const [drawBackCueIds, setDrawBackCueIds] = useState<Set<string>>(new Set());
     const previousCardIdsRef = useRef<string[]>([]);
     const onCardSelectRef = useRef(onCardSelect);
+    const selectedRef = useRef<ItemCard[]>([]);
     const selectedIdSet = useMemo(() => buildSelectedCardIdSet(selected), [selected]);
     const cardIdsKey = useMemo(() => buildCardIdsKey(cards), [cards]);
     const drawMotionByCardId = useMemo(() => buildDrawMotionByCardId(motionCues), [motionCues]);
@@ -69,6 +70,7 @@ export const usePlayerHandInteraction = ({
 
     useEffect(() => {
         setSelected([]);
+        selectedRef.current = [];
         onCardSelectRef.current([]);
     }, [cardIdsKey]);
 
@@ -94,16 +96,15 @@ export const usePlayerHandInteraction = ({
             return;
         }
 
-        setSelected((prevSelected) => {
-            setFocusedCardId(card.id);
-            const exists = prevSelected.some((selectedCard) => selectedCard.id === card.id);
-            const nextSelected = exists
-                ? prevSelected.filter((selectedCard) => selectedCard.id !== card.id)
-                : [...prevSelected, card];
+        setFocusedCardId(card.id);
+        const exists = selectedRef.current.some((selectedCard) => selectedCard.id === card.id);
+        const nextSelected = exists
+            ? selectedRef.current.filter((selectedCard) => selectedCard.id !== card.id)
+            : [...selectedRef.current, card];
 
-            onCardSelectRef.current(nextSelected);
-            return nextSelected;
-        });
+        selectedRef.current = nextSelected;
+        setSelected(nextSelected);
+        onCardSelectRef.current(nextSelected);
     }, [isOpeningHandInteractionBlocked]);
 
     return {

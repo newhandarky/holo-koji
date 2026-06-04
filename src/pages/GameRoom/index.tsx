@@ -3,7 +3,6 @@ import React, { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import GameBoard from '../../components/game/GameBoard';
 import type { FocusSection } from '../../components/game/GameBoard';
 import OpeningDealModal from '../../components/game/OpeningDealModal';
 import OrderDecisionModal from '../../components/game/OrderDecisionModal';
@@ -20,17 +19,15 @@ import { useGameRoomEventReactions } from './useGameRoomEventReactions';
 import { useGameRoomOpeningPresentation } from './useGameRoomOpeningPresentation';
 import { useGameRoomInviteActions } from './useGameRoomInviteActions';
 import { GameRoomWaitingPanel } from './GameRoomWaitingPanel';
-import { GameRoomInfoPanel } from './GameRoomInfoPanel';
 import { GameRoomDrawNotification } from './GameRoomDrawNotification';
 import { GameRoomRoundSummaryOverlay } from './GameRoomRoundSummaryOverlay';
 import { GameRoomReadySheet } from './GameRoomReadySheet';
 import { GameRoomEndSheet } from './GameRoomEndSheet';
-
-const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
-    { section: 'info', label: '資訊' },
-    { section: 'characterBoard', label: '角色' },
-    { section: 'handActions', label: '手牌&指令' }
-];
+import {
+    GameRoomConnectingSurface,
+    GameRoomErrorSurface
+} from './GameRoomConnectionSurface';
+import { GameRoomActiveSurface } from './GameRoomActiveSurface';
 
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
@@ -170,29 +167,11 @@ const GameRoom: React.FC = () => {
     setShouldHoldFocusForSelfDrawFlag(shouldHoldFocusForSelfDraw);
 
     if (!isConnected) {
-        return (
-            <div className="game-background d-flex align-items-center justify-content-center">
-                <div className="text-center text-white">
-                    <div className="spinner-custom mb-3"></div>
-                    <h3>連接伺服器中...</h3>
-                    <small className="text-muted">
-                        正在連接到: {config.websocketUrl}
-                    </small>
-                </div>
-            </div>
-        );
+        return <GameRoomConnectingSurface websocketUrl={config.websocketUrl} />;
     }
 
     if (error) {
-        return (
-            <div className="game-background d-flex align-items-center justify-content-center">
-                <div className="card p-4 text-center" style={{ minWidth: 360, maxWidth: 520 }}>
-                    <h4 className="text-danger mb-3">無法進入對戰</h4>
-                    <p className="mb-4">{error}</p>
-                    <button className="btn btn-primary" onClick={handleReturnToLobby}>返回大廳</button>
-                </div>
-            </div>
-        );
+        return <GameRoomErrorSurface error={error} onReturnToLobby={handleReturnToLobby} />;
     }
 
     if (statusModel.isWaiting) {
@@ -217,62 +196,32 @@ const GameRoom: React.FC = () => {
 
     return (
         <div className="game-background game-room-page p-3">
-            <div className="container-fluid">
-                <div
-                    ref={gameSurfaceRef}
-                    className={`card game-card game-room-surface p-2 ${statusModel.isInteractionLocked ? 'game-card--locked' : ''} game-room-focus-layout`}
-                    aria-hidden={isOpeningDealModalActive ? true : undefined}
-                >
-                    <nav className="game-room-tabs" aria-label="遊戲區塊切換">
-                        {SECTION_TABS.map((tab) => {
-                            const isActive = focusSection === tab.section;
-                            return (
-                                <button
-                                    key={tab.section}
-                                    type="button"
-                                    className={`game-room-tabs__button ${isActive ? 'is-active' : ''}`}
-                                    onClick={() => setFocusSection(tab.section)}
-                                    aria-pressed={isActive}
-                                >
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                    </nav>
-                    <section className={`game-focus-section game-focus-section--info ${focusSection === 'info' ? 'is-expanded' : 'is-collapsed'}`}>
-                        {focusSection === 'info' && (
-                            <GameRoomInfoPanel
-                                state={state}
-                                currentPlayerId={currentPlayerId}
-                                currentPlayer={currentPlayer}
-                                hostId={hostId}
-                                activeTurnPlayerName={activeTurnPlayerName}
-                                displayName={displayName}
-                                activeGeishaSet={activeGeishaSet}
-                                getPlayerDisplayName={getPlayerDisplayName}
-                                getPlayerAvatar={getPlayerAvatar}
-                                onReturnToLobby={handleReturnToLobby}
-                            />
-                        )}
-                    </section>
-
-                    <GameBoard
-                        state={state}
-                        playerId={currentPlayerId}
-                        hostId={hostId}
-                        onSendAction={sendGameAction}
-                        canAct={statusModel.canAct}
-                        highlightCardId={drawHighlightCardId}
-                        highlightActive={isDrawHighlightActive}
-                        motionCues={activeMotionCues}
-                        prefersReducedMotion={prefersReducedMotion}
-                        focusSection={focusSection}
-                        openingDealSteps={activeOpeningDealSteps}
-                        openingHandReveal={openingHandRevealModel.isEligible || openingHandRevealModel.status === 'revealed' ? openingHandRevealModel : null}
-                        onTakeOpeningHand={handleTakeOpeningHand}
-                    />
-                </div>
-            </div>
+            <GameRoomActiveSurface
+                state={state}
+                gameSurfaceRef={gameSurfaceRef}
+                isInteractionLocked={statusModel.isInteractionLocked}
+                isOpeningDealModalActive={isOpeningDealModalActive}
+                focusSection={focusSection}
+                onFocusSectionChange={setFocusSection}
+                currentPlayerId={currentPlayerId}
+                currentPlayer={currentPlayer}
+                hostId={hostId}
+                activeTurnPlayerName={activeTurnPlayerName}
+                displayName={displayName}
+                activeGeishaSet={activeGeishaSet}
+                getPlayerDisplayName={getPlayerDisplayName}
+                getPlayerAvatar={getPlayerAvatar}
+                onReturnToLobby={handleReturnToLobby}
+                onSendAction={sendGameAction}
+                canAct={statusModel.canAct}
+                highlightCardId={drawHighlightCardId}
+                highlightActive={isDrawHighlightActive}
+                motionCues={activeMotionCues}
+                prefersReducedMotion={prefersReducedMotion}
+                openingDealSteps={activeOpeningDealSteps}
+                openingHandReveal={openingHandRevealModel.isEligible || openingHandRevealModel.status === 'revealed' ? openingHandRevealModel : null}
+                onTakeOpeningHand={handleTakeOpeningHand}
+            />
 
             <GameRoomDrawNotification
                 recentDraw={recentDraw}

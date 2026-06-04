@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 - 新增專案優化 closeout roadmap，記錄 042–138 架構收斂後的剩餘優化範圍、告一段落標準與 139–147 建議里程碑。
+- 完成後端 042–102 boundary closeout：收斂 authoritative game runtime、WebSocket lifecycle/message、GameRoom facade、action transition、game state factory、geisha set rules 與部署驗證流程。
+- 完成前端 107–138 boundary closeout：收斂 WebSocket listener / hook、account / achievement response queue、LINE LIFF / account utility、GameRoom / Lobby page assembly 與 gameplay presentation 邊界。
+- 補強 139–147 closeout：建立 Lobby / GameRoom test harness、收斂 runtime logger typing、記錄必要 typing escape hatch，並補齊專案驗證與 release readiness 文件。
 - 移除過時的本機 `docs/` 文件、舊 Symphony `WORKFLOW.md`，以及不符合現行架構的歷史 `specs/001-*` 到 `specs/056-*` 規格文件。
 - 更新 README 專案結構說明，將正式文件入口收斂到 `AGENTS.md`、`.specify/` 與未來新建的 `specs/`。
 - 清理 active docs 與 Speckit workflow memory，避免後續規劃誤用舊的 local `game-shared-types`、Socket.IO 或 submodule 架構描述。

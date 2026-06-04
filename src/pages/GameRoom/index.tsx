@@ -21,6 +21,10 @@ import { useGameRoomOpeningPresentation } from './useGameRoomOpeningPresentation
 import { useGameRoomInviteActions } from './useGameRoomInviteActions';
 import { GameRoomWaitingPanel } from './GameRoomWaitingPanel';
 import { GameRoomInfoPanel } from './GameRoomInfoPanel';
+import { GameRoomDrawNotification } from './GameRoomDrawNotification';
+import { GameRoomRoundSummaryOverlay } from './GameRoomRoundSummaryOverlay';
+import { GameRoomReadySheet } from './GameRoomReadySheet';
+import { GameRoomEndSheet } from './GameRoomEndSheet';
 
 const SECTION_TABS: Array<{ section: FocusSection; label: string }> = [
     { section: 'info', label: '資訊' },
@@ -270,38 +274,13 @@ const GameRoom: React.FC = () => {
                 </div>
             </div>
 
-            {recentDraw && (
-                <div className="draw-toast shadow">{recentDraw}</div>
-            )}
-
-            {isActiveSelfDrawNotification && (
-                <div className="draw-notification shadow" role="status" aria-label="抽牌通知">
-                    <div className="draw-notification__card-back" aria-hidden="true">
-                        <span />
-                    </div>
-                    <div className="draw-notification__content">
-                        <div className="draw-notification__title">你抽到一張新牌</div>
-                        <div className="draw-notification__actions">
-                            <button
-                                type="button"
-                                className="btn btn-outline-light btn-sm"
-                                onClick={handleDrawNotificationDismiss}
-                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'dismiss')}
-                            >
-                                稍後確認
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-light btn-sm"
-                                onClick={handleDrawNotificationViewNow}
-                                onKeyDown={(event) => handleDrawNotificationKeyDown(event, 'view_now')}
-                            >
-                                現在查看
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <GameRoomDrawNotification
+                recentDraw={recentDraw}
+                isActiveSelfDrawNotification={isActiveSelfDrawNotification}
+                onDismiss={handleDrawNotificationDismiss}
+                onViewNow={handleDrawNotificationViewNow}
+                onKeyDown={handleDrawNotificationKeyDown}
+            />
 
             <OpeningDealModal
                 isOpen={isOpeningDealModalActive}
@@ -310,21 +289,11 @@ const GameRoom: React.FC = () => {
             />
 
             {roundSummary && (
-                <div className="round-summary-overlay">
-                    <div className="round-summary-card shadow">
-                        <h4 className="mb-2">第 {roundSummary.round} 回合結算完成</h4>
-                        <p className="text-muted mb-3">好感指示物已更新，準備進入下一回合</p>
-                        <div className="d-flex flex-column gap-2">
-                            {state.players.map((player) => (
-                                <div key={player.id} className="round-summary-row">
-                                    <span className="fw-semibold">{getPlayerDisplayName(player.id)}</span>
-                                    <span>魅力 {player.score?.charm || 0}</span>
-                                    <span>藝妓 {player.score?.tokens || 0}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <GameRoomRoundSummaryOverlay
+                    roundSummary={roundSummary}
+                    players={state.players}
+                    getPlayerDisplayName={getPlayerDisplayName}
+                />
             )}
 
             {/* 順序決定彈窗 */}
@@ -341,87 +310,29 @@ const GameRoom: React.FC = () => {
             />
 
             {readyStatus && (
-                <div className="bottom-sheet">
-                    <div className="bottom-sheet__backdrop" />
-                    <div className="bottom-sheet__panel">
-                        <div className="bottom-sheet__header">
-                            <h5 className="bottom-sheet__title">準備開始</h5>
-                        </div>
-                        <div className="bottom-sheet__body">
-                            <p>請確認已準備好開始新對戰。</p>
-                            <div className="d-flex flex-column gap-2 mb-3">
-                                {state.players.map((player) => (
-                                    <div key={player.id} className="d-flex justify-content-between">
-                                        <span>{getPlayerDisplayName(player.id)}</span>
-                                        <span>
-                                            {readyStatus.confirmations.includes(player.id) ? '✅ 已準備' : '⏳ 等待中'}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button className="btn btn-primary w-100" onClick={confirmReady}>
-                                我準備好了
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <GameRoomReadySheet
+                    readyStatus={readyStatus}
+                    players={state.players}
+                    getPlayerDisplayName={getPlayerDisplayName}
+                    onConfirmReady={confirmReady}
+                />
             )}
 
             {statusModel.isGameEnded && (
-                <div className="bottom-sheet">
-                    <div className="bottom-sheet__backdrop" />
-                    <div className={`bottom-sheet__panel ${isEndSheetCollapsed ? 'is-collapsed' : ''}`}>
-                        {!isEndSheetCollapsed && (
-                            <>
-                                <div className="bottom-sheet__header">
-                                    <button
-                                        className="bottom-sheet__toggle"
-                                        onClick={() => setIsEndSheetCollapsed(true)}
-                                    >
-                                        查看戰況
-                                    </button>
-                                </div>
-                                <div className="bottom-sheet__body bottom-sheet__body--full">
-                                    <div className="text-center mb-3">
-                                        <h2 className="text-success mb-2">🎉 遊戲結束！</h2>
-                                        <p className="fs-5 mb-0">獲勝者: <strong>{getPlayerDisplayName(state.winner)}</strong></p>
-                                    </div>
-                                    <div className="mb-4">
-                                        {state.players.map((player) => (
-                                            <div key={player.id} className="d-flex justify-content-between mb-1">
-                                                <span className="fw-semibold">{getPlayerDisplayName(player.id)}</span>
-                                                <span>魅力 {player.score?.charm || 0} / 藝妓 {player.score?.tokens || 0}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="d-flex justify-content-center gap-2">
-                                        <button className="btn btn-primary" onClick={handleReturnToLobby}>
-                                            返回大廳
-                                        </button>
-                                        <button
-                                            className="btn btn-outline-primary"
-                                            onClick={() => {
-                                                requestRematch();
-                                                setIsRematchRequested(true);
-                                            }}
-                                            disabled={isRematchRequested}
-                                        >
-                                            {isRematchRequested ? '等待對手...' : '再來一場'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                        {isEndSheetCollapsed && (
-                            <button
-                                className="bottom-sheet__expand"
-                                onClick={() => setIsEndSheetCollapsed(false)}
-                            >
-                                展開結算
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <GameRoomEndSheet
+                    players={state.players}
+                    winner={state.winner}
+                    isCollapsed={isEndSheetCollapsed}
+                    isRematchRequested={isRematchRequested}
+                    getPlayerDisplayName={getPlayerDisplayName}
+                    onCollapse={() => setIsEndSheetCollapsed(true)}
+                    onExpand={() => setIsEndSheetCollapsed(false)}
+                    onReturnToLobby={handleReturnToLobby}
+                    onRequestRematch={() => {
+                        requestRematch();
+                        setIsRematchRequested(true);
+                    }}
+                />
             )}
 
             {statusModel.needsResponse && pendingInteraction && (

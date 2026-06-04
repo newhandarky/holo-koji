@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react';
 import { GameState, ItemCard, PendingInteraction } from '@newhandarky/hanakoji-game-types';
 import { getDrawFlipDurationMs } from './drawNotificationModel';
+import {
+    prepareMotionQueue,
+    resolveMotionSourceZone,
+    type MotionCue,
+    type MotionCueKind,
+    type MotionOwner
+} from './gameMotionModel';
 
-export type MotionCueKind = 'draw' | 'removal' | 'placement' | 'gift-result' | 'competition-result';
-export type MotionOwner = 'self' | 'opponent';
-export type MotionSourceZone = 'hand' | 'gift-modal' | 'competition-modal' | 'opponent-side';
+export {
+    prepareMotionQueue,
+    resolveMotionSourceZone,
+    type MotionCue,
+    type MotionCueKind,
+    type MotionOwner,
+    type MotionSourceZone
+} from './gameMotionModel';
+
 export type DealCueOwner = 'self' | 'opponent';
 
 export interface DealAnimationStep {
@@ -34,29 +47,6 @@ export interface MotionSnapshot {
     opponentPlayedByGeisha: Record<number, string[]>;
     pendingInteraction: PendingInteraction | null;
 }
-
-export interface MotionCue {
-    id: string;
-    kind: MotionCueKind;
-    owner: MotionOwner;
-    cardId?: string;
-    geishaId?: number;
-    sourceZone: MotionSourceZone;
-    targetZone: 'hand' | 'board';
-    targetGeishaId?: number;
-    createdAt: number;
-    durationMs: number;
-    delayMs: number;
-    reducedMotion: boolean;
-}
-
-const CUE_PRIORITY: Record<MotionCueKind, number> = {
-    draw: 0,
-    removal: 1,
-    placement: 2,
-    'gift-result': 3,
-    'competition-result': 4
-};
 
 const OPENING_DEAL_STEP_DELAY_MS = {
     normal: 95,
@@ -131,39 +121,6 @@ const resolveResultCueKind = (interaction: PendingInteraction | null): MotionCue
     return null;
 };
 
-const resolveSourceZone = (kind: MotionCueKind, owner: MotionOwner): MotionSourceZone => {
-    if (kind === 'gift-result') {
-        return 'gift-modal';
-    }
-
-    if (kind === 'competition-result') {
-        return 'competition-modal';
-    }
-
-    return owner === 'self' ? 'hand' : 'opponent-side';
-};
-
-export const prepareMotionQueue = (cues: MotionCue[], now = Date.now()): MotionCue[] =>
-    cues
-        .sort((a, b) => {
-            const byPriority = CUE_PRIORITY[a.kind] - CUE_PRIORITY[b.kind];
-            if (byPriority !== 0) {
-                return byPriority;
-            }
-
-            const byGeisha = (a.targetGeishaId ?? 0) - (b.targetGeishaId ?? 0);
-            if (byGeisha !== 0) {
-                return byGeisha;
-            }
-
-            return a.owner.localeCompare(b.owner);
-        })
-        .map((cue, index) => ({
-            ...cue,
-            createdAt: now,
-            delayMs: index * 90
-        }));
-
 export const deriveMotionCues = (
     previous: MotionSnapshot,
     current: MotionSnapshot,
@@ -183,7 +140,7 @@ export const deriveMotionCues = (
         owner,
         cardId,
         geishaId,
-        sourceZone: resolveSourceZone(kind, owner),
+        sourceZone: resolveMotionSourceZone(kind, owner),
         targetZone: kind === 'draw' ? 'hand' : 'board',
         targetGeishaId: kind === 'draw' ? undefined : geishaId,
         createdAt: now,

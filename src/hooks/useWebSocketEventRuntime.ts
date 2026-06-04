@@ -23,6 +23,11 @@ import {
     resolveGameStatePayload,
     roundCompletePayload
 } from './webSocketPayloads';
+import {
+    appendRuntimeEvent,
+    clearRuntimeQueueOnCleanup,
+    consumeRuntimeEvent
+} from './webSocketEventQueue';
 
 // 連線事件的保留名稱，避免與伺服器事件衝突
 const CONNECTION_OPEN = '__OPEN__';
@@ -135,16 +140,12 @@ export const useWebSocketEventRuntime = ({
 
         const handleCardDrawn = (payload: unknown) => {
             const drawEvent = cardDrawEvent(payload);
-            if (drawEvent) {
-                setDrawQueue(prev => [...prev, drawEvent]);
-            }
+            setDrawQueue((previous) => appendRuntimeEvent(previous, drawEvent));
         };
 
         const handleDealAnimation = (payload: unknown) => {
             const dealEvent = dealAnimationEvent(payload);
-            if (dealEvent) {
-                setDealQueue((previous) => [...previous, dealEvent]);
-            }
+            setDealQueue((previous) => appendRuntimeEvent(previous, dealEvent));
         };
 
         const handleRoundComplete = (payload: unknown) => {
@@ -268,18 +269,18 @@ export const useWebSocketEventRuntime = ({
         return () => {
             isActive = false;
             cleanupHandlers();
-            setDrawQueue((previous) => previous.length === 0 ? previous : []);
-            setDealQueue((previous) => previous.length === 0 ? previous : []);
+            setDrawQueue(clearRuntimeQueueOnCleanup);
+            setDealQueue(clearRuntimeQueueOnCleanup);
         };
     }, [gameId, playerId]);
 
     // 消耗一個抽牌事件
     const consumeDrawEvent = useCallback(() => {
-        setDrawQueue(prev => prev.slice(1));
+        setDrawQueue(consumeRuntimeEvent);
     }, []);
 
     const consumeDealEvent = useCallback(() => {
-        setDealQueue(prev => prev.slice(1));
+        setDealQueue(consumeRuntimeEvent);
     }, []);
 
     return {

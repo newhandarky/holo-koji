@@ -147,6 +147,45 @@ describe('useWebSocketEventRuntime', () => {
         expect(result.current.dealQueue).toEqual([]);
     });
 
+    test('ignores non-object draw and deal payloads without changing queues', async () => {
+        const { result } = renderHook(() => useWebSocketEventRuntime({
+            gameId: 'ABC123',
+            playerId: 'host',
+            gameDispatch: jest.fn(),
+            clientDispatch: jest.fn()
+        }));
+
+        const cardDrawnHandler = await getRegisteredHandler('CARD_DRAWN');
+        const dealAnimationHandler = await getRegisteredHandler('DEAL_ANIMATION');
+
+        act(() => {
+            cardDrawnHandler({ playerId: 'host', card: null });
+            dealAnimationHandler({ sequence: [{ order: 1, playerId: 'host', card: null }] });
+        });
+
+        expect(result.current.drawQueue).toEqual([]);
+        expect(result.current.dealQueue).toEqual([]);
+    });
+
+    test('unmount cleanup removes draw and deal listeners', async () => {
+        const { unmount } = renderHook(() => useWebSocketEventRuntime({
+            gameId: 'ABC123',
+            playerId: 'host',
+            gameDispatch: jest.fn(),
+            clientDispatch: jest.fn()
+        }));
+
+        const cardDrawnHandler = await getRegisteredHandler('CARD_DRAWN');
+        const dealAnimationHandler = await getRegisteredHandler('DEAL_ANIMATION');
+        expect(mockGameWebSocket.messageHandlers.get('CARD_DRAWN')?.has(cardDrawnHandler)).toBe(true);
+        expect(mockGameWebSocket.messageHandlers.get('DEAL_ANIMATION')?.has(dealAnimationHandler)).toBe(true);
+
+        unmount();
+
+        expect(mockGameWebSocket.messageHandlers.get('CARD_DRAWN')).toBeUndefined();
+        expect(mockGameWebSocket.messageHandlers.get('DEAL_ANIMATION')).toBeUndefined();
+    });
+
     test('unmount cleanup removes only this hook listeners', async () => {
         const externalHandler = jest.fn();
         gameWebSocket.on('ERROR', externalHandler);

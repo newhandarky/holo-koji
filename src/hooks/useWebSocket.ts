@@ -2,15 +2,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import {
-    ClientAction,
-    ClientState,
     GameAction,
-    GameState,
-    ItemCard,
-    ErrorPayload,
     JoinRoomPayload,
-    OrderDecisionResultPayload,
-    OrderDecisionStartPayload,
     Player,
     ReadyStatusPayload,
     ServerToClientEventMap,
@@ -20,128 +13,27 @@ import { gameWebSocket } from '../services/websocket';
 import { frontendLogger } from '../utils/runtimeLogger';
 import { clearRoomSessionToken, getStoredRoomSessionToken } from '../utils/roomSession';
 import config from '../config/environment';
+import { clientReducer, initialClientState } from './useWebSocketState';
+import {
+    CardDrawEvent,
+    DealAnimationEvent,
+    cardDrawEvent,
+    dealAnimationEvent,
+    normalizeErrorPayload,
+    orderConfirmationUpdate,
+    orderDecisionPlayers,
+    orderDecisionResult,
+    readyStatusPayload,
+    resolveGameStatePayload,
+    roundCompletePayload
+} from './webSocketPayloads';
+
+export type { CardDrawEvent, DealAnimationEvent } from './webSocketPayloads';
 
 // 連線事件的保留名稱，避免與伺服器事件衝突
 const CONNECTION_OPEN = '__OPEN__';
 const CONNECTION_CLOSE = '__CLOSE__';
 const PLAYER_ID_TAKEN_ERROR = '這個房間的重連憑證已失效，請返回大廳重新加入或更換名稱。';
-
-export interface CardDrawEvent {
-    // 抽牌玩家 ID
-    playerId: string;
-    // 抽到的卡片
-    card: ItemCard;
-}
-
-export interface DealAnimationEvent {
-    sequence: Array<{
-        order: number;
-        playerId: string;
-        card: ItemCard;
-    }>;
-}
-
-interface RoundCompletePayload {
-    // 結算回合數
-    round?: number;
-}
-
-// 前端狀態 reducer（保留型別同步，避免直接改變原始狀態）
-const clientReducer = (state: ClientState, action: ClientAction): ClientState => {
-    switch (action.type) {
-        case 'SYNC_SERVER_STATE':
-            return {
-                ...state,
-                gameState: action.payload,
-                isLoading: false,
-                error: null
-            };
-        case 'SET_CONNECTION_STATUS':
-            return {
-                ...state,
-                isConnected: action.payload.isConnected
-            };
-        case 'SET_ERROR':
-            return {
-                ...state,
-                error: action.payload.error,
-                isLoading: false
-            };
-        case 'CLEAR_ERROR':
-            return {
-                ...state,
-                error: null
-            };
-        case 'SET_LOADING':
-            return {
-                ...state,
-                isLoading: action.payload.isLoading
-            };
-        default:
-            return state;
-    }
-};
-
-// 初始的客戶端狀態快照
-const initialClientState: ClientState = {
-    gameState: {} as GameState,
-    isConnected: false,
-    isLoading: true,
-    error: null
-};
-
-// 解析廣播 payload 中的 GameState，確保型別安全
-const resolveGameStatePayload = (payload: unknown): GameState | null => {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    if ('gameState' in payload && (payload as { gameState: GameState }).gameState) {
-        return (payload as { gameState: GameState }).gameState;
-    }
-
-    if ('gameId' in payload && 'players' in payload) {
-        return payload as GameState;
-    }
-
-    return null;
-};
-
-// 讀取順序決定事件中的玩家列表
-const orderDecisionPlayers = (payload: unknown): string[] => {
-    if (!payload || typeof payload !== 'object') {
-        return [];
-    }
-
-    if ('players' in payload && Array.isArray((payload as OrderDecisionStartPayload).players)) {
-        return (payload as OrderDecisionStartPayload).players;
-    }
-
-    return [];
-};
-
-// 讀取順序決定結果（允許缺少 gameState）
-const orderDecisionResult = (payload: unknown): OrderDecisionResultPayload | null => {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    const candidate = payload as Partial<OrderDecisionResultPayload>;
-    if (candidate.firstPlayer && candidate.secondPlayer && Array.isArray(candidate.order)) {
-        const result: OrderDecisionResultPayload = {
-            firstPlayer: candidate.firstPlayer,
-            secondPlayer: candidate.secondPlayer,
-            order: candidate.order,
-            gameState: candidate.gameState
-        };
-        if (!candidate.gameState) {
-            delete result.gameState;
-        }
-        return result;
-    }
-
-    return null;
-};
 
 // WebSocket 主 Hook：處理連線、事件、狀態同步
 export const useWebSocket = (gameId?: string | null, playerData?: Player | null) => {
@@ -162,7 +54,7 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         let isActive = true; // 確保卸載後不再更新 state
         const unsubscribeHandlers: Array<() => void> = []; // 紀錄本 hook 註冊的 listener，避免清掉其他頁面 listener
 
-        const safeDispatch = (action: ClientAction) => {
+        const safeDispatch: typeof clientDispatch = (action) => {
             if (isActive) {
                 clientDispatch(action);
             }
@@ -208,89 +100,48 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         };
 
         const handleOrderConfirmationUpdate = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
+            const update = orderConfirmationUpdate(payload);
+            if (!update) {
                 return;
             }
 
-            const candidate = payload as { confirmations?: unknown; waitingFor?: unknown };
-            const confirmations = Array.isArray(candidate.confirmations) ? (candidate.confirmations as string[]) : [];
-            const waitingFor = Array.isArray(candidate.waitingFor) ? (candidate.waitingFor as string[]) : [];
-
             gameDispatch({
                 type: 'UPDATE_ORDER_CONFIRMATIONS',
-                payload: { confirmations, waitingFor }
+                payload: update
             });
         };
 
         const handleErrorMessage = (payload: unknown) => {
-            const errorPayload = payload && typeof payload === 'object'
-                ? payload as Partial<ErrorPayload>
-                : null;
-            const message = typeof payload === 'string'
-                ? payload
-                : (errorPayload && typeof errorPayload.message === 'string')
-                    ? errorPayload.message
-                    : '未知錯誤';
-            if (errorPayload?.code === 'PLAYER_ID_TAKEN') {
+            const errorPayload = normalizeErrorPayload(payload);
+            if (errorPayload.code === 'PLAYER_ID_TAKEN') {
                 clearRoomSessionToken(gameId, playerId);
                 safeDispatch({ type: 'SET_ERROR', payload: { error: PLAYER_ID_TAKEN_ERROR } });
                 return;
             }
-            safeDispatch({ type: 'SET_ERROR', payload: { error: message } });
+            safeDispatch({ type: 'SET_ERROR', payload: { error: errorPayload.message } });
         };
 
         const handleCardDrawn = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
-                return;
-            }
-
-            const candidate = payload as Partial<CardDrawEvent> & { card?: ItemCard };
-            if (typeof candidate.playerId === 'string' && candidate.card && typeof candidate.card === 'object') {
-                const drawEvent: CardDrawEvent = {
-                    playerId: candidate.playerId,
-                    card: candidate.card
-                };
+            const drawEvent = cardDrawEvent(payload);
+            if (drawEvent) {
                 setDrawQueue(prev => [...prev, drawEvent]);
             }
         };
 
         const handleDealAnimation = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
-                return;
+            const dealEvent = dealAnimationEvent(payload);
+            if (dealEvent) {
+                setDealQueue((previous) => [...previous, dealEvent]);
             }
-
-            const candidate = payload as Partial<DealAnimationEvent>;
-            if (!Array.isArray(candidate.sequence)) {
-                return;
-            }
-
-            const sequence = candidate.sequence.filter((step): step is DealAnimationEvent['sequence'][number] => (
-                Boolean(step)
-                && typeof step === 'object'
-                && typeof step.order === 'number'
-                && typeof step.playerId === 'string'
-                && Boolean(step.card)
-                && typeof step.card === 'object'
-            ));
-
-            if (sequence.length === 0) {
-                return;
-            }
-
-            setDealQueue((previous) => [...previous, { sequence }]);
         };
 
         const handleRoundComplete = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
+            const roundPayload = roundCompletePayload(payload);
+            if (!roundPayload) {
                 return;
             }
 
-            const round = (payload as RoundCompletePayload).round;
-            if (!round) {
-                return;
-            }
-
-            setRoundSummary({ round });
+            setRoundSummary({ round: roundPayload.round! });
 
             if (roundSummaryTimerRef.current) {
                 window.clearTimeout(roundSummaryTimerRef.current);
@@ -302,18 +153,17 @@ export const useWebSocket = (gameId?: string | null, playerData?: Player | null)
         };
 
         const handleReadyCheck = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
-                return;
+            const candidate = readyStatusPayload(payload);
+            if (candidate) {
+                setReadyStatus(candidate);
             }
-            const candidate = payload as ReadyStatusPayload;
-            setReadyStatus(candidate);
         };
 
         const handleReadyStatus = (payload: unknown) => {
-            if (!payload || typeof payload !== 'object') {
+            const candidate = readyStatusPayload(payload);
+            if (!candidate) {
                 return;
             }
-            const candidate = payload as ReadyStatusPayload;
             if (candidate.waitingFor.length === 0) {
                 setReadyStatus(null);
             } else {

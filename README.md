@@ -126,6 +126,7 @@ npm run build
 - 專案級 agent 規則請參考 `AGENTS.md`。
 - 長期原則與品質門檻位於 `.specify/memory/constitution.md`。
 - 新功能、版本更新或大型行為調整請先在 `specs/` 建立新的對應 spec，依序維護 `spec.md`、`plan.md`、`tasks.md`。
+- 目前架構優化收斂狀態與後續里程碑請參考 `specs/139-project-optimization-closeout-roadmap/spec.md`。
 - 共用 Codex skills 透過 `.agents/skills/` 連結到本專案。
 
 ## 部署（GitHub Pages）

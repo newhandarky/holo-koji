@@ -3,6 +3,7 @@
 本檔案依目前 git commit 記錄整理，時間戳未完整保留，先以「未標註日期」呈現；後續可依實際提交日期補齊。
 
 ## [Unreleased]
+- 新增專案優化 closeout roadmap，記錄 042–138 架構收斂後的剩餘優化範圍、告一段落標準與 139–147 建議里程碑。
 - 移除過時的本機 `docs/` 文件、舊 Symphony `WORKFLOW.md`，以及不符合現行架構的歷史 `specs/001-*` 到 `specs/056-*` 規格文件。
 - 更新 README 專案結構說明，將正式文件入口收斂到 `AGENTS.md`、`.specify/` 與未來新建的 `specs/`。
 - 清理 active docs 與 Speckit workflow memory，避免後續規劃誤用舊的 local `game-shared-types`、Socket.IO 或 submodule 架構描述。

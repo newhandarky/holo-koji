@@ -1,8 +1,6 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { gameWebSocket } from '../../services/websocket';
-import { frontendLogger } from '../../utils/runtimeLogger';
 import { AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 import LobbyBrandSurface from './LobbyBrandSurface';
 import LobbyPlayControls from './LobbyPlayControls';
@@ -12,11 +10,11 @@ import {
     InvitedRoom,
     InviteRecoveryNotice
 } from './lobbyInviteFlow';
-import { buildCreateRoomPayload, buildJoinRoomPayload } from './lobbyRoomPayloads';
 import { useLobbyAccountAchievements } from './useLobbyAccountAchievements';
 import { useLobbyRoomLifecycle } from './useLobbyRoomLifecycle';
 import { useLobbyInviteBootstrap } from './useLobbyInviteBootstrap';
 import { useLobbyCustomSelection } from './useLobbyCustomSelection';
+import { useLobbyRoomCommands } from './useLobbyRoomCommands';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -98,63 +96,29 @@ const Lobby: React.FC = () => {
         setIsConnecting
     });
 
-    // 建立房間請求
-    const createRoom = () => {
-        if (!canCreateRoom) return;
-        setIsConnecting(true);
-        const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
-        frontendLogger.diagnostic('🐞 [Lobby] 建立房間摘要', {
-            playerId: playerName,
-            mode: matchMode,
-            aiDifficulty: matchMode === 'npc' ? normalizedAiDifficulty : undefined,
-            geishaSet: selectedGeishaSet,
-            setupMode
-        });
-        const createPayload = buildCreateRoomPayload({
-            playerName,
-            matchMode,
-            aiDifficulty,
-            selectedGeishaSet,
-            setupMode,
-            selectedCharacterIds,
-            boundAccountProfile
-        });
-        gameWebSocket.send('CREATE_ROOM', createPayload);
-    };
-
-    // 加入房間請求
-    const joinRoom = () => {
-        if (!playerName.trim() || !roomId.trim() || connectionStatus !== 'connected') return;
-        setIsConnecting(true);
-        pendingJoinRoomRef.current = roomId;
-        setInviteRecovery(null);
-        frontendLogger.diagnostic('🐞 [Lobby] 加入房間摘要', {
-            roomId,
-            playerId: playerName
-        });
-        const joinPayload = buildJoinRoomPayload({
-            roomId,
-            playerName,
-            boundAccountProfile
-        });
-        gameWebSocket.send('JOIN_ROOM', joinPayload);
-    };
-
-    const canCreateRoom = Boolean(
-        playerName.trim()
-        && !isConnecting
-        && !isAccountSyncPending
-        && connectionStatus === 'connected'
-        && selectedGeishaSetOption?.available
-        && customSelectionIsReady
-    );
-    const canJoinRoom = Boolean(
-        playerName.trim()
-        && roomId.trim()
-        && !isConnecting
-        && !isAccountSyncPending
-        && connectionStatus === 'connected'
-    );
+    const {
+        canCreateRoom,
+        canJoinRoom,
+        createRoom,
+        joinRoom
+    } = useLobbyRoomCommands({
+        playerName,
+        roomId,
+        matchMode,
+        aiDifficulty,
+        selectedGeishaSet,
+        setupMode,
+        selectedCharacterIds,
+        selectedGeishaSetAvailable: Boolean(selectedGeishaSetOption?.available),
+        customSelectionIsReady,
+        isConnecting,
+        isAccountSyncPending,
+        connectionStatus,
+        boundAccountProfile,
+        pendingJoinRoomRef,
+        setIsConnecting,
+        setInviteRecovery
+    });
 
     const invitedRoomNotice = buildInvitedRoomNotice(invitedRoom);
 

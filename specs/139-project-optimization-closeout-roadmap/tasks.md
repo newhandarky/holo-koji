@@ -38,15 +38,15 @@
 
 ## 145–147 Release Readiness / Docs Closeout
 
-- [ ] 145：更新 README 架構與驗證流程。
+- [x] 145：更新 README 架構與驗證流程。
   - 補 root / server / shared package 的目前關係。
   - 補前端、後端、Render health check 的標準驗證命令。
 
-- [ ] 146：更新 CHANGELOG 架構優化摘要。
+- [x] 146：更新 CHANGELOG 架構優化摘要。
   - 摘要記錄 042–138 完成的 backend/frontend boundary closeout。
   - 不改版本號。
 
-- [ ] 147：建立 release readiness checklist。
+- [x] 147：建立 release readiness checklist。
   - 記錄自動驗證、Render health、手動 UI 驗收、known non-goals。
   - 驗證：文件連結可從 README 找到。
 

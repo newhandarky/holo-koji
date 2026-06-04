@@ -151,6 +151,7 @@ curl -fsSL https://holo-koji-server.onrender.com/health
 - 長期原則與品質門檻位於 `.specify/memory/constitution.md`。
 - 新功能、版本更新或大型行為調整請先在 `specs/` 建立新的對應 spec，依序維護 `spec.md`、`plan.md`、`tasks.md`。
 - 目前架構優化收斂狀態與後續里程碑請參考 `specs/139-project-optimization-closeout-roadmap/spec.md`。
+- Release 前的自動驗證、Render health 與手動 UI 檢查項目請參考 `specs/139-project-optimization-closeout-roadmap/release-readiness-checklist.md`。
 - 共用 Codex skills 透過 `.agents/skills/` 連結到本專案。
 
 ## 部署（GitHub Pages）

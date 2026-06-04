@@ -17,11 +17,62 @@ export type MockDealEvent = {
     sequence: Array<{ order: number; playerId: string; card: { id: string; geishaId: number; type: string } }>;
 };
 
-export const mockHookState: {
+export type MockGameRoomCard = {
+    id: string;
+    geishaId: number;
+    type: string;
+    itemLabel?: string;
+    itemImageUrl?: string;
+};
+
+export type MockActionToken = {
+    type: string;
+    used: boolean;
+};
+
+export type MockGameRoomPlayer = {
+    id: string;
+    name: string;
+    avatarUrl: string;
+    hand: MockGameRoomCard[];
+    playedCards: MockGameRoomCard[];
+    secretCards: MockGameRoomCard[];
+    discardedCards: MockGameRoomCard[];
+    actionTokens: MockActionToken[];
+    score: {
+        charm: number;
+        tokens: number;
+    };
+};
+
+type MockOrderDecision = {
+    isOpen: boolean;
+    phase: string;
+    players: unknown[];
+    result: unknown;
+    confirmations: unknown[];
+    waitingFor: string[];
+};
+
+export type MockGameRoomState = {
+    phase: string;
+    geishaSet: string;
+    currentPlayer: number;
+    winner: unknown;
+    geishas: unknown[];
+    pendingInteraction: unknown;
+    players: MockGameRoomPlayer[];
+    orderDecision: MockOrderDecision;
+    openingDeal?: OpeningDealSummary;
+    removedCard?: unknown;
+    drawPile?: unknown[];
+};
+
+type MockGameRoomHookState = {
     isConnected: boolean;
     error: string | null;
-    roundSummary: any | null;
-    readyStatus: null;
+    roundSummary: unknown | null;
+    readyStatus: unknown | null;
     confirmOrder: jest.Mock;
     sendGameAction: jest.Mock;
     requestRematch: jest.Mock;
@@ -31,7 +82,9 @@ export const mockHookState: {
     consumeDealEvent: jest.Mock;
     drawQueue: MockDrawEvent[];
     consumeDrawEvent: jest.Mock;
-} = {
+};
+
+export const mockHookState: MockGameRoomHookState = {
     isConnected: true,
     error: null as string | null,
     roundSummary: null,
@@ -47,14 +100,14 @@ export const mockHookState: {
     consumeDrawEvent: jest.fn()
 };
 
-export const makeActionTokens = (usedType?: string) => [
+export const makeActionTokens = (usedType?: string): MockActionToken[] => [
     { type: 'secret', used: usedType === 'secret' },
     { type: 'trade-off', used: usedType === 'trade-off' },
     { type: 'gift', used: usedType === 'gift' },
     { type: 'competition', used: usedType === 'competition' }
 ];
 
-export const makePlayer = (overrides: Record<string, unknown> = {}) => ({
+export const makePlayer = (overrides: Partial<MockGameRoomPlayer> = {}): MockGameRoomPlayer => ({
     id: 'p1',
     name: '玩家一',
     avatarUrl: '',
@@ -67,7 +120,7 @@ export const makePlayer = (overrides: Record<string, unknown> = {}) => ({
     ...overrides
 });
 
-export const mockState: any = {
+export const mockState: MockGameRoomState = {
     phase: 'playing',
     geishaSet: 'hololive',
     currentPlayer: 0,
@@ -112,7 +165,23 @@ jest.mock('../../utils/runtimeLogger', () => ({
     summarizeGameState: jest.fn(() => ({}))
 }));
 
-jest.mock('../../components/game/GameBoard', () => (props: any) => (
+type MockGameBoardProps = {
+    state: MockGameRoomState;
+    canAct: boolean;
+    highlightActive?: boolean;
+    focusSection?: string;
+    openingHandReveal?: {
+        status?: string;
+        isConcealed?: boolean;
+        isInteractionBlocked?: boolean;
+        revealedCount?: number;
+    };
+    highlightCardId?: string;
+    motionCues?: Array<{ cardId?: string }>;
+    onTakeOpeningHand?: () => void;
+};
+
+jest.mock('../../components/game/GameBoard', () => (props: MockGameBoardProps) => (
     <div
         data-testid="game-board"
         data-geisha-set={props.state.geishaSet}
@@ -124,7 +193,7 @@ jest.mock('../../components/game/GameBoard', () => (props: any) => (
         data-opening-hand-blocked={String(Boolean(props.openingHandReveal?.isInteractionBlocked))}
         data-opening-hand-revealed-count={String(props.openingHandReveal?.revealedCount ?? 0)}
         data-highlight-card-id={props.highlightCardId ?? ''}
-        data-motion-card-ids={(props.motionCues ?? []).map((cue: any) => cue.cardId).filter(Boolean).join(',')}
+        data-motion-card-ids={(props.motionCues ?? []).map((cue) => cue.cardId).filter(Boolean).join(',')}
     >
         角色內容
         {props.openingHandReveal?.status === 'pending_take' && (
@@ -132,7 +201,7 @@ jest.mock('../../components/game/GameBoard', () => (props: any) => (
         )}
         {props.openingHandReveal && !props.openingHandReveal.isConcealed && (
             <div data-testid="mock-visible-own-hand">
-                {props.state.players.find((player: any) => player.id === 'p1')?.hand.map((card: any) => card.id).join(',')}
+                {props.state.players.find((player) => player.id === 'p1')?.hand.map((card) => card.id).join(',')}
             </div>
         )}
     </div>
@@ -178,7 +247,7 @@ export const makeOpeningDeal = (overrides: Partial<OpeningDealSummary> = {}): Op
     ...overrides
 });
 
-export const makeOpeningHand = () => Array.from({ length: 6 }, (_, index) => ({
+export const makeOpeningHand = (): MockGameRoomCard[] => Array.from({ length: 6 }, (_, index) => ({
     id: `own-opening-card-${index + 1}`,
     geishaId: index + 1,
     type: 'item',
@@ -236,7 +305,7 @@ export const resetGameRoomTestHarness = () => {
     mockHookState.consumeDealEvent.mockReset();
     mockHookState.consumeDrawEvent.mockReset();
     usePrefersReducedMotion.mockReturnValue(false);
-    delete (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal;
+    delete mockState.openingDeal;
 };
 
 export const GameRoomTestSubject = GameRoom;

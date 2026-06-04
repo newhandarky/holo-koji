@@ -92,7 +92,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opens opening deal modal from replayable safe opening deal summary', () => {
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -106,7 +106,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opening deal modal blocks behind-game actions while visible', () => {
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -122,7 +122,7 @@ describe('GameRoom character set room surface', () => {
         infoTab.focus();
         expect(document.activeElement).toBe(infoTab);
 
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
         rerender(renderGameRoomElement());
 
         const dialog = screen.getByRole('dialog', { name: '開局發牌' });
@@ -136,10 +136,10 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opening deal modal auto-closes within six seconds without changing existing own-hand visibility', () => {
-        (mockState.players[0] as any).hand = [
-            { id: 'my-card-1', geishaId: 1, type: 'real' } as any
+        mockState.players[0].hand = [
+            { id: 'my-card-1', geishaId: 1, type: 'real' }
         ];
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -156,7 +156,7 @@ describe('GameRoom character set room surface', () => {
     test('opening deal modal output does not expose forbidden card identity fields', () => {
         const openingDeal = makeOpeningDeal() as OpeningDealSummary & { removedCard?: unknown };
         openingDeal.removedCard = { id: 'removed-secret-card', geishaId: 7, itemImageUrl: '/secret.png' };
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = openingDeal;
+        mockState.openingDeal = openingDeal;
 
         renderGameRoom();
 
@@ -168,7 +168,7 @@ describe('GameRoom character set room surface', () => {
 
     test('reduced motion opening deal modal completes through short path', () => {
         usePrefersReducedMotion.mockReturnValue(true);
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -182,7 +182,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('replayable reconnect restarts opening deal modal from the beginning', () => {
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.openingDeal = makeOpeningDeal();
 
         const { unmount } = renderGameRoom();
         expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
@@ -194,7 +194,7 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('not replayable opening deal skips full modal replay', () => {
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal({
+        mockState.openingDeal = makeOpeningDeal({
             status: 'not_replayable',
             replayable: false
         });
@@ -204,12 +204,12 @@ describe('GameRoom character set room surface', () => {
         expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
         expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'true');
 
-        delete (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal;
+        delete mockState.openingDeal;
     });
 
     test('eligible opening hand shows take control before own hand faces', () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -227,8 +227,8 @@ describe('GameRoom character set room surface', () => {
 
     test('eligible opening hand focuses hand actions even when it is not the viewer turn', () => {
         mockState.currentPlayer = 1;
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
 
@@ -242,8 +242,8 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('taking opening hand reveals own hand in current order and focuses hand actions', async () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         const { unmount } = renderGameRoom();
         act(() => {
@@ -264,8 +264,8 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('take opening hand supports keyboard activation with Enter and Space', async () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         const { unmount } = renderGameRoom();
         act(() => {
@@ -283,7 +283,7 @@ describe('GameRoom character set room surface', () => {
         });
         unmount();
 
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal({
+        mockState.openingDeal = makeOpeningDeal({
             sequenceId: 'opening-room-1-round-2'
         });
         renderGameRoom();
@@ -299,8 +299,8 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opening hand flow blocks gameplay actions while preserving section navigation', async () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
         act(() => {
@@ -322,11 +322,11 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opening hand hidden-info regression covers opponent removed draw and pending fixtures', () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState.players[1] as any).hand = [{ id: 'opponent-secret-card', type: 'hidden', geishaId: 0 }];
-        (mockState as any).removedCard = { id: 'removed-hidden-card', geishaId: 7, itemLabel: '移除秘密牌' };
-        (mockState as any).drawPile = [{ id: 'draw-pile-secret-card', geishaId: 3, itemLabel: '牌堆秘密牌' }];
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.players[1].hand = [{ id: 'opponent-secret-card', type: 'hidden', geishaId: 0 }];
+        mockState.removedCard = { id: 'removed-hidden-card', geishaId: 7, itemLabel: '移除秘密牌' };
+        mockState.drawPile = [{ id: 'draw-pile-secret-card', geishaId: 3, itemLabel: '牌堆秘密牌' }];
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
         act(() => {
@@ -342,8 +342,8 @@ describe('GameRoom character set room surface', () => {
 
     test('reduced motion take flow reveals immediately and lands on hand actions', async () => {
         usePrefersReducedMotion.mockReturnValue(true);
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         renderGameRoom();
         act(() => {
@@ -357,8 +357,8 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('local opening hand gate can re-present after remount while eligible', () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.openingDeal = makeOpeningDeal();
 
         const { unmount } = renderGameRoom();
         act(() => {
@@ -377,9 +377,9 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('opening hand gate remains available when opponent action marks deal replay not replayable', () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState.players[1] as any).actionTokens = makeActionTokens('secret');
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = {
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.players[1].actionTokens = makeActionTokens('secret');
+        mockState.openingDeal = {
             ...makeOpeningDeal(),
             status: 'not_replayable',
             replayable: false
@@ -396,9 +396,9 @@ describe('GameRoom character set room surface', () => {
     });
 
     test('progressed or non-starting hand state skips take opening hand gate', () => {
-        (mockState.players[0] as any).hand = makeOpeningHand();
-        (mockState.players[0] as any).actionTokens = makeActionTokens('secret');
-        (mockState as typeof mockState & { openingDeal?: OpeningDealSummary }).openingDeal = makeOpeningDeal();
+        mockState.players[0].hand = makeOpeningHand();
+        mockState.players[0].actionTokens = makeActionTokens('secret');
+        mockState.openingDeal = makeOpeningDeal();
 
         const { rerender } = renderGameRoom();
         act(() => {
@@ -407,8 +407,8 @@ describe('GameRoom character set room surface', () => {
 
         expect(screen.queryByRole('button', { name: '拿取手牌' })).not.toBeInTheDocument();
 
-        (mockState.players[0] as any).actionTokens = makeActionTokens();
-        (mockState.players[0] as any).hand = makeOpeningHand().slice(0, 5);
+        mockState.players[0].actionTokens = makeActionTokens();
+        mockState.players[0].hand = makeOpeningHand().slice(0, 5);
         rerender(renderGameRoomElement());
 
         expect(screen.queryByRole('button', { name: '拿取手牌' })).not.toBeInTheDocument();

@@ -1,15 +1,8 @@
 // src/pages/Lobby/index.tsx - 保存玩家ID到localStorage
 import React, { useEffect, useRef, useState } from 'react';
-import {
-    GeishaSet,
-    RoomSetupMode
-} from '@newhandarky/hanakoji-game-types';
 import { useNavigate } from 'react-router-dom';
 import { gameWebSocket } from '../../services/websocket';
-import { getInviteRoomIdFromLocation } from '../../utils/lineLiff';
-import { getCharacterProfilesForSet } from '../../utils/gameData';
 import { frontendLogger } from '../../utils/runtimeLogger';
-import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
 import { AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
 import LobbyBrandSurface from './LobbyBrandSurface';
 import LobbyPlayControls from './LobbyPlayControls';
@@ -19,9 +12,11 @@ import {
     InvitedRoom,
     InviteRecoveryNotice
 } from './lobbyInviteFlow';
-import { buildCreateRoomPayload, buildJoinRoomPayload, isCustomSelectionReady } from './lobbyRoomPayloads';
+import { buildCreateRoomPayload, buildJoinRoomPayload } from './lobbyRoomPayloads';
 import { useLobbyAccountAchievements } from './useLobbyAccountAchievements';
 import { useLobbyRoomLifecycle } from './useLobbyRoomLifecycle';
+import { useLobbyInviteBootstrap } from './useLobbyInviteBootstrap';
+import { useLobbyCustomSelection } from './useLobbyCustomSelection';
 
 // Lobby 入口主畫面
 const Lobby: React.FC = () => {
@@ -33,10 +28,6 @@ const Lobby: React.FC = () => {
     const [matchMode, setMatchMode] = useState<'online' | 'npc'>('online');
     // AI 難度（僅 NPC 模式使用）
     const [aiDifficulty, setAiDifficulty] = useState<AiDifficulty>('easy');
-    // 藝妓組合選擇（online / npc 共用）
-    const [selectedGeishaSet, setSelectedGeishaSet] = useState<GeishaSet>('default');
-    const [setupMode, setSetupMode] = useState<RoomSetupMode>('random');
-    const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
     // 是否正在連線或送出請求
     const [isConnecting, setIsConnecting] = useState(false);
     // 連線狀態顯示
@@ -50,6 +41,19 @@ const Lobby: React.FC = () => {
     const playerNameRef = useRef('');
     const pendingJoinRoomRef = useRef<string | null>(null);
     const invitedRoomRef = useRef<InvitedRoom | null>(null);
+    const {
+        selectedGeishaSet,
+        setupMode,
+        selectedCharacterIds,
+        selectedGeishaSetOption,
+        hasUnavailableCharacterSet,
+        availableCharacterProfiles,
+        customSelectionCount,
+        customSelectionIsReady,
+        handleGeishaSetChange,
+        handleSetupModeChange,
+        toggleCharacterSelection
+    } = useLobbyCustomSelection();
     const {
         accountBindingStatus,
         accountGuestNotice,
@@ -77,45 +81,12 @@ const Lobby: React.FC = () => {
         invitedRoomRef.current = invitedRoom;
     }, [invitedRoom]);
 
-    // 若網址帶 roomId，預填加入房間欄位
-    useEffect(() => {
-        const { roomId: invitedRoomId, source } = getInviteRoomIdFromLocation();
-        if (!invitedRoomId) return;
-
-        const normalizedRoomId = invitedRoomId.toUpperCase();
-        setRoomId(normalizedRoomId);
-        setMatchMode('online');
-        setInvitedRoom({ roomId: normalizedRoomId, source: source === 'liff' ? 'liff' : 'query' });
-        const previousPlayerId = localStorage.getItem('currentPlayerId')?.trim();
-        if (previousPlayerId) {
-            setPlayerName(previousPlayerId);
-        }
-
-        if (source === 'liff') {
-            const nextParams = new URLSearchParams(window.location.search);
-            nextParams.set('roomId', normalizedRoomId);
-            nextParams.delete('liff.state');
-            const nextUrl = `${window.location.pathname}?${nextParams.toString()}`;
-            window.history.replaceState(null, '', nextUrl);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (setupMode !== 'custom') {
-            setSelectedCharacterIds([]);
-            return;
-        }
-
-        const profiles = getCharacterProfilesForSet(selectedGeishaSet);
-        setSelectedCharacterIds((currentIds) => {
-            if (profiles.length === 7) {
-                return profiles.map((profile) => profile.characterId);
-            }
-
-            const validIds = new Set(profiles.map((profile) => profile.characterId));
-            return currentIds.filter((characterId) => validIds.has(characterId));
-        });
-    }, [selectedGeishaSet, setupMode]);
+    useLobbyInviteBootstrap({
+        setRoomId,
+        setMatchMode,
+        setInvitedRoom,
+        setPlayerName
+    });
 
     useLobbyRoomLifecycle({
         navigate,
@@ -169,11 +140,6 @@ const Lobby: React.FC = () => {
         gameWebSocket.send('JOIN_ROOM', joinPayload);
     };
 
-    const selectedGeishaSetOption = CHARACTER_SET_OPTIONS.find((option) => option.key === selectedGeishaSet);
-    const hasUnavailableCharacterSet = CHARACTER_SET_OPTIONS.some((option) => !option.available);
-    const availableCharacterProfiles = getCharacterProfilesForSet(selectedGeishaSet);
-    const customSelectionCount = selectedCharacterIds.length;
-    const customSelectionIsReady = isCustomSelectionReady(setupMode, selectedCharacterIds);
     const canCreateRoom = Boolean(
         playerName.trim()
         && !isConnecting
@@ -189,23 +155,6 @@ const Lobby: React.FC = () => {
         && !isAccountSyncPending
         && connectionStatus === 'connected'
     );
-
-    const handleGeishaSetChange = (value: GeishaSet) => {
-        setSelectedGeishaSet(value);
-    };
-
-    const handleSetupModeChange = (value: RoomSetupMode) => {
-        setSetupMode(value);
-    };
-
-    const toggleCharacterSelection = (characterId: string) => {
-        setSelectedCharacterIds((currentIds) => {
-            if (currentIds.includes(characterId)) {
-                return currentIds.filter((id) => id !== characterId);
-            }
-            return [...currentIds, characterId];
-        });
-    };
 
     const invitedRoomNotice = buildInvitedRoomNotice(invitedRoom);
 

@@ -45,7 +45,7 @@ export const routeDrawPresentation = (
     focusSection: FocusSection,
     isNecessaryFlowActive: boolean
 ): DrawPresentationRoute => {
-    if (isNecessaryFlowActive && event.owner === 'self') {
+    if (isNecessaryFlowActive) {
         return 'defer';
     }
 
@@ -71,4 +71,3 @@ export const transitionDrawDecision = (
 
     return next;
 };
-

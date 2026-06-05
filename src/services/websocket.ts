@@ -19,6 +19,26 @@ type GameWebSocketEventPayload<TType extends GameWebSocketEventType> =
     TType extends ServerToClientEventType ? ServerToClientEventMap[TType] : unknown;
 type MessageHandler = (payload: unknown) => void;
 type UnsubscribeHandler = () => void;
+type AttachedSession = {
+    roomId: string;
+    playerId: string;
+};
+
+const resolveAttachedSession = (payload: unknown): AttachedSession | null => {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+
+    const candidate = payload as { roomId?: unknown; playerId?: unknown };
+    if (typeof candidate.roomId !== 'string' || typeof candidate.playerId !== 'string') {
+        return null;
+    }
+
+    return {
+        roomId: candidate.roomId,
+        playerId: candidate.playerId
+    };
+};
 
 export class GameWebSocket {
     // WebSocket 連線物件
@@ -34,6 +54,7 @@ export class GameWebSocket {
     private reconnectTimerId: ReturnType<typeof setTimeout> | null = null;
     private shouldReconnect = false;
     private connectPromise: Promise<void> | null = null;
+    private attachedSession: AttachedSession | null = null;
 
     // 建立 WebSocket 連線
     connect(url: string): Promise<void> {
@@ -85,6 +106,7 @@ export class GameWebSocket {
 
                 this.ws.onclose = (event) => {
                     this.connectPromise = null;
+                    this.attachedSession = null;
                     this.dispatchMessage('__CLOSE__', { code: event.code, reason: event.reason }); // 通知使用端關閉事件
 
                     if (this.shouldReconnect && !event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -102,6 +124,10 @@ export class GameWebSocket {
     }
 
     private dispatchMessage(messageType: string, payload: unknown): boolean {
+        if (messageType === 'ROOM_CREATED' || messageType === 'PLAYER_JOINED') {
+            this.attachedSession = resolveAttachedSession(payload);
+        }
+
         const handlers = this.messageHandlers.get(messageType);
         if (!handlers || handlers.size === 0) {
             return false;
@@ -209,6 +235,7 @@ export class GameWebSocket {
         this.shouldReconnect = false;
         this.clearReconnectTimer();
         this.connectPromise = null;
+        this.attachedSession = null;
         if (this.ws) {
             this.ws.close(1000, '正常關閉');
             this.ws = null;
@@ -231,6 +258,10 @@ export class GameWebSocket {
     // 是否已連線
     isConnected(): boolean {
         return this.ws?.readyState === WebSocket.OPEN;
+    }
+
+    getAttachedSession(): AttachedSession | null {
+        return this.attachedSession;
     }
 }
 

@@ -20,6 +20,7 @@ jest.mock('../services/websocket', () => {
             off: jest.fn((messageType) => {
                 messageHandlers.delete(messageType);
             }),
+            getAttachedSession: jest.fn(() => null),
             send: jest.fn(),
             messageHandlers
         }
@@ -59,6 +60,8 @@ describe('useWebSocket', () => {
         mockGameWebSocket.isConnected.mockReturnValue(true);
         mockGameWebSocket.on.mockClear();
         mockGameWebSocket.off.mockClear();
+        mockGameWebSocket.getAttachedSession.mockClear();
+        mockGameWebSocket.getAttachedSession.mockReturnValue(null);
         mockGameWebSocket.send.mockClear();
     });
 

@@ -58,6 +58,7 @@ export const useGameRoomOpeningPresentation = ({
     const nextDealEventKey = getDealQueueEventKey(nextDealEvent);
     const nextDealEventRef = useRef<DealAnimationEvent | null>(null);
     nextDealEventRef.current = nextDealEvent;
+    const isOpeningPresentationAllowed = state.phase === 'playing' && !state.orderDecision.isOpen;
 
     const clearOpeningHandRevealTimers = useCallback(() => {
         openingHandRevealTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -67,7 +68,7 @@ export const useGameRoomOpeningPresentation = ({
     useEffect(() => {
         const currentDealEvent = nextDealEventRef.current;
 
-        if (!currentPlayerId || !currentDealEvent || !nextDealEventKey) {
+        if (!isOpeningPresentationAllowed || !currentPlayerId || !currentDealEvent || !nextDealEventKey) {
             return;
         }
 
@@ -95,6 +96,7 @@ export const useGameRoomOpeningPresentation = ({
     }, [
         consumeDealEvent,
         currentPlayerId,
+        isOpeningPresentationAllowed,
         nextDealEventKey,
         prefersReducedMotion,
         state.openingDeal?.replayable
@@ -105,6 +107,7 @@ export const useGameRoomOpeningPresentation = ({
 
         if (
             !currentPlayerId
+            || !isOpeningPresentationAllowed
             || !openingDeal
             || openingDeal.status === 'not_replayable'
             || !openingDeal.replayable
@@ -119,7 +122,7 @@ export const useGameRoomOpeningPresentation = ({
         }
 
         setActiveOpeningDealModalSequenceId(openingDeal.sequenceId);
-    }, [currentPlayerId, state.openingDeal]);
+    }, [currentPlayerId, isOpeningPresentationAllowed, state.openingDeal]);
 
     const openingDealModalModel = useMemo(() => {
         const openingDeal = state.openingDeal;
@@ -147,7 +150,7 @@ export const useGameRoomOpeningPresentation = ({
     const openingHandRevealModel = useMemo(() => buildOpeningHandRevealModel({
         eligibility: {
             ...openingHandEligibility,
-            isEligible: openingHandEligibility.isEligible && !isOpeningDealActive,
+            isEligible: openingHandEligibility.isEligible && isOpeningPresentationAllowed && !isOpeningDealActive,
             sequenceId: openingHandRevealSequenceId
         },
         cards: currentPlayer?.hand ?? [],
@@ -160,6 +163,7 @@ export const useGameRoomOpeningPresentation = ({
         openingHandRevealSequenceId,
         openingHandRevealStatus,
         openingHandRevealedCount,
+        isOpeningPresentationAllowed,
         isOpeningDealActive,
         prefersReducedMotion
     ]);

@@ -42,6 +42,19 @@ const makeState = () => ({
     }
 });
 
+const makeReplayableOpeningDeal = () => ({
+    sequenceId: 'opening-sequence-1',
+    status: 'completed',
+    completed: true,
+    replayable: true,
+    steps: [
+        { type: 'BURN_HIDDEN_CARD' as const, order: 0, targetZone: 'hidden-reserve' as const },
+        { type: 'DEAL_CARD_BACK' as const, order: 1, targetPlayerId: 'p1', cardIndex: 1 },
+        { type: 'DEAL_CARD_BACK' as const, order: 2, targetPlayerId: 'p2', cardIndex: 1 },
+        { type: 'OPENING_DEAL_COMPLETE' as const, order: 3 }
+    ]
+});
+
 describe('useGameRoomOpeningPresentation', () => {
     beforeEach(() => {
         jest.useFakeTimers();
@@ -74,6 +87,58 @@ describe('useGameRoomOpeningPresentation', () => {
             jest.runOnlyPendingTimers();
         });
 
+        expect(consumeDealEvent).toHaveBeenCalledTimes(1);
+    });
+
+    test('defers opening deal presentation while order decision is still open', () => {
+        const consumeDealEvent = jest.fn();
+        const state = makeState() as any;
+        state.phase = 'deciding_order';
+        state.orderDecision = {
+            isOpen: true,
+            phase: 'waiting_confirmation',
+            players: ['p1', 'p2'],
+            result: {
+                firstPlayer: 'p1',
+                secondPlayer: 'p2',
+                order: ['p1', 'p2']
+            },
+            confirmations: ['p1'],
+            waitingFor: ['p2']
+        };
+        state.openingDeal = makeReplayableOpeningDeal();
+
+        const { result, rerender } = renderHook(() => useGameRoomOpeningPresentation({
+            state,
+            roomId: 'ROOM01',
+            currentPlayerId: 'p1',
+            currentPlayer: state.players[0],
+            dealQueue: [{
+                sequence: [
+                    { order: 1, playerId: 'p1', card: { id: 'deal-card-1', geishaId: 1, type: 'item' as const } }
+                ]
+            }],
+            consumeDealEvent,
+            prefersReducedMotion: true,
+            setFocusSection: jest.fn()
+        }));
+
+        expect(result.current.activeOpeningDealSteps).toEqual([]);
+        expect(result.current.openingDealModalModel).toBeNull();
+        expect(result.current.openingHandRevealModel.isEligible).toBe(false);
+        expect(consumeDealEvent).not.toHaveBeenCalled();
+
+        state.phase = 'playing';
+        state.orderDecision = {
+            ...state.orderDecision,
+            isOpen: false,
+            phase: 'result',
+            confirmations: ['p1', 'p2'],
+            waitingFor: []
+        };
+        rerender();
+
+        expect(result.current.openingDealModalModel?.sequenceId).toBe('opening-sequence-1');
         expect(consumeDealEvent).toHaveBeenCalledTimes(1);
     });
 

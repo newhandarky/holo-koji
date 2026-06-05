@@ -18,6 +18,7 @@ interface UseGameRoomDrawPresentationOptions {
     focusSection: FocusSection;
     setFocusSection: React.Dispatch<React.SetStateAction<FocusSection>>;
     isInteractionLocked: boolean;
+    isPresentationFlowActive: boolean;
     getPlayerDisplayName: (playerId?: string) => string;
     enqueueMotionCues: (cues: MotionCue[]) => void;
     prefersReducedMotion: boolean;
@@ -30,6 +31,7 @@ export const useGameRoomDrawPresentation = ({
     focusSection,
     setFocusSection,
     isInteractionLocked,
+    isPresentationFlowActive,
     getPlayerDisplayName,
     enqueueMotionCues,
     prefersReducedMotion
@@ -138,7 +140,11 @@ export const useGameRoomDrawPresentation = ({
         }
 
         const drawReviewEvent = classifyDrawEvent(activeDrawQueueEvent, currentPlayerId);
-        const route = routeDrawPresentation(drawReviewEvent, focusSection, isInteractionLocked);
+        const route = routeDrawPresentation(
+            drawReviewEvent,
+            focusSection,
+            isPresentationFlowActive || (isInteractionLocked && drawReviewEvent.owner === 'self')
+        );
 
         if (route === 'defer') {
             setRecentDraw(null);
@@ -180,6 +186,7 @@ export const useGameRoomDrawPresentation = ({
         focusSection,
         getPlayerDisplayName,
         isInteractionLocked,
+        isPresentationFlowActive,
         prefersReducedMotion,
         startDrawFlipPresentation
     ]);

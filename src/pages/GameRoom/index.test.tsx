@@ -105,6 +105,35 @@ describe('GameRoom character set room surface', () => {
         expect(screen.getByText('後手 6')).toBeInTheDocument();
     });
 
+    test('order decision blocks opening deal presentation until the decision closes', () => {
+        mockState.orderDecision = {
+            isOpen: true,
+            phase: 'choosing',
+            players: [],
+            result: null,
+            confirmations: [],
+            waitingFor: ['p1', 'p2']
+        };
+        mockState.openingDeal = makeOpeningDeal();
+
+        const { rerender } = renderGameRoom();
+
+        expect(screen.queryByRole('dialog', { name: '開局發牌' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
+
+        mockState.orderDecision = {
+            isOpen: false,
+            phase: 'idle',
+            players: [],
+            result: null,
+            confirmations: [],
+            waitingFor: []
+        };
+        rerender(renderGameRoomElement());
+
+        expect(screen.getByRole('dialog', { name: '開局發牌' })).toBeInTheDocument();
+    });
+
     test('opening deal modal blocks behind-game actions while visible', () => {
         mockState.openingDeal = makeOpeningDeal();
 
@@ -602,6 +631,29 @@ describe('GameRoom character set room surface', () => {
 
         expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
         expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+    });
+
+    test('opponent draw during ready sheet defers safe toast until ready flow clears', () => {
+        mockHookState.readyStatus = {
+            confirmations: ['p1'],
+            waitingFor: ['p2']
+        };
+        mockHookState.drawQueue = [{
+            playerId: 'p2',
+            card: { id: 'hidden-ready-p2', geishaId: 0, type: 'hidden' }
+        }];
+
+        const { rerender } = renderGameRoom();
+
+        expect(screen.getByText('準備開始')).toBeInTheDocument();
+        expect(screen.queryByText('玩家二 抽到了新卡')).not.toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+
+        mockHookState.readyStatus = null;
+        rerender(renderGameRoomElement());
+
+        expect(screen.getByText('玩家二 抽到了新卡')).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('hidden-ready-p2');
     });
 
     test('self draw during opening deal cue defers notification until deal queue is released', () => {

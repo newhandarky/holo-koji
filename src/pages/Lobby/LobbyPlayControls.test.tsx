@@ -100,6 +100,41 @@ describe('LobbyPlayControls', () => {
         expect(props.onCharacterSelectionToggle).toHaveBeenCalledWith('character-8');
     });
 
+    test('custom setup keeps unavailable character set warning visible', () => {
+        renderLobbyPlayControls({
+            hasUnavailableCharacterSet: true
+        });
+
+        expect(screen.getByText('不可用的女公關組合會保留顯示，但目前無法建立房間。')).toBeInTheDocument();
+    });
+
+    test('match mode and setup mode changes use existing parent callbacks', async () => {
+        const { user, props } = renderLobbyPlayControls();
+
+        await user.click(screen.getByRole('radio', { name: '對戰 NPC' }));
+        await user.click(screen.getByRole('radio', { name: '自選七位' }));
+
+        expect(props.onMatchModeChange).toHaveBeenCalledWith('npc');
+        expect(props.onSetupModeChange).toHaveBeenCalledWith('custom');
+    });
+
+    test('connecting state disables setup controls and keeps room entry guard delegated', () => {
+        renderLobbyPlayControls({
+            setupMode: 'custom',
+            isConnecting: true,
+            selectedCharacterIds: characterProfiles.slice(0, 7).map((profile) => profile.characterId),
+            customSelectionCount: 7,
+            canCreateRoom: false,
+            canJoinRoom: false
+        });
+
+        expect(screen.getByRole('radio', { name: '線上玩家' })).toBeDisabled();
+        expect(screen.getByRole('radio', { name: '自選七位' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: '角色 1' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /建立中/ })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /加入中/ })).toBeDisabled();
+    });
+
     test('invite recovery keeps copy and recovery actions isolated', async () => {
         const { user, props } = renderLobbyPlayControls({
             inviteRecovery: {

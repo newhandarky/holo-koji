@@ -15,6 +15,18 @@ import {
     OpeningHandRevealStatus
 } from '../../components/game/openingHandRevealModel';
 import type { DealAnimationEvent } from '../../hooks/useWebSocket';
+import {
+    getDealQueueEventKey,
+    getOpeningDealModalSequenceId,
+    isOpeningPresentationAllowed,
+    shouldBuildOpeningDealModalModel
+} from './openingDealPresentationModel';
+import {
+    buildOpeningHandRevealSequenceId,
+    clearOpeningHandRevealTimers,
+    getPendingOpeningHandRevealStatus,
+    scheduleOpeningHandRevealTimers
+} from './openingHandRevealRuntime';
 
 interface UseGameRoomOpeningPresentationOptions {
     state: GameState;
@@ -26,16 +38,6 @@ interface UseGameRoomOpeningPresentationOptions {
     prefersReducedMotion: boolean;
     setFocusSection: React.Dispatch<React.SetStateAction<FocusSection>>;
 }
-
-const getDealQueueEventKey = (event: DealAnimationEvent | null): string | null => {
-    if (!event) {
-        return null;
-    }
-
-    return event.sequence
-        .map((step) => `${step.order}:${step.playerId}:${step.card.id}:${step.card.type}`)
-        .join('|');
-};
 
 export const useGameRoomOpeningPresentation = ({
     state,
@@ -58,17 +60,17 @@ export const useGameRoomOpeningPresentation = ({
     const nextDealEventKey = getDealQueueEventKey(nextDealEvent);
     const nextDealEventRef = useRef<DealAnimationEvent | null>(null);
     nextDealEventRef.current = nextDealEvent;
-    const isOpeningPresentationAllowed = state.phase === 'playing' && !state.orderDecision.isOpen;
+    const openingPresentationAllowed = isOpeningPresentationAllowed(state);
 
-    const clearOpeningHandRevealTimers = useCallback(() => {
-        openingHandRevealTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    const clearOpeningHandRevealTimerRefs = useCallback(() => {
+        clearOpeningHandRevealTimers(openingHandRevealTimersRef.current);
         openingHandRevealTimersRef.current = [];
     }, []);
 
     useEffect(() => {
         const currentDealEvent = nextDealEventRef.current;
 
-        if (!isOpeningPresentationAllowed || !currentPlayerId || !currentDealEvent || !nextDealEventKey) {
+        if (!openingPresentationAllowed || !currentPlayerId || !currentDealEvent || !nextDealEventKey) {
             return;
         }
 
@@ -96,8 +98,8 @@ export const useGameRoomOpeningPresentation = ({
     }, [
         consumeDealEvent,
         currentPlayerId,
-        isOpeningPresentationAllowed,
         nextDealEventKey,
+        openingPresentationAllowed,
         prefersReducedMotion,
         state.openingDeal?.replayable
     ]);
@@ -105,35 +107,25 @@ export const useGameRoomOpeningPresentation = ({
     useEffect(() => {
         const openingDeal = state.openingDeal;
 
-        if (
-            !currentPlayerId
-            || !isOpeningPresentationAllowed
-            || !openingDeal
-            || openingDeal.status === 'not_replayable'
-            || !openingDeal.replayable
-            || openingDeal.steps.length === 0
-        ) {
+        const sequenceId = getOpeningDealModalSequenceId({
+            openingDeal,
+            currentPlayerId,
+            presentationAllowed: openingPresentationAllowed,
+            completedSequenceIds: completedOpeningDealModalSequencesRef.current
+        });
+
+        if (!sequenceId) {
             setActiveOpeningDealModalSequenceId(null);
             return;
         }
 
-        if (completedOpeningDealModalSequencesRef.current.has(openingDeal.sequenceId)) {
-            return;
-        }
-
-        setActiveOpeningDealModalSequenceId(openingDeal.sequenceId);
-    }, [currentPlayerId, isOpeningPresentationAllowed, state.openingDeal]);
+        setActiveOpeningDealModalSequenceId(sequenceId);
+    }, [currentPlayerId, openingPresentationAllowed, state.openingDeal]);
 
     const openingDealModalModel = useMemo(() => {
         const openingDeal = state.openingDeal;
 
-        if (
-            !openingDeal
-            || !activeOpeningDealModalSequenceId
-            || openingDeal.sequenceId !== activeOpeningDealModalSequenceId
-            || openingDeal.status === 'not_replayable'
-            || !openingDeal.replayable
-        ) {
+        if (!shouldBuildOpeningDealModalModel(openingDeal, activeOpeningDealModalSequenceId)) {
             return null;
         }
 
@@ -145,12 +137,16 @@ export const useGameRoomOpeningPresentation = ({
         () => getOpeningHandTakeEligibility(state, currentPlayerId),
         [currentPlayerId, state]
     );
-    const openingHandRevealSequenceId = openingHandEligibility.sequenceId
-        ?? (roomId && currentPlayerId ? `${roomId}-${state.round}-${currentPlayerId}` : null);
+    const openingHandRevealSequenceId = buildOpeningHandRevealSequenceId({
+        eligibilitySequenceId: openingHandEligibility.sequenceId,
+        roomId,
+        round: state.round,
+        currentPlayerId
+    });
     const openingHandRevealModel = useMemo(() => buildOpeningHandRevealModel({
         eligibility: {
             ...openingHandEligibility,
-            isEligible: openingHandEligibility.isEligible && isOpeningPresentationAllowed && !isOpeningDealActive,
+            isEligible: openingHandEligibility.isEligible && openingPresentationAllowed && !isOpeningDealActive,
             sequenceId: openingHandRevealSequenceId
         },
         cards: currentPlayer?.hand ?? [],
@@ -163,8 +159,8 @@ export const useGameRoomOpeningPresentation = ({
         openingHandRevealSequenceId,
         openingHandRevealStatus,
         openingHandRevealedCount,
-        isOpeningPresentationAllowed,
         isOpeningDealActive,
+        openingPresentationAllowed,
         prefersReducedMotion
     ]);
     const isOpeningHandRevealBlocking = openingHandRevealModel.isInteractionBlocked;
@@ -179,7 +175,7 @@ export const useGameRoomOpeningPresentation = ({
 
     useEffect(() => {
         if (!openingHandRevealModel.isEligible || !openingHandRevealSequenceId) {
-            clearOpeningHandRevealTimers();
+            clearOpeningHandRevealTimerRefs();
             setOpeningHandRevealStatus('not_eligible');
             setOpeningHandRevealedCount(0);
             return;
@@ -191,17 +187,11 @@ export const useGameRoomOpeningPresentation = ({
             return;
         }
 
-        setOpeningHandRevealStatus((currentStatus) => {
-            if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
-                return currentStatus;
-            }
-
-            return 'pending_take';
-        });
+        setOpeningHandRevealStatus(getPendingOpeningHandRevealStatus);
         setOpeningHandRevealedCount(0);
         setFocusSection('handActions');
     }, [
-        clearOpeningHandRevealTimers,
+        clearOpeningHandRevealTimerRefs,
         currentPlayer?.hand.length,
         openingHandRevealModel.isEligible,
         openingHandRevealSequenceId,
@@ -209,19 +199,19 @@ export const useGameRoomOpeningPresentation = ({
     ]);
 
     useEffect(() => () => {
-        clearOpeningHandRevealTimers();
-    }, [clearOpeningHandRevealTimers]);
+        clearOpeningHandRevealTimerRefs();
+    }, [clearOpeningHandRevealTimerRefs]);
 
     const completeOpeningHandReveal = useCallback(() => {
         if (openingHandRevealSequenceId) {
             completedOpeningHandRevealSequencesRef.current.add(openingHandRevealSequenceId);
         }
 
-        clearOpeningHandRevealTimers();
+        clearOpeningHandRevealTimerRefs();
         setOpeningHandRevealedCount(currentPlayer?.hand.length ?? 0);
         setOpeningHandRevealStatus('revealed');
         setFocusSection('handActions');
-    }, [clearOpeningHandRevealTimers, currentPlayer?.hand.length, openingHandRevealSequenceId, setFocusSection]);
+    }, [clearOpeningHandRevealTimerRefs, currentPlayer?.hand.length, openingHandRevealSequenceId, setFocusSection]);
 
     const handleTakeOpeningHand = useCallback(() => {
         if (
@@ -232,7 +222,7 @@ export const useGameRoomOpeningPresentation = ({
             return;
         }
 
-        clearOpeningHandRevealTimers();
+        clearOpeningHandRevealTimerRefs();
 
         if (prefersReducedMotion) {
             completeOpeningHandReveal();
@@ -243,19 +233,15 @@ export const useGameRoomOpeningPresentation = ({
         setOpeningHandRevealStatus('revealing');
         setOpeningHandRevealedCount(0);
 
-        steps.forEach((step, index) => {
-            const timerId = window.setTimeout(() => {
-                setOpeningHandRevealedCount(index + 1);
-            }, step.delayMs + step.durationMs);
-            openingHandRevealTimersRef.current.push(timerId);
+        openingHandRevealTimersRef.current = scheduleOpeningHandRevealTimers({
+            steps,
+            reducedMotion: false,
+            onRevealCount: setOpeningHandRevealedCount,
+            onComplete: completeOpeningHandReveal,
+            getTotalMs: getOpeningHandRevealTotalMs
         });
-
-        const completeTimerId = window.setTimeout(() => {
-            completeOpeningHandReveal();
-        }, getOpeningHandRevealTotalMs(steps, false));
-        openingHandRevealTimersRef.current.push(completeTimerId);
     }, [
-        clearOpeningHandRevealTimers,
+        clearOpeningHandRevealTimerRefs,
         completeOpeningHandReveal,
         currentPlayer,
         openingHandRevealModel.isEligible,

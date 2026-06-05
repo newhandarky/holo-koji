@@ -1,6 +1,7 @@
 import React from 'react';
 import { CharacterProfile, GeishaSet, RoomSetupMode } from '@newhandarky/hanakoji-game-types';
 import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
+import { LobbyCustomCharacterSelection } from './LobbyCustomCharacterSelection';
 
 interface CharacterSetupSectionProps {
     selectedGeishaSet: GeishaSet;
@@ -78,34 +79,13 @@ export const LobbyCharacterSetupSection: React.FC<CharacterSetupSectionProps> = 
             </div>
 
             {setupMode === 'custom' && (
-                <div className="lobby-character-selection">
-                    <div className="lobby-character-selection__summary" aria-live="polite">
-                        已選 {customSelectionCount} / 7
-                        {customSelectionCount === 7 ? '，可以建立房間' : '，請選滿七位'}
-                    </div>
-                    <div className="lobby-character-grid">
-                        {availableCharacterProfiles.map((profile) => {
-                            const isSelected = selectedCharacterIds.includes(profile.characterId);
-                            return (
-                                <button
-                                    key={profile.characterId}
-                                    type="button"
-                                    className={`lobby-character-card ${isSelected ? 'is-selected' : ''}`}
-                                    onClick={() => onCharacterSelectionToggle(profile.characterId)}
-                                    disabled={isConnecting}
-                                    aria-pressed={isSelected}
-                                >
-                                    <span
-                                        className="lobby-character-card__image"
-                                        style={{ backgroundImage: `url(${profile.imageUrl})` }}
-                                        aria-hidden="true"
-                                    />
-                                    <span className="lobby-character-card__name">{profile.name}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                <LobbyCustomCharacterSelection
+                    availableCharacterProfiles={availableCharacterProfiles}
+                    selectedCharacterIds={selectedCharacterIds}
+                    customSelectionCount={customSelectionCount}
+                    isConnecting={isConnecting}
+                    onCharacterSelectionToggle={onCharacterSelectionToggle}
+                />
             )}
         </div>
     </>

@@ -32,6 +32,15 @@ class MockWebSocket {
             data: JSON.stringify({ type, payload })
         } as MessageEvent);
     }
+
+    receiveRaw(data: string) {
+        this.onmessage?.({ data } as MessageEvent);
+    }
+
+    closeWith(event: Pick<CloseEvent, 'code' | 'reason' | 'wasClean'>) {
+        this.readyState = MockWebSocket.CLOSED;
+        this.onclose?.(event as CloseEvent);
+    }
 }
 
 describe('GameWebSocket', () => {
@@ -47,6 +56,7 @@ describe('GameWebSocket', () => {
     });
 
     afterEach(() => {
+        jest.useRealTimers();
         Object.defineProperty(global, 'WebSocket', {
             configurable: true,
             writable: true,
@@ -181,6 +191,89 @@ describe('GameWebSocket', () => {
         expect(throwingHandler).toHaveBeenCalledWith({ message: '伺服器錯誤' });
         expect(secondHandler).toHaveBeenCalledWith({ message: '伺服器錯誤' });
         expect(errorSpy).toHaveBeenCalled();
+
+        errorSpy.mockRestore();
+    });
+
+    test('logs invalid websocket messages without notifying handlers', async () => {
+        const socket = new GameWebSocket();
+        const errorHandler = jest.fn();
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        socket.on('ERROR', errorHandler);
+
+        const connectPromise = socket.connect('ws://localhost:3001');
+        MockWebSocket.instances[0].open();
+        await connectPromise;
+
+        MockWebSocket.instances[0].receiveRaw('{invalid-json');
+
+        expect(errorHandler).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalled();
+
+        errorSpy.mockRestore();
+    });
+
+    test('clears attached session after websocket close', async () => {
+        const socket = new GameWebSocket();
+        socket.on('ROOM_CREATED', jest.fn());
+
+        const connectPromise = socket.connect('ws://localhost:3001');
+        MockWebSocket.instances[0].open();
+        await connectPromise;
+
+        MockWebSocket.instances[0].receive('ROOM_CREATED', {
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+        expect(socket.getAttachedSession()).toEqual({
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+
+        MockWebSocket.instances[0].closeWith({
+            code: 1000,
+            reason: 'clean close',
+            wasClean: true
+        });
+
+        expect(socket.getAttachedSession()).toBeNull();
+    });
+
+    test('attempts reconnect after an unclean close', async () => {
+        jest.useFakeTimers();
+        const socket = new GameWebSocket();
+
+        const connectPromise = socket.connect('ws://localhost:3001');
+        MockWebSocket.instances[0].open();
+        await connectPromise;
+
+        MockWebSocket.instances[0].closeWith({
+            code: 1006,
+            reason: 'network lost',
+            wasClean: false
+        });
+
+        expect(MockWebSocket.instances).toHaveLength(1);
+
+        jest.advanceTimersByTime(1000);
+
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('throws when sending while websocket is not open', () => {
+        const socket = new GameWebSocket();
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        expect(() => {
+            socket.send('CREATE_ROOM', {
+                playerId: '玩家一',
+                displayName: '玩家一',
+                mode: 'online',
+                geishaSet: 'default',
+                setupMode: 'random'
+            });
+        }).toThrow('WebSocket 連線不可用');
 
         errorSpy.mockRestore();
     });

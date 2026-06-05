@@ -6,39 +6,26 @@ import {
     ServerToClientEventType
 } from '@newhandarky/hanakoji-game-types';
 import { frontendLogger, summarizeSocketMessage } from '../utils/runtimeLogger';
-
-// WebSocket 訊息格式
-interface ParsedWebSocketMessage {
-    type: string;
-    payload: unknown;
-}
+import {
+    getReconnectDelayMs,
+    resolveAttachedSession,
+    shouldAttemptReconnect,
+    shouldUpdateAttachedSession,
+    type AttachedSession
+} from './websocketConnectionRuntime';
+import {
+    addWebSocketMessageHandler,
+    dispatchWebSocketMessage,
+    removeWebSocketMessageHandler,
+    type MessageHandler
+} from './websocketDispatchRuntime';
+import { parseWebSocketMessage } from './websocketMessageParser';
 
 type InternalConnectionEvent = '__OPEN__' | '__CLOSE__';
 type GameWebSocketEventType = ServerToClientEventType | InternalConnectionEvent;
 type GameWebSocketEventPayload<TType extends GameWebSocketEventType> =
     TType extends ServerToClientEventType ? ServerToClientEventMap[TType] : unknown;
-type MessageHandler = (payload: unknown) => void;
 type UnsubscribeHandler = () => void;
-type AttachedSession = {
-    roomId: string;
-    playerId: string;
-};
-
-const resolveAttachedSession = (payload: unknown): AttachedSession | null => {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    const candidate = payload as { roomId?: unknown; playerId?: unknown };
-    if (typeof candidate.roomId !== 'string' || typeof candidate.playerId !== 'string') {
-        return null;
-    }
-
-    return {
-        roomId: candidate.roomId,
-        playerId: candidate.playerId
-    };
-};
 
 export class GameWebSocket {
     // WebSocket 連線物件
@@ -90,7 +77,7 @@ export class GameWebSocket {
                 // 關鍵：訊息接收處理
                 this.ws.onmessage = (event) => {
                     try {
-                        const message: ParsedWebSocketMessage = JSON.parse(event.data);
+                        const message = parseWebSocketMessage(event.data);
 
                         const handled = this.dispatchMessage(message.type, message.payload);
                         if (!handled) {
@@ -109,7 +96,12 @@ export class GameWebSocket {
                     this.attachedSession = null;
                     this.dispatchMessage('__CLOSE__', { code: event.code, reason: event.reason }); // 通知使用端關閉事件
 
-                    if (this.shouldReconnect && !event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
+                    if (shouldAttemptReconnect({
+                        shouldReconnect: this.shouldReconnect,
+                        wasClean: event.wasClean,
+                        reconnectAttempts: this.reconnectAttempts,
+                        maxReconnectAttempts: this.maxReconnectAttempts
+                    })) {
                         this.attemptReconnect(url);
                     }
                 };
@@ -124,27 +116,21 @@ export class GameWebSocket {
     }
 
     private dispatchMessage(messageType: string, payload: unknown): boolean {
-        if (messageType === 'ROOM_CREATED' || messageType === 'PLAYER_JOINED') {
+        if (shouldUpdateAttachedSession(messageType)) {
             this.attachedSession = resolveAttachedSession(payload);
         }
 
-        const handlers = this.messageHandlers.get(messageType);
-        if (!handlers || handlers.size === 0) {
-            return false;
-        }
-
-        Array.from(handlers).forEach((handler) => {
-            try {
-                handler(payload);
-            } catch (error) {
+        return dispatchWebSocketMessage({
+            handlers: this.messageHandlers,
+            messageType,
+            payload,
+            onHandlerError: (type, error) => {
                 frontendLogger.error('❌ [WebSocket] 處理器執行失敗', {
-                    type: messageType,
+                    type,
                     error: error instanceof Error ? error.message : 'unknown'
                 });
             }
         });
-
-        return true;
     }
 
     private clearReconnectTimer() {
@@ -176,7 +162,7 @@ export class GameWebSocket {
                     });
                 }
             });
-        }, this.reconnectDelay * this.reconnectAttempts);
+        }, getReconnectDelayMs(this.reconnectDelay, this.reconnectAttempts));
     }
 
     // 發送訊息到伺服器
@@ -200,9 +186,7 @@ export class GameWebSocket {
         handler: (payload: GameWebSocketEventPayload<TType>) => void
     ): UnsubscribeHandler {
         const normalizedHandler = handler as MessageHandler;
-        const handlers = this.messageHandlers.get(messageType) ?? new Set<MessageHandler>();
-        handlers.add(normalizedHandler);
-        this.messageHandlers.set(messageType, handlers);
+        addWebSocketMessageHandler(this.messageHandlers, messageType, normalizedHandler);
 
         return () => {
             this.off(messageType, handler);
@@ -215,19 +199,11 @@ export class GameWebSocket {
         handler?: (payload: GameWebSocketEventPayload<TType>) => void
     ): void {
         if (!handler) {
-            this.messageHandlers.delete(messageType);
+            removeWebSocketMessageHandler(this.messageHandlers, messageType);
             return;
         }
 
-        const handlers = this.messageHandlers.get(messageType);
-        if (!handlers) {
-            return;
-        }
-
-        handlers.delete(handler as MessageHandler);
-        if (handlers.size === 0) {
-            this.messageHandlers.delete(messageType);
-        }
+        removeWebSocketMessageHandler(this.messageHandlers, messageType, handler as MessageHandler);
     }
 
     // 主動關閉連線

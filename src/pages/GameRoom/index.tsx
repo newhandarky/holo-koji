@@ -122,6 +122,13 @@ const GameRoom: React.FC = () => {
         hasRoundSummary: Boolean(roundSummary),
         hasReadyStatus: Boolean(readyStatus)
     });
+    const isPresentationFlowActive = Boolean(
+        state.orderDecision.isOpen
+        || readyStatus
+        || isOpeningDealActive
+        || isOpeningHandRevealBlocking
+        || roundSummary
+    );
     const {
         activeMotionCues,
         activePendingMotionKind,
@@ -160,6 +167,7 @@ const GameRoom: React.FC = () => {
         focusSection,
         setFocusSection,
         isInteractionLocked: statusModel.isInteractionLocked,
+        isPresentationFlowActive,
         getPlayerDisplayName,
         enqueueMotionCues,
         prefersReducedMotion

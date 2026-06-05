@@ -1,7 +1,13 @@
 import React from 'react';
 import { CharacterProfile, GeishaSet, RoomSetupMode } from '@newhandarky/hanakoji-game-types';
-import { CHARACTER_SET_OPTIONS } from './characterSetOptions';
-import { AI_DIFFICULTY_OPTIONS, AiDifficulty, normalizeAiDifficulty } from './aiDifficultyOptions';
+import { AiDifficulty } from './aiDifficultyOptions';
+import {
+    LobbyCharacterSetupSection,
+    LobbyCreateRoomSection,
+    LobbyJoinRoomSection,
+    LobbyMatchModeSection,
+    LobbyNoticeSection
+} from './LobbyPlayControlSections';
 
 interface LobbyPlayControlsProps {
     playerName: string;
@@ -65,10 +71,6 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
     onCreateRoom,
     onJoinRoom
 }) => {
-    const normalizedAiDifficulty = normalizeAiDifficulty(aiDifficulty);
-    const selectedDifficulty = AI_DIFFICULTY_OPTIONS.find((option) => option.value === normalizedAiDifficulty)
-        ?? AI_DIFFICULTY_OPTIONS[0];
-
     return (
     <div className="lobby-controls">
         <div className="lobby-controls__heading">
@@ -79,211 +81,52 @@ const LobbyPlayControls: React.FC<LobbyPlayControlsProps> = ({
         </div>
 
         <div className="lobby-form-block">
-            {accountGuestNotice && (
-                <div className="lobby-account-notice" role="status">
-                    {accountGuestNotice}
-                </div>
-            )}
-
-            {invitedRoomNotice && (
-                <div className="lobby-invite-notice" role="status">
-                    {invitedRoomNotice}
-                </div>
-            )}
-
-            {inviteRecovery && (
-                <div className="lobby-invite-recovery" role="alert">
-                    <div className="lobby-invite-recovery__message">{inviteRecovery.message}</div>
-                    <code className="lobby-invite-recovery__room">{inviteRecovery.roomId}</code>
-                    <div className="lobby-invite-recovery__actions">
-                        <button type="button" className="btn btn-outline-light btn-sm" onClick={onCopyInviteRoomId}>
-                            複製房號
-                        </button>
-                        <button type="button" className="btn btn-outline-light btn-sm" onClick={onClearInviteRecovery}>
-                            回到一般加入
-                        </button>
-                    </div>
-                    <div className="lobby-invite-recovery__hint">可請對方重送邀請，或回到建立/加入房間流程。</div>
-                </div>
-            )}
-
-            <label className="form-label">對戰模式</label>
-            <div className="lobby-mode-toggle mb-3" role="radiogroup" aria-label="對戰模式">
-                <label className={`lobby-mode-toggle__option ${matchMode === 'online' ? 'is-active' : ''}`}>
-                    <input
-                        type="radio"
-                        className="form-check-input me-2"
-                        name="matchMode"
-                        value="online"
-                        checked={matchMode === 'online'}
-                        onChange={() => onMatchModeChange('online')}
-                        disabled={isConnecting}
-                    />
-                    線上玩家
-                </label>
-                <label className={`lobby-mode-toggle__option ${matchMode === 'npc' ? 'is-active' : ''}`}>
-                    <input
-                        type="radio"
-                        className="form-check-input me-2"
-                        name="matchMode"
-                        value="npc"
-                        checked={matchMode === 'npc'}
-                        onChange={() => onMatchModeChange('npc')}
-                        disabled={isConnecting}
-                    />
-                    對戰 NPC
-                </label>
-            </div>
-
-            {matchMode === 'npc' && (
-                <div className="mb-3">
-                    <label className="form-label" htmlFor="ai-difficulty-select">AI 難度</label>
-                    <select
-                        id="ai-difficulty-select"
-                        className="form-select"
-                        value={normalizedAiDifficulty}
-                        onChange={(event) => onAiDifficultyChange(normalizeAiDifficulty(event.target.value))}
-                        disabled={isConnecting}
-                        aria-label="AI 難度"
-                    >
-                        {AI_DIFFICULTY_OPTIONS.map((option) => {
-                            return (
-                                <option key={option.value} value={option.value}>
-                                    {option.label} - {option.description}
-                                </option>
-                            );
-                        })}
-                    </select>
-                    <div className="form-text">{selectedDifficulty.description}</div>
-                </div>
-            )}
-
-            <div className="mb-3">
-                <label className="form-label">女公關組合</label>
-                <select
-                    className="form-select"
-                    value={selectedGeishaSet}
-                    onChange={(event) => onGeishaSetChange(event.target.value as GeishaSet)}
-                    disabled={isConnecting}
-                    aria-label="女公關組合"
-                >
-                    {CHARACTER_SET_OPTIONS.map((option) => (
-                        <option key={option.key} value={option.key} disabled={!option.available}>
-                            {option.available ? option.displayName : `${option.displayName}（目前不可用）`}
-                        </option>
-                    ))}
-                </select>
-                {hasUnavailableCharacterSet && (
-                    <div className="form-text">不可用的女公關組合會保留顯示，但目前無法建立房間。</div>
-                )}
-            </div>
-
-            <div className="mb-3">
-                <label className="form-label">角色設定</label>
-                <div className="lobby-mode-toggle mb-2" role="radiogroup" aria-label="角色設定">
-                    <label className={`lobby-mode-toggle__option ${setupMode === 'random' ? 'is-active' : ''}`}>
-                        <input
-                            type="radio"
-                            className="form-check-input me-2"
-                            name="setupMode"
-                            value="random"
-                            checked={setupMode === 'random'}
-                            onChange={() => onSetupModeChange('random')}
-                            disabled={isConnecting}
-                        />
-                        隨機
-                    </label>
-                    <label className={`lobby-mode-toggle__option ${setupMode === 'custom' ? 'is-active' : ''}`}>
-                        <input
-                            type="radio"
-                            className="form-check-input me-2"
-                            name="setupMode"
-                            value="custom"
-                            checked={setupMode === 'custom'}
-                            onChange={() => onSetupModeChange('custom')}
-                            disabled={isConnecting}
-                        />
-                        自選七位
-                    </label>
-                </div>
-
-                {setupMode === 'custom' && (
-                    <div className="lobby-character-selection">
-                        <div className="lobby-character-selection__summary" aria-live="polite">
-                            已選 {customSelectionCount} / 7
-                            {customSelectionCount === 7 ? '，可以建立房間' : '，請選滿七位'}
-                        </div>
-                        <div className="lobby-character-grid">
-                            {availableCharacterProfiles.map((profile) => {
-                                const isSelected = selectedCharacterIds.includes(profile.characterId);
-                                return (
-                                    <button
-                                        key={profile.characterId}
-                                        type="button"
-                                        className={`lobby-character-card ${isSelected ? 'is-selected' : ''}`}
-                                        onClick={() => onCharacterSelectionToggle(profile.characterId)}
-                                        disabled={isConnecting}
-                                        aria-pressed={isSelected}
-                                    >
-                                        <span
-                                            className="lobby-character-card__image"
-                                            style={{ backgroundImage: `url(${profile.imageUrl})` }}
-                                            aria-hidden="true"
-                                        />
-                                        <span className="lobby-character-card__name">{profile.name}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <label className="form-label">玩家名稱</label>
-            <input
-                type="text"
-                className="form-control mb-3"
-                placeholder="輸入你的名稱"
-                value={playerName}
-                onChange={(event) => onPlayerNameChange(event.target.value)}
-                disabled={isConnecting}
-                maxLength={20}
+            <LobbyNoticeSection
+                accountGuestNotice={accountGuestNotice}
+                invitedRoomNotice={invitedRoomNotice}
+                inviteRecovery={inviteRecovery}
+                onCopyInviteRoomId={onCopyInviteRoomId}
+                onClearInviteRecovery={onClearInviteRecovery}
             />
-            <button className="btn btn-primary w-100 lobby-primary-button" onClick={onCreateRoom} disabled={!canCreateRoom}>
-                {isConnecting ? (
-                    <>
-                        <span className="spinner-border spinner-border-sm me-2"></span>
-                        建立中...
-                    </>
-                ) : '🏠 建立房間'}
-            </button>
+
+            <LobbyMatchModeSection
+                matchMode={matchMode}
+                aiDifficulty={aiDifficulty}
+                isConnecting={isConnecting}
+                onMatchModeChange={onMatchModeChange}
+                onAiDifficultyChange={onAiDifficultyChange}
+            />
+
+            <LobbyCharacterSetupSection
+                selectedGeishaSet={selectedGeishaSet}
+                setupMode={setupMode}
+                availableCharacterProfiles={availableCharacterProfiles}
+                selectedCharacterIds={selectedCharacterIds}
+                customSelectionCount={customSelectionCount}
+                isConnecting={isConnecting}
+                hasUnavailableCharacterSet={hasUnavailableCharacterSet}
+                onGeishaSetChange={onGeishaSetChange}
+                onSetupModeChange={onSetupModeChange}
+                onCharacterSelectionToggle={onCharacterSelectionToggle}
+            />
+
+            <LobbyCreateRoomSection
+                playerName={playerName}
+                isConnecting={isConnecting}
+                canCreateRoom={canCreateRoom}
+                onPlayerNameChange={onPlayerNameChange}
+                onCreateRoom={onCreateRoom}
+            />
         </div>
-        {matchMode === 'online' && (
-            <div className="lobby-form-block lobby-form-block--secondary">
-                <label className="form-label">加入房間</label>
-                <input
-                    type="text"
-                    className="form-control mb-2"
-                    placeholder="輸入房間代碼"
-                    value={roomId}
-                    onChange={(event) => onRoomIdChange(event.target.value.toUpperCase())}
-                    disabled={isConnecting}
-                    maxLength={6}
-                />
-                <button
-                    className="btn btn-outline-light w-100 lobby-secondary-button"
-                    onClick={onJoinRoom}
-                    disabled={!canJoinRoom}
-                >
-                    {isConnecting ? (
-                        <>
-                            <span className="spinner-border spinner-border-sm me-2"></span>
-                            加入中...
-                        </>
-                    ) : '🚪 加入房間'}
-                </button>
-            </div>
-        )}
+
+        <LobbyJoinRoomSection
+            roomId={roomId}
+            matchMode={matchMode}
+            isConnecting={isConnecting}
+            canJoinRoom={canJoinRoom}
+            onRoomIdChange={onRoomIdChange}
+            onJoinRoom={onJoinRoom}
+        />
     </div>
     );
 };

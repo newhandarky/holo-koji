@@ -1,14 +1,13 @@
 // src/components/game/PlayerHand.tsx
 import React, { useMemo } from 'react';
-import { ItemCard, GeishaSet } from "@newhandarky/hanakoji-game-types"
-import { getItemCardImage } from '../../utils/gameData';
+import { ItemCard, GeishaSet } from '@newhandarky/hanakoji-game-types';
 import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import type { OpeningHandRevealModel } from './openingHandRevealModel';
-import {
-    buildHandCardPresentation,
-    buildRevealVisibleCardIds,
-    splitOpeningDealSteps
-} from './playerHandModel';
+import { buildRevealVisibleCardIds } from './playerHandModel';
+import { PlayerHandCardRow } from './PlayerHandCardRow';
+import { PlayerHandControls } from './PlayerHandControls';
+import { PlayerHandDealLanes } from './PlayerHandDealLanes';
+import { PlayerHandRemovalCues } from './PlayerHandRemovalCues';
 import { usePlayerHandInteraction } from './usePlayerHandInteraction';
 
 /**
@@ -43,7 +42,6 @@ const PlayerHand: React.FC<Props> = ({
     onTakeOpeningHand
 }) => {
     const removalCues = useMemo(() => motionCues.filter((cue) => cue.kind === 'removal'), [motionCues]);
-    const { selfDealSteps, opponentDealSteps } = useMemo(() => splitOpeningDealSteps(openingDealSteps), [openingDealSteps]);
     const isOpeningDealActive = openingDealSteps.length > 0;
     const isOpeningHandConcealed = Boolean(openingHandReveal?.isConcealed);
     const isOpeningHandRevealing = openingHandReveal?.status === 'revealing';
@@ -72,135 +70,28 @@ const PlayerHand: React.FC<Props> = ({
                 aria-label="手牌焦點切換"
             >
                 <div className="player-hand-stage__content">
-                    {isOpeningDealActive && (
-                        <div className="player-hand-deal-lanes" aria-hidden="true">
-                            <div className="player-hand-deal-lane player-hand-deal-lane--opponent">
-                                {opponentDealSteps.map((step) => {
-                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
-                                    return (
-                                        <div
-                                            key={step.id}
-                                            className={`player-hand-deal-card player-hand-deal-card--opponent ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
-                                            style={{
-                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
-                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
-                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
-                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
-                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </div>
-                            <div className="player-hand-deal-lane player-hand-deal-lane--self">
-                                {selfDealSteps.map((step) => {
-                                    const cardImage = step.isMasked ? '' : getItemCardImage(step.card, geishaSet ?? 'default');
-                                    return (
-                                        <div
-                                            key={step.id}
-                                            className={`player-hand-deal-card player-hand-deal-card--self ${step.reducedMotion ? 'player-hand-deal-card--reduced' : ''} ${step.isMasked ? 'is-masked' : ''}`}
-                                            style={{
-                                                ['--deal-slot-index' as string]: `${step.slotIndex}`,
-                                                ['--deal-slot-count' as string]: `${step.slotCount}`,
-                                                ['--motion-delay' as string]: `${step.delayMs}ms`,
-                                                ['--motion-duration' as string]: `${step.durationMs}ms`,
-                                                backgroundImage: cardImage ? `url(${cardImage})` : 'none'
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    {removalCues.length > 0 && (
-                        <div className="player-hand-removal-cues" aria-hidden="true">
-                            {removalCues.map((cue, index) => (
-                                <div
-                                    key={cue.id}
-                                    className={`player-hand-removal-cue player-hand-removal-cue--${cue.owner} ${cue.reducedMotion ? 'player-hand-removal-cue--reduced' : ''}`}
-                                    style={{
-                                        ['--removal-index' as string]: `${index}`,
-                                        ['--motion-delay' as string]: `${cue.delayMs}ms`,
-                                        ['--motion-duration' as string]: `${cue.durationMs}ms`
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    )}
-                    <div className="player-hand-row">
-                        {cards.map((card, index) => {
-                            const center = (cards.length - 1) / 2;
-                            const relativeIndex = index - center;
-                            const absRelative = Math.abs(relativeIndex);
-                            const stackLevel = cards.length - Math.round(absRelative);
-                            const rotationDeg = relativeIndex * 5;
-                            const presentation = buildHandCardPresentation({
-                                card,
-                                index,
-                                geishaSet: geishaSet ?? 'default',
-                                selectedIdSet,
-                                focusedCardId,
-                                isOpeningHandConcealed,
-                                revealVisibleCardIds,
-                                openingHandReveal,
-                                drawMotionByCardId,
-                                drawBackCueIds
-                            });
-
-                            return (
-                                <button
-                                    key={card.id}
-                                    type="button"
-                                    className={`item-card item-card--image item-card--hand ${
-                                        presentation.isSelected ? 'selected' : ''
-                                    } ${
-                                        presentation.isFocused ? 'item-card--focused' : ''
-                                    } ${
-                                        highlightActive && highlightCardId === card.id ? 'item-card--new' : ''
-                                    } ${
-                                        drawMotionByCardId.has(card.id) ? 'item-card--motion-draw' : ''
-                                    } ${
-                                        prefersReducedMotion && drawMotionByCardId.has(card.id) ? 'item-card--motion-reduced' : ''
-                                    } ${
-                                        presentation.hasCardImage ? '' : 'item-card--missing-artwork'
-                                    } ${
-                                        presentation.isConcealedCard ? 'item-card--opening-concealed' : ''
-                                    } ${
-                                        isOpeningHandRevealing && !presentation.isConcealedCard ? 'item-card--opening-revealed' : ''
-                                    }`}
-                                    disabled={isOpeningHandInteractionBlocked}
-                                    aria-pressed={presentation.isSelected}
-                                    aria-label={presentation.ariaLabel}
-                                    onClick={() => toggleCard(card)}
-                                    style={{
-                                        backgroundImage: presentation.backgroundImage,
-                                        ['--fan-index' as string]: `${relativeIndex}`,
-                                        ['--fan-rotate-deg' as string]: `${rotationDeg}deg`,
-                                        ['--fan-abs-index' as string]: `${absRelative}`,
-                                        ['--fan-z-index' as string]: `${stackLevel}`,
-                                        ['--motion-delay' as string]: `${presentation.revealStep?.delayMs ?? presentation.drawMotionCue?.delayMs ?? 0}ms`,
-                                        ['--motion-duration' as string]: `${presentation.revealStep?.durationMs ?? presentation.drawMotionCue?.durationMs ?? 0}ms`
-                                    }}
-                                >
-                                    <div className="item-card__overlay" />
-                                    {(presentation.isConcealedCard || presentation.isDrawBackVisible) && (
-                                        <div className="item-card__opening-back" aria-hidden="true">
-                                            <span />
-                                        </div>
-                                    )}
-                                    {!presentation.isConcealedCard && !presentation.isDrawBackVisible && !presentation.hasCardImage && (
-                                        <div className="item-card__fallback-label">{presentation.fallbackLabel}</div>
-                                    )}
-                                    {presentation.isSelected && (
-                                        <div className="item-card__selected-check" aria-hidden="true">✓</div>
-                                    )}
-                                    {drawMotionByCardId.has(card.id) && (
-                                        <div className="item-card__motion-glow" aria-hidden="true" />
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <PlayerHandDealLanes
+                        openingDealSteps={openingDealSteps}
+                        geishaSet={geishaSet ?? 'default'}
+                    />
+                    <PlayerHandRemovalCues removalCues={removalCues} />
+                    <PlayerHandCardRow
+                        cards={cards}
+                        geishaSet={geishaSet ?? 'default'}
+                        selectedIdSet={selectedIdSet}
+                        focusedCardId={focusedCardId}
+                        isOpeningHandConcealed={isOpeningHandConcealed}
+                        revealVisibleCardIds={revealVisibleCardIds}
+                        openingHandReveal={openingHandReveal}
+                        drawMotionByCardId={drawMotionByCardId}
+                        drawBackCueIds={drawBackCueIds}
+                        highlightCardId={highlightCardId}
+                        highlightActive={highlightActive}
+                        prefersReducedMotion={prefersReducedMotion}
+                        isOpeningHandRevealing={isOpeningHandRevealing}
+                        isOpeningHandInteractionBlocked={isOpeningHandInteractionBlocked}
+                        onToggleCard={toggleCard}
+                    />
 
                     {openingHandReveal?.status === 'pending_take' && (
                         <div className="opening-hand-gate" role="status" aria-label="開局手牌可拿取">
@@ -214,29 +105,11 @@ const PlayerHand: React.FC<Props> = ({
                         </div>
                     )}
 
-                    <div className="player-hand-controls">
-                        <button
-                            type="button"
-                            className="player-hand-controls__button"
-                            onClick={() => moveFocus('prev')}
-                            disabled={cards.length < 2}
-                            aria-label="上一張手牌"
-                        >
-                            ←
-                        </button>
-                        <span className="player-hand-controls__status" aria-live="polite">
-                            {cards.length === 0 ? '0 / 0' : `${Math.max(focusedIndex, 0) + 1} / ${cards.length}`}
-                        </span>
-                        <button
-                            type="button"
-                            className="player-hand-controls__button"
-                            onClick={() => moveFocus('next')}
-                            disabled={cards.length < 2}
-                            aria-label="下一張手牌"
-                        >
-                            →
-                        </button>
-                    </div>
+                    <PlayerHandControls
+                        cardsLength={cards.length}
+                        focusedIndex={focusedIndex}
+                        onMoveFocus={moveFocus}
+                    />
                 </div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ItemCard } from '@newhandarky/hanakoji-game-types';
 import PlayerHand from './PlayerHand';
-import { MotionCue } from './gameMotion';
+import { MotionCue, OpeningDealCueStep } from './gameMotion';
 import { OpeningHandRevealModel } from './openingHandRevealModel';
 
 const makeCard = (id: string, itemImageUrl = '/card.png'): ItemCard => ({
@@ -41,6 +41,35 @@ const makeDrawCue = (id: string, cardId: string): MotionCue => ({
     durationMs: 520,
     delayMs: 0,
     reducedMotion: false
+});
+
+const makeRemovalCue = (id: string, owner: 'self' | 'opponent'): MotionCue => ({
+    id,
+    kind: 'removal',
+    owner,
+    cardId: `${owner}-removed-card`,
+    sourceZone: owner === 'self' ? 'hand' : 'opponent-side',
+    targetZone: 'hand',
+    createdAt: 0,
+    durationMs: 520,
+    delayMs: 90,
+    reducedMotion: false
+});
+
+const makeDealStep = (
+    id: string,
+    owner: 'self' | 'opponent',
+    isMasked = owner === 'opponent'
+): OpeningDealCueStep => ({
+    id,
+    owner,
+    card: makeCard(id, `/${id}.png`),
+    slotIndex: owner === 'self' ? 1 : 0,
+    slotCount: owner === 'self' ? 2 : 1,
+    delayMs: 95,
+    durationMs: 260,
+    reducedMotion: false,
+    isMasked
 });
 
 describe('PlayerHand', () => {
@@ -108,6 +137,40 @@ describe('PlayerHand', () => {
         expect(onTakeOpeningHand).toHaveBeenCalledTimes(1);
     });
 
+    test('routes opening deal steps into self and opponent lanes without revealing masked artwork', () => {
+        const { container } = render(
+            <PlayerHand
+                cards={[makeCard('card-1')]}
+                onCardSelect={jest.fn()}
+                openingDealSteps={[
+                    makeDealStep('self-deal-card', 'self', false),
+                    makeDealStep('opponent-hidden-card', 'opponent', true)
+                ]}
+            />
+        );
+
+        const selfDealCard = container.querySelector('.player-hand-deal-card--self');
+        const opponentDealCard = container.querySelector('.player-hand-deal-card--opponent');
+
+        expect(selfDealCard).toHaveStyle({ backgroundImage: 'url(/self-deal-card.png)' });
+        expect(opponentDealCard).toHaveClass('is-masked');
+        expect(opponentDealCard).toHaveStyle({ backgroundImage: 'none' });
+        expect(container.querySelector('.player-hand-stage')).toHaveClass('player-hand-stage--deal-active');
+    });
+
+    test('renders removal cues without exposing removed card identity', () => {
+        const { container } = render(
+            <PlayerHand
+                cards={[makeCard('card-1')]}
+                onCardSelect={jest.fn()}
+                motionCues={[makeRemovalCue('removal-1', 'self')]}
+            />
+        );
+
+        expect(container.querySelector('.player-hand-removal-cue--self')).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('self-removed-card');
+    });
+
     test('keeps selection aria and missing artwork fallback behavior', () => {
         const onCardSelect = jest.fn();
         render(
@@ -125,5 +188,22 @@ describe('PlayerHand', () => {
 
         expect(cardButton).toHaveAttribute('aria-pressed', 'true');
         expect(onCardSelect).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'missing-art' })]);
+    });
+
+    test('moves focused hand card with prev and next controls', () => {
+        const { container } = render(
+            <PlayerHand
+                cards={[makeCard('card-1', ''), makeCard('card-2', ''), makeCard('card-3', '')]}
+                onCardSelect={jest.fn()}
+            />
+        );
+
+        expect(container.querySelector('.item-card--focused')).toHaveTextContent('卡片 card-2');
+
+        fireEvent.click(screen.getByRole('button', { name: '下一張手牌' }));
+        expect(container.querySelector('.item-card--focused')).toHaveTextContent('卡片 card-3');
+
+        fireEvent.click(screen.getByRole('button', { name: '上一張手牌' }));
+        expect(container.querySelector('.item-card--focused')).toHaveTextContent('卡片 card-2');
     });
 });

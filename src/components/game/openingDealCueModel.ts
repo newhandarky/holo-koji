@@ -30,6 +30,11 @@ const OPENING_DEAL_STEP_DURATION_MS = {
     reduced: 180
 };
 
+export const getOpeningDealCueTiming = (prefersReducedMotion: boolean) => ({
+    stepDelayMs: prefersReducedMotion ? OPENING_DEAL_STEP_DELAY_MS.reduced : OPENING_DEAL_STEP_DELAY_MS.normal,
+    durationMs: prefersReducedMotion ? OPENING_DEAL_STEP_DURATION_MS.reduced : OPENING_DEAL_STEP_DURATION_MS.normal
+});
+
 export const createOpeningDealCueSteps = (
     sequence: DealAnimationStep[],
     viewerId: string,
@@ -45,8 +50,7 @@ export const createOpeningDealCueSteps = (
         acc[owner] += 1;
         return acc;
     }, { self: 0, opponent: 0 });
-    const stepDelayMs = prefersReducedMotion ? OPENING_DEAL_STEP_DELAY_MS.reduced : OPENING_DEAL_STEP_DELAY_MS.normal;
-    const durationMs = prefersReducedMotion ? OPENING_DEAL_STEP_DURATION_MS.reduced : OPENING_DEAL_STEP_DURATION_MS.normal;
+    const { stepDelayMs, durationMs } = getOpeningDealCueTiming(prefersReducedMotion);
 
     return orderedSequence.map((step) => {
         const owner: DealCueOwner = step.playerId === viewerId ? 'self' : 'opponent';

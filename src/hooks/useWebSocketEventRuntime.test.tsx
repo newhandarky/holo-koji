@@ -27,6 +27,7 @@ jest.mock('../services/websocket', () => {
             }),
             send: jest.fn(),
             disconnect: jest.fn(),
+            getAttachedSession: jest.fn(() => null),
             messageHandlers,
             unsubscribeHandlers
         }
@@ -52,6 +53,8 @@ describe('useWebSocketEventRuntime', () => {
         mockGameWebSocket.isConnected.mockClear();
         mockGameWebSocket.isConnected.mockReturnValue(true);
         mockGameWebSocket.send.mockClear();
+        mockGameWebSocket.getAttachedSession.mockClear();
+        mockGameWebSocket.getAttachedSession.mockReturnValue(null);
         mockGameWebSocket.messageHandlers.clear();
         mockGameWebSocket.unsubscribeHandlers.length = 0;
         mockGameWebSocket.on.mockImplementation((messageType: string, handler: (payload: unknown) => void) => {
@@ -85,6 +88,23 @@ describe('useWebSocketEventRuntime', () => {
             playerId: 'host',
             roomSessionToken: 'host-token'
         }));
+    });
+
+    test('does not rejoin when the current socket is already attached to this room and player', async () => {
+        mockGameWebSocket.getAttachedSession.mockReturnValue({
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+
+        renderHook(() => useWebSocketEventRuntime({
+            gameId: 'ABC123',
+            playerId: 'host',
+            gameDispatch: jest.fn(),
+            clientDispatch: jest.fn()
+        }));
+
+        await waitFor(() => expect(mockGameWebSocket.getAttachedSession).toHaveBeenCalled());
+        expect(mockGameWebSocket.send).not.toHaveBeenCalledWith('JOIN_ROOM', expect.anything());
     });
 
     test('clears stale room session token on PLAYER_ID_TAKEN', async () => {
@@ -145,6 +165,40 @@ describe('useWebSocketEventRuntime', () => {
 
         expect(result.current.drawQueue).toEqual([]);
         expect(result.current.dealQueue).toEqual([]);
+    });
+
+    test('clears ready status when server state enters active play', async () => {
+        const { result } = renderHook(() => useWebSocketEventRuntime({
+            gameId: 'ABC123',
+            playerId: 'host',
+            gameDispatch: jest.fn(),
+            clientDispatch: jest.fn()
+        }));
+
+        const readyCheckHandler = await getRegisteredHandler('READY_CHECK');
+        const gameStateHandler = await getRegisteredHandler('GAME_STATE_UPDATE');
+
+        act(() => {
+            readyCheckHandler({
+                confirmations: ['host'],
+                waitingFor: ['guest']
+            });
+        });
+
+        expect(result.current.readyStatus).toEqual({
+            confirmations: ['host'],
+            waitingFor: ['guest']
+        });
+
+        act(() => {
+            gameStateHandler({
+                gameId: 'ABC123',
+                players: [],
+                phase: 'playing'
+            });
+        });
+
+        expect(result.current.readyStatus).toBeNull();
     });
 
     test('ignores non-object draw and deal payloads without changing queues', async () => {

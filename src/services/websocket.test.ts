@@ -88,6 +88,38 @@ describe('GameWebSocket', () => {
         expect(secondHandler).toHaveBeenCalledWith({ message: '伺服器錯誤' });
     });
 
+    test('tracks the accepted room attachment from lifecycle events', async () => {
+        const socket = new GameWebSocket();
+        socket.on('ROOM_CREATED', jest.fn());
+        socket.on('PLAYER_JOINED', jest.fn());
+
+        const connectPromise = socket.connect('ws://localhost:3001');
+        MockWebSocket.instances[0].open();
+        await connectPromise;
+
+        expect(socket.getAttachedSession()).toBeNull();
+
+        MockWebSocket.instances[0].receive('ROOM_CREATED', {
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+
+        expect(socket.getAttachedSession()).toEqual({
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+
+        MockWebSocket.instances[0].receive('PLAYER_JOINED', {
+            roomId: 'XYZ789',
+            playerId: 'guest'
+        });
+
+        expect(socket.getAttachedSession()).toEqual({
+            roomId: 'XYZ789',
+            playerId: 'guest'
+        });
+    });
+
     test('off with a handler removes only that listener', async () => {
         const socket = new GameWebSocket();
         const firstHandler = jest.fn();

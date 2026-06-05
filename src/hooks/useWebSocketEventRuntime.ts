@@ -83,6 +83,10 @@ export const useWebSocketEventRuntime = ({
                 return;
             }
 
+            if (gameState.phase !== 'deciding_order') {
+                setReadyStatus(null);
+            }
+
             gameDispatchRef.current({ type: 'SYNC_SERVER_STATE', payload: gameState });
             safeDispatch({ type: 'SYNC_SERVER_STATE', payload: gameState });
         };
@@ -214,6 +218,11 @@ export const useWebSocketEventRuntime = ({
             safeDispatch({ type: 'CLEAR_ERROR' });
 
             try {
+                const attachedSession = gameWebSocket.getAttachedSession();
+                if (attachedSession?.roomId === gameId && attachedSession.playerId === playerId) {
+                    return;
+                }
+
                 const roomSessionToken = getStoredRoomSessionToken(gameId, playerId);
                 const joinPayload: JoinRoomPayload = {
                     roomId: gameId,
@@ -271,6 +280,7 @@ export const useWebSocketEventRuntime = ({
             cleanupHandlers();
             setDrawQueue(clearRuntimeQueueOnCleanup);
             setDealQueue(clearRuntimeQueueOnCleanup);
+            setReadyStatus(null);
         };
     }, [gameId, playerId]);
 

@@ -581,6 +581,59 @@ describe('GameRoom character set room surface', () => {
         expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
     });
 
+    test('self draw during ready sheet defers notification until ready flow clears', () => {
+        mockHookState.readyStatus = {
+            confirmations: ['p1'],
+            waitingFor: ['p2']
+        };
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-ready-1', geishaId: 5, type: 'real' }
+        }];
+
+        const { rerender } = renderGameRoom();
+
+        expect(screen.getByText('準備開始')).toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+
+        mockHookState.readyStatus = null;
+        rerender(renderGameRoomElement());
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+    });
+
+    test('self draw during opening deal cue defers notification until deal queue is released', () => {
+        mockHookState.dealQueue = [{
+            sequence: [
+                { order: 0, playerId: 'p1', card: { id: 'deal-card-1', geishaId: 1, type: 'real' } },
+                { order: 1, playerId: 'p2', card: { id: 'hidden-p2-1', geishaId: 0, type: 'hidden' } }
+            ]
+        }];
+        mockHookState.drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'card-opening-deal-1', geishaId: 5, type: 'real' }
+        }];
+
+        const { rerender } = renderGameRoom();
+
+        expect(screen.getByTestId('game-board')).toHaveAttribute('data-can-act', 'false');
+        expect(screen.queryByRole('status', { name: '抽牌通知' })).not.toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+
+        act(() => {
+            jest.advanceTimersByTime(1200);
+        });
+        expect(mockHookState.consumeDealEvent).toHaveBeenCalled();
+
+        mockHookState.dealQueue = [];
+        rerender(renderGameRoomElement());
+
+        expect(screen.getByRole('status', { name: '抽牌通知' })).toBeInTheDocument();
+        expect(mockHookState.consumeDrawEvent).not.toHaveBeenCalled();
+    });
+
     test('multiple self draw events process in arrival order after each decision', () => {
         const firstDraw = {
             playerId: 'p1',

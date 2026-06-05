@@ -89,6 +89,25 @@ describe('Lobby character set selection', () => {
         expect(mockNavigate).toHaveBeenCalledWith('/game/ABC123');
     });
 
+    test('stores room session token when invited player joins successfully', async () => {
+        mockGetInviteRoomIdFromLocation.mockReturnValue({ roomId: 'room01', source: 'query' });
+
+        renderLobby();
+
+        await testUser.type(screen.getByPlaceholderText('輸入你的名稱'), 'joiner');
+        await waitFor(() => expect(screen.getByRole('button', { name: '🚪 加入房間' })).toBeEnabled());
+        await testUser.click(screen.getByRole('button', { name: '🚪 加入房間' }));
+        await emitRegisteredHandler('PLAYER_JOINED', {
+            roomId: 'ROOM01',
+            playerId: 'joiner',
+            roomSessionToken: 'join-token'
+        });
+
+        expect(window.localStorage.getItem('currentPlayerId')).toBe('joiner');
+        expect(getStoredRoomSessionToken('ROOM01', 'joiner')).toBe('join-token');
+        expect(mockNavigate).toHaveBeenCalledWith('/game/ROOM01');
+    });
+
     test('selected character set is preserved when switching between online and npc', async () => {
         renderLobby();
 

@@ -25,4 +25,11 @@ describe('gameRoomPresentationFlowModel', () => {
             ...override
         })).toBe(true);
     });
+
+    test('does not treat pending interaction as a required presentation flow', () => {
+        expect(isGameRoomPresentationFlowActive({
+            ...baseFlowInput,
+            pendingInteraction: { type: 'GIFT_SELECTION' }
+        } as typeof baseFlowInput)).toBe(false);
+    });
 });

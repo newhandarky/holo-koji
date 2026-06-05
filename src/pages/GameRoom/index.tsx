@@ -28,6 +28,7 @@ import {
     GameRoomErrorSurface
 } from './GameRoomConnectionSurface';
 import { GameRoomActiveSurface } from './GameRoomActiveSurface';
+import { isGameRoomPresentationFlowActive } from './gameRoomPresentationFlowModel';
 
 // 遊戲房間主畫面
 const GameRoom: React.FC = () => {
@@ -122,13 +123,13 @@ const GameRoom: React.FC = () => {
         hasRoundSummary: Boolean(roundSummary),
         hasReadyStatus: Boolean(readyStatus)
     });
-    const isPresentationFlowActive = Boolean(
-        state.orderDecision.isOpen
-        || readyStatus
-        || isOpeningDealActive
-        || isOpeningHandRevealBlocking
-        || roundSummary
-    );
+    const isPresentationFlowActive = isGameRoomPresentationFlowActive({
+        isOrderDecisionOpen: state.orderDecision.isOpen,
+        readyStatus,
+        isOpeningDealActive,
+        isOpeningHandRevealBlocking,
+        roundSummary
+    });
     const {
         activeMotionCues,
         activePendingMotionKind,

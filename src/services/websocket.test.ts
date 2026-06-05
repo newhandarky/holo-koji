@@ -240,6 +240,29 @@ describe('GameWebSocket', () => {
         expect(socket.getAttachedSession()).toBeNull();
     });
 
+    test('clears attached session immediately when disconnecting', async () => {
+        const socket = new GameWebSocket();
+        socket.on('ROOM_CREATED', jest.fn());
+
+        const connectPromise = socket.connect('ws://localhost:3001');
+        MockWebSocket.instances[0].open();
+        await connectPromise;
+
+        MockWebSocket.instances[0].receive('ROOM_CREATED', {
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+        expect(socket.getAttachedSession()).toEqual({
+            roomId: 'ABC123',
+            playerId: 'host'
+        });
+
+        socket.disconnect();
+
+        expect(socket.getAttachedSession()).toBeNull();
+        expect(MockWebSocket.instances[0].close).toHaveBeenCalledWith(1000, '正常關閉');
+    });
+
     test('attempts reconnect after an unclean close', async () => {
         jest.useFakeTimers();
         const socket = new GameWebSocket();

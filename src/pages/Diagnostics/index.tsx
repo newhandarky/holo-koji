@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildDiagnosticsSnapshot, buildDiagnosticsSummaryItems } from './diagnosticsSummary';
 import { DiagnosticsSnapshot } from './types';
+import { DiagnosticsPlaytestChecklist } from './DiagnosticsPlaytestChecklist';
 
 const DiagnosticsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -49,6 +50,7 @@ const DiagnosticsPage: React.FC = () => {
                             </section>
                         ))}
                     </div>
+                    <DiagnosticsPlaytestChecklist />
                 </div>
             </div>
         </div>

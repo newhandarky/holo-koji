@@ -145,6 +145,55 @@ describe('useGameRoomDrawPresentation', () => {
         expect(consumeDrawEvent).not.toHaveBeenCalled();
     });
 
+    test('resumes deferred self draw and consumes it after viewer opens the hand', () => {
+        const consumeDrawEvent = jest.fn();
+        const setFocusSection = jest.fn();
+        const enqueueMotionCues = jest.fn();
+        const drawQueue = [{
+            playerId: 'p1',
+            card: { id: 'self-draw-card', geishaId: 1, type: 'item' as const }
+        }];
+        const { result, rerender } = renderDrawPresentation({
+            drawQueue,
+            consumeDrawEvent,
+            setFocusSection,
+            enqueueMotionCues,
+            isPresentationFlowActive: true
+        });
+
+        expect(result.current.isActiveSelfDrawNotification).toBe(false);
+        expect(consumeDrawEvent).not.toHaveBeenCalled();
+
+        rerender({
+            drawQueue,
+            consumeDrawEvent,
+            currentPlayerId: 'p1',
+            focusSection: 'characterBoard',
+            setFocusSection,
+            isInteractionLocked: false,
+            isPresentationFlowActive: false,
+            getPlayerDisplayName: (playerId) => playerId ?? '未知玩家',
+            enqueueMotionCues,
+            prefersReducedMotion: true
+        });
+
+        expect(result.current.isActiveSelfDrawNotification).toBe(true);
+
+        act(() => {
+            result.current.handleDrawNotificationViewNow();
+        });
+
+        expect(setFocusSection).toHaveBeenCalledWith('handActions');
+        expect(result.current.drawHighlightCardId).toBe('self-draw-card');
+        expect(enqueueMotionCues).toHaveBeenCalledTimes(1);
+
+        act(() => {
+            jest.advanceTimersByTime(720);
+        });
+
+        expect(consumeDrawEvent).toHaveBeenCalledTimes(1);
+    });
+
     test('defers opponent draw toast while a required presentation flow is active', () => {
         const consumeDrawEvent = jest.fn();
         const drawQueue = [{

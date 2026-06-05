@@ -7,6 +7,7 @@
 - Diagnostics 回報：尚未收到
 - Production timing change：未變更
 - Server source change：未變更
+- 230–238 執行紀錄：`specs/230-238-diagnostics-guided-playtest-timing-fixes/execution-log.md`
 
 ## Baseline 驗證
 
@@ -48,3 +49,7 @@ CI=1 npm test -- --watchAll=false src/pages/Diagnostics/index.test.tsx
 ```
 
 若回報指向 hidden-state 外洩、session/auth 錯亂、重複加入房間或遊戲流程卡死，優先視為 hotfix，不繼續一般重構。
+
+## 230–238 Baseline Update
+
+230–238 已再次執行 frontend timing / reconnect / Diagnostics focused checks，未發現可自動重現的 timing regression。因尚未收到實際 Diagnostics 試玩回報，仍不調整 production timing 行為。

@@ -50,6 +50,15 @@ describe('drawNotificationModel', () => {
         expect(routeDrawPresentation(event, 'handActions', false)).toBe('opponent');
     });
 
+    test('defers opponent draw while a necessary presentation flow is active', () => {
+        const event = classifyDrawEvent({
+            playerId: 'p2',
+            card: { id: 'hidden-opponent-card', geishaId: 0, type: 'hidden' }
+        }, 'p1');
+
+        expect(routeDrawPresentation(event, 'characterBoard', true)).toBe('defer');
+    });
+
     test('uses fixed notification timeout and bounded flip durations', () => {
         expect(getDrawNotificationTimeoutMs()).toBe(DRAW_NOTIFICATION_TIMEOUT_MS);
         expect(getDrawFlipDurationMs(false)).toBeLessThanOrEqual(2000);
@@ -64,4 +73,3 @@ describe('drawNotificationModel', () => {
         expect(transitionDrawDecision('animated', 'dismissed')).toBe('animated');
     });
 });
-

@@ -3,12 +3,19 @@ import { ItemCard } from '@newhandarky/hanakoji-game-types';
 import type { FocusSection } from '../../components/game/GameBoard';
 import { createDrawMotionCue, MotionCue } from '../../components/game/gameMotion';
 import {
-    classifyDrawEvent,
-    getDrawEventId,
-    getDrawFlipDurationMs,
-    getDrawNotificationTimeoutMs,
-    routeDrawPresentation
-} from '../../components/game/drawNotificationModel';
+    getActiveDrawEventId,
+    isActiveSelfDrawNotificationEvent,
+    resolveDrawPresentationRoute,
+    shouldHoldFocusForSelfDrawEvent,
+    shouldResetDrawPresentationState
+} from './gameRoomDrawPresentationModel';
+import {
+    clearDrawPresentationTimer,
+    getDrawFlipConsumeDelayMs,
+    getOpponentDrawToastTimeoutMs,
+    getSelfDrawNotificationTimeoutMs,
+    scheduleDrawPresentationTimer
+} from './gameRoomDrawPresentationRuntime';
 import type { CardDrawEvent } from '../../hooks/useWebSocket';
 
 interface UseGameRoomDrawPresentationOptions {
@@ -43,20 +50,23 @@ export const useGameRoomDrawPresentation = ({
     const [activeDrawAnimationEventId, setActiveDrawAnimationEventId] = useState<string | null>(null);
     const completedDrawEventIdsRef = useRef<Set<string>>(new Set());
     const activeDrawQueueEvent = drawQueue[0] ?? null;
-    const activeDrawEventId = activeDrawQueueEvent ? getDrawEventId(activeDrawQueueEvent) : null;
-    const isActiveSelfDrawNotification = Boolean(
-        activeDrawEventId
-        && activeDrawNotificationEventId === activeDrawEventId
-        && activeDrawQueueEvent?.playerId === currentPlayerId
-        && activeDrawQueueEvent.card.type !== 'hidden'
-    );
-    const shouldHoldFocusForSelfDraw = Boolean(
-        activeDrawEventId
-        && !completedDrawEventIdsRef.current.has(activeDrawEventId)
-        && activeDrawQueueEvent?.playerId === currentPlayerId
-        && activeDrawQueueEvent.card.type !== 'hidden'
-        && focusSection !== 'handActions'
-    );
+    const activeDrawEventId = getActiveDrawEventId(activeDrawQueueEvent);
+    const isActiveSelfDrawNotification = isActiveSelfDrawNotificationEvent({
+        activeDrawEventId,
+        activeDrawQueueEvent,
+        activeDrawNotificationEventId,
+        completedDrawEventIds: completedDrawEventIdsRef.current,
+        currentPlayerId,
+        focusSection
+    });
+    const shouldHoldFocusForSelfDraw = shouldHoldFocusForSelfDrawEvent({
+        activeDrawEventId,
+        activeDrawQueueEvent,
+        activeDrawNotificationEventId,
+        completedDrawEventIds: completedDrawEventIdsRef.current,
+        currentPlayerId,
+        focusSection
+    });
 
     const consumeActiveDrawEvent = useCallback((eventId: string) => {
         completedDrawEventIdsRef.current.add(eventId);
@@ -80,9 +90,9 @@ export const useGameRoomDrawPresentation = ({
         setIsDrawHighlightActive(true);
         enqueueMotionCues([createDrawMotionCue(card.id, prefersReducedMotion)]);
 
-        window.setTimeout(() => {
+        scheduleDrawPresentationTimer(() => {
             consumeActiveDrawEvent(eventId);
-        }, getDrawFlipDurationMs(prefersReducedMotion) + 120);
+        }, getDrawFlipConsumeDelayMs(prefersReducedMotion));
     }, [
         activeDrawAnimationEventId,
         consumeActiveDrawEvent,
@@ -125,7 +135,7 @@ export const useGameRoomDrawPresentation = ({
     }, [handleDrawNotificationDismiss, handleDrawNotificationViewNow]);
 
     useEffect(() => {
-        if (!activeDrawQueueEvent || !activeDrawEventId) {
+        if (shouldResetDrawPresentationState(activeDrawQueueEvent, activeDrawEventId)) {
             setRecentDraw(null);
             setActiveDrawNotificationEventId(null);
             setActiveDrawAnimationEventId(null);
@@ -135,16 +145,21 @@ export const useGameRoomDrawPresentation = ({
             return;
         }
 
+        if (!activeDrawQueueEvent || !activeDrawEventId) {
+            return;
+        }
+
         if (completedDrawEventIdsRef.current.has(activeDrawEventId)) {
             return;
         }
 
-        const drawReviewEvent = classifyDrawEvent(activeDrawQueueEvent, currentPlayerId);
-        const route = routeDrawPresentation(
-            drawReviewEvent,
+        const { drawReviewEvent, route } = resolveDrawPresentationRoute({
+            activeDrawQueueEvent,
+            currentPlayerId,
             focusSection,
-            isPresentationFlowActive || (isInteractionLocked && drawReviewEvent.owner === 'self')
-        );
+            isInteractionLocked,
+            isPresentationFlowActive
+        });
 
         if (route === 'defer') {
             setRecentDraw(null);
@@ -157,22 +172,22 @@ export const useGameRoomDrawPresentation = ({
             setRecentDraw(label);
             setActiveDrawNotificationEventId(null);
 
-            const timer = window.setTimeout(() => {
+            const timer = scheduleDrawPresentationTimer(() => {
                 consumeActiveDrawEvent(activeDrawEventId);
-            }, prefersReducedMotion ? 520 : 700);
+            }, getOpponentDrawToastTimeoutMs(prefersReducedMotion));
 
-            return () => window.clearTimeout(timer);
+            return () => clearDrawPresentationTimer(timer);
         }
 
         if (route === 'notify') {
             setRecentDraw(null);
             setActiveDrawNotificationEventId(activeDrawEventId);
 
-            const timer = window.setTimeout(() => {
+            const timer = scheduleDrawPresentationTimer(() => {
                 consumeActiveDrawEvent(activeDrawEventId);
-            }, getDrawNotificationTimeoutMs());
+            }, getSelfDrawNotificationTimeoutMs());
 
-            return () => window.clearTimeout(timer);
+            return () => clearDrawPresentationTimer(timer);
         }
 
         if (drawReviewEvent.cardReference) {

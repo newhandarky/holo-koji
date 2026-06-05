@@ -1,4 +1,5 @@
 import type { OpeningHandRevealStep } from '../../components/game/openingHandRevealModel';
+import type { OpeningHandRevealStatus } from '../../components/game/openingHandRevealModel';
 
 export const buildOpeningHandRevealSequenceId = ({
     eligibilitySequenceId,
@@ -15,6 +16,16 @@ export const buildOpeningHandRevealSequenceId = ({
 
 export const clearOpeningHandRevealTimers = (timerIds: number[]): void => {
     timerIds.forEach((timerId) => window.clearTimeout(timerId));
+};
+
+export const getPendingOpeningHandRevealStatus = (
+    currentStatus: OpeningHandRevealStatus
+): OpeningHandRevealStatus => {
+    if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
+        return currentStatus;
+    }
+
+    return 'pending_take';
 };
 
 export const scheduleOpeningHandRevealTimers = ({

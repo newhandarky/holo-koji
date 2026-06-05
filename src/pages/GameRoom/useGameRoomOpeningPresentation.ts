@@ -24,6 +24,7 @@ import {
 import {
     buildOpeningHandRevealSequenceId,
     clearOpeningHandRevealTimers,
+    getPendingOpeningHandRevealStatus,
     scheduleOpeningHandRevealTimers
 } from './openingHandRevealRuntime';
 
@@ -186,13 +187,7 @@ export const useGameRoomOpeningPresentation = ({
             return;
         }
 
-        setOpeningHandRevealStatus((currentStatus) => {
-            if (currentStatus === 'revealing' || currentStatus === 'pending_take') {
-                return currentStatus;
-            }
-
-            return 'pending_take';
-        });
+        setOpeningHandRevealStatus(getPendingOpeningHandRevealStatus);
         setOpeningHandRevealedCount(0);
         setFocusSection('handActions');
     }, [

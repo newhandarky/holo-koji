@@ -32,6 +32,7 @@
 - 不改 WebSocket payload、shared types 或 server 遊戲規則。
 - 若只是視覺節奏不自然，先補手動回報案例與 focused test，再決定是否調整 duration。
 - 若涉及 hidden state 外洩、session 錯亂或遊戲卡死，升級為 P0/P1 hotfix。
+- 221–229 的執行紀錄放在 `specs/221-229-frontend-diagnostics-assisted-timing-fixes/triage-log.md`；沒有 Diagnostics 回報時，不做推測式 production timing change。
 
 ## 回報轉任務格式
 

@@ -698,6 +698,67 @@ code {
   border-color: rgba(255, 115, 115, 0.28);
 }
 
+.diagnostics-playtest {
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 235, 210, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ginza-readable-text);
+}
+
+.diagnostics-playtest__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.diagnostics-playtest__title {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+}
+
+.diagnostics-playtest__description,
+.diagnostics-playtest__prompt,
+.diagnostics-playtest__status {
+  color: var(--ginza-muted-text);
+  line-height: 1.65;
+}
+
+.diagnostics-playtest__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.diagnostics-playtest__item {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 248, 236, 0.05);
+}
+
+.diagnostics-playtest__label {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.diagnostics-playtest__fallback {
+  margin-top: 14px;
+}
+
+.diagnostics-playtest__textarea {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 235, 210, 0.18);
+  background: rgba(20, 18, 22, 0.72);
+  color: var(--ginza-readable-text);
+}
+
 @media (max-width: 991.98px) {
   .lobby-shell {
     grid-template-columns: 1fr;
@@ -714,6 +775,10 @@ code {
   }
 
   .diagnostics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostics-playtest__grid {
     grid-template-columns: 1fr;
   }
 }
@@ -742,6 +807,10 @@ code {
   .diagnostics-shell__header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .diagnostics-playtest__header {
+    flex-direction: column;
   }
 }
 

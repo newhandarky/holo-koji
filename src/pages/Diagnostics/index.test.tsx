@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DiagnosticsPage from './index';
 import config from '../../config/environment';
@@ -67,6 +67,13 @@ const mockGameWebSocket = gameWebSocket as jest.Mocked<typeof gameWebSocket>;
 const mockGetLiffDiagnosticsSnapshot = getLiffDiagnosticsSnapshot as jest.MockedFunction<typeof getLiffDiagnosticsSnapshot>;
 const mockGetAccountDiagnosticsSnapshot = getAccountDiagnosticsSnapshot as jest.MockedFunction<typeof getAccountDiagnosticsSnapshot>;
 
+const setClipboardMock = (writeText: jest.Mock) => {
+    Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText }
+    });
+};
+
 describe('DiagnosticsPage', () => {
     beforeEach(() => {
         mockNavigate.mockReset();
@@ -96,6 +103,10 @@ describe('DiagnosticsPage', () => {
             accountPersistenceMode: 'temporary',
             accountPersistenceAvailable: true,
             accountPersistenceMessage: 'Account profiles are temporary in this environment.'
+        });
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: undefined
         });
     });
 
@@ -218,6 +229,55 @@ describe('DiagnosticsPage', () => {
         expect(screen.queryByText(/uptime/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/alert/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/history/i)).not.toBeInTheDocument();
+    });
+
+    test('renders playtest timing checklist for screenshot review', () => {
+        render(<DiagnosticsPage />);
+
+        expect(screen.getByRole('heading', { name: '試玩時序確認' })).toBeInTheDocument();
+        expect(screen.getByText('房型')).toBeInTheDocument();
+        expect(screen.getByText('順序確認')).toBeInTheDocument();
+        expect(screen.getByText('opening deal')).toBeInTheDocument();
+        expect(screen.getByText('opening hand reveal')).toBeInTheDocument();
+        expect(screen.getByText('draw toast')).toBeInTheDocument();
+        expect(screen.getByText('pending interaction')).toBeInTheDocument();
+        expect(screen.getByText('round summary')).toBeInTheDocument();
+        expect(screen.getByText('reconnect')).toBeInTheDocument();
+    });
+
+    test('copies a safe playtest timing checklist without sensitive fields', async () => {
+        const user = userEvent.setup();
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        setClipboardMock(writeText);
+
+        render(<DiagnosticsPage />);
+
+        await act(async () => {
+            await user.click(screen.getByRole('button', { name: '複製確認清單' }));
+        });
+
+        expect(writeText).toHaveBeenCalledTimes(1);
+        const copiedText = writeText.mock.calls[0][0] as string;
+        expect(copiedText).toContain('試玩時序確認');
+        expect(copiedText).toContain('opening deal');
+        expect(copiedText).toContain('draw toast');
+        expect(copiedText).not.toMatch(/token|lineUserId|raw profile|hidden card id|raw payload/i);
+        expect(await screen.findByText('已複製確認清單')).toBeInTheDocument();
+    });
+
+    test('shows manual copy fallback when clipboard write fails', async () => {
+        const user = userEvent.setup();
+        setClipboardMock(jest.fn().mockRejectedValue(new Error('clipboard unavailable')));
+
+        render(<DiagnosticsPage />);
+
+        await act(async () => {
+            await user.click(screen.getByRole('button', { name: '複製確認清單' }));
+        });
+
+        expect(await screen.findByText('無法自動複製，請手動選取下方文字。')).toBeInTheDocument();
+        const fallbackText = screen.getByRole('textbox', { name: '可手動複製的試玩確認清單' }) as HTMLTextAreaElement;
+        expect(fallbackText.value).toContain('試玩時序確認');
     });
 
     test('navigates back to lobby', async () => {

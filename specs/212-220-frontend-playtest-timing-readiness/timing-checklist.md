@@ -15,6 +15,7 @@
 
 ## 需要手動觀察
 
+- 系統診斷頁已提供「試玩時序確認」區塊，可直接截圖或按「複製確認清單」貼回對話。
 - opening deal → opening hand reveal → draw notification 的視覺銜接是否自然。
 - 手機 viewport 下 modal、bottom sheet、toast 是否互相遮擋。
 - online 延遲較高時，order decision / ready sheet / reconnect 的體感是否清楚。

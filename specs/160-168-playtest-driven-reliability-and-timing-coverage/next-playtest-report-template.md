@@ -23,6 +23,21 @@
 - 是否有通知被吞掉：
 - 是否有同一動畫重播：
 
+## 169–177 已自動覆蓋的回歸
+
+- 順序確認尚未結束時，不啟動 opening deal presentation。
+- ready sheet 顯示中，自抽通知與對手安全抽牌 toast 都會延後。
+- WebSocket runtime 會保留既有 server event aliases、draw/deal queue 行為與 `PLAYER_ID_TAKEN` stale token cleanup。
+- Lobby play controls 的 create/join disabled guard、custom selection、invite recovery 與 NPC difficulty controls 有 component-level coverage。
+- GameBoard action guard、secret payload、competition confirm 與 opening hand block 有 focused hook coverage。
+
+## 仍需手動觀察的項目
+
+- 真機或瀏覽器實際動畫節奏是否自然，特別是 opening deal → opening hand reveal → draw notification 的視覺銜接。
+- 手機 viewport 下 bottom sheet、toast、modal 是否遮擋重要操作。
+- online 雙人房延遲較高時，ready / order confirmation / reconnect 的體感是否清楚。
+- 再來一場後 presentation state 是否讓玩家覺得是新局，而不是舊動畫殘留。
+
 ## 安全狀態檢查
 
 - 是否看到對手手牌 id 或圖：

@@ -3,20 +3,24 @@ import { ensureLiffReady, isSupportedLiffOrigin } from './lineLiffRuntime';
 import type { LineProfile, VerifiedLineProfile } from './lineLiffTypes';
 
 export const getLineProfile = async (): Promise<LineProfile | null> => {
-    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
+    if (!config.liffId || !isSupportedLiffOrigin()) {
         return null;
     }
 
     await ensureLiffReady();
+    const liff = window.liff;
+    if (!liff) {
+        return null;
+    }
 
-    if (!window.liff.isLoggedIn()) {
-        if (window.liff.isInClient()) {
-            window.liff.login();
+    if (!liff.isLoggedIn()) {
+        if (liff.isInClient()) {
+            liff.login();
         }
         return null;
     }
 
-    const profile = await window.liff.getProfile();
+    const profile = await liff.getProfile();
     return {
         userId: profile.userId,
         displayName: profile.displayName,
@@ -25,24 +29,28 @@ export const getLineProfile = async (): Promise<LineProfile | null> => {
 };
 
 export const getVerifiedLineProfile = async (): Promise<VerifiedLineProfile | null> => {
-    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
+    if (!config.liffId || !isSupportedLiffOrigin()) {
         return null;
     }
 
     await ensureLiffReady();
-
-    if (!window.liff.isLoggedIn()) {
-        window.liff.login();
+    const liff = window.liff;
+    if (!liff) {
         return null;
     }
 
-    if (typeof window.liff.getIDToken !== 'function') {
+    if (!liff.isLoggedIn()) {
+        liff.login();
+        return null;
+    }
+
+    if (typeof liff.getIDToken !== 'function') {
         return null;
     }
 
     const [profile, idToken] = await Promise.all([
-        window.liff.getProfile(),
-        Promise.resolve(window.liff.getIDToken())
+        liff.getProfile(),
+        Promise.resolve(liff.getIDToken())
     ]);
 
     if (!idToken) {

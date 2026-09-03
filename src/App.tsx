@@ -87,11 +87,6 @@ function App() {
         return;
       }
 
-      if (!window.liff) {
-        handleError('找不到 LIFF SDK，請確認 index.html 是否載入 liff SDK。');
-        return;
-      }
-
       const result = await initLiffIfPossible();
       if (!result.ready) {
         handleError('LIFF 初始化失敗，請確認 LIFF ID 與 Endpoint URL。');

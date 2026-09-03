@@ -33,9 +33,38 @@ describe('lineLiffProfile', () => {
         __resetLiffRuntimeForTests();
     });
 
-    test('returns null when LIFF SDK is unavailable', async () => {
+    test('returns null without requesting the SDK when LIFF ID is unavailable', async () => {
+        config.liffId = '';
+
         await expect(getLineProfile()).resolves.toBeNull();
         await expect(getVerifiedLineProfile()).resolves.toBeNull();
+        expect(document.getElementById('line-liff-sdk')).toBeNull();
+    });
+
+    test('loads the SDK when a verified profile is explicitly requested', async () => {
+        const profileRequest = getVerifiedLineProfile();
+        const script = document.getElementById('line-liff-sdk');
+        const init = jest.fn().mockResolvedValue(undefined);
+
+        window.liff = {
+            init,
+            isLoggedIn: jest.fn(() => true),
+            getProfile: jest.fn().mockResolvedValue({
+                userId: 'line-user-1',
+                displayName: 'LINE 玩家'
+            }),
+            getIDToken: jest.fn(() => 'id-token-1')
+        };
+        script?.dispatchEvent(new Event('load'));
+
+        await expect(profileRequest).resolves.toEqual({
+            idToken: 'id-token-1',
+            profile: {
+                userId: 'line-user-1',
+                displayName: 'LINE 玩家'
+            }
+        });
+        expect(init).toHaveBeenCalledTimes(1);
     });
 
     test('returns null on unsupported origin without initializing LIFF', async () => {

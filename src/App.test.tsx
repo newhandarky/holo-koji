@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import App from './App';
 import config from './config/environment';
 import { resolveRouterMode } from './utils/routerMode';
+import { __resetLiffRuntimeForTests } from './utils/lineLiffRuntime';
 
 jest.mock('./pages/Lobby', () => () => <div>Mock Lobby Page</div>);
 jest.mock('./pages/Diagnostics', () => () => <div>Mock Diagnostics Page</div>);
@@ -22,6 +23,7 @@ describe('App routing', () => {
     window.history.pushState({}, '', '/');
     config.webAppUrl = originalWebAppUrl;
     delete window.liff;
+    __resetLiffRuntimeForTests();
   });
 
   test('renders lobby on root route', () => {
@@ -29,6 +31,7 @@ describe('App routing', () => {
     render(<App />);
 
     expect(screen.getByText('Mock Lobby Page')).toBeInTheDocument();
+    expect(document.getElementById('line-liff-sdk')).toBeNull();
   });
 
   test('renders diagnostics page on diagnostics route', async () => {

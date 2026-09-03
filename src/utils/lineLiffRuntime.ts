@@ -1,4 +1,5 @@
 import config from '../config/environment';
+import { __resetLiffSdkLoaderForTests, loadLiffSdk } from './lineLiffLoader';
 import './lineLiffTypes';
 
 let liffInitPromise: Promise<void> | null = null;
@@ -55,12 +56,21 @@ export const isLineClient = () => {
 };
 
 export const ensureLiffReady = async () => {
-    if (!window.liff || !config.liffId || !isSupportedLiffOrigin()) {
+    if (!config.liffId || !isSupportedLiffOrigin()) {
         return;
     }
 
+    if (!window.liff) {
+        await loadLiffSdk();
+    }
+
+    const liff = window.liff;
+    if (!liff) {
+        throw new Error('LIFF SDK 載入後仍不可用');
+    }
+
     if (!liffInitPromise) {
-        liffInitPromise = window.liff.init({ liffId: config.liffId }).catch((error: unknown) => {
+        liffInitPromise = liff.init({ liffId: config.liffId }).catch((error: unknown) => {
             liffInitPromise = null;
             liffReady = false;
             throw error;
@@ -72,7 +82,7 @@ export const ensureLiffReady = async () => {
 };
 
 export const initLiffIfPossible = async () => {
-    if (!window.liff || !config.liffId) {
+    if (!config.liffId) {
         return { ready: false as const, reason: 'missing' as const };
     }
 
@@ -138,4 +148,5 @@ export const getLiffDiagnosticsSnapshot = () => {
 export const __resetLiffRuntimeForTests = () => {
     liffInitPromise = null;
     liffReady = false;
+    __resetLiffSdkLoaderForTests();
 };

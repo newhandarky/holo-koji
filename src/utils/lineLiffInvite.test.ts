@@ -66,11 +66,13 @@ describe('lineLiffInvite', () => {
         expect(getLiffInviteUrl('ROOM01')).toBe('https://liff.line.me/test-liff?roomId=ROOM01');
     });
 
-    test('copies browser invite URL when LIFF SDK is unavailable', async () => {
+    test('copies browser invite URL when an explicit LIFF SDK load fails', async () => {
         const writeText = jest.fn().mockResolvedValue(undefined);
         setClipboard(writeText);
+        const sharing = shareRoomInvite('ROOM01');
+        document.getElementById('line-liff-sdk')?.dispatchEvent(new Event('error'));
 
-        await expect(shareRoomInvite('ROOM01')).resolves.toEqual({
+        await expect(sharing).resolves.toEqual({
             mode: 'copy',
             url: 'https://game.example.test/holo-koji/?roomId=ROOM01'
         });
@@ -112,6 +114,7 @@ describe('lineLiffInvite', () => {
     });
 
     test('returns unavailable with manual URL when clipboard is denied', async () => {
+        config.liffId = '';
         setClipboard(jest.fn().mockRejectedValue(new Error('denied')));
 
         await expect(shareRoomInvite('ROOM01')).resolves.toEqual({

@@ -48,11 +48,15 @@ describe('lineLiffRuntime', () => {
         __resetLiffRuntimeForTests();
     });
 
-    test('returns missing when LIFF SDK is unavailable', async () => {
+    test('returns missing without requesting the SDK when LIFF ID is unavailable', async () => {
+        config.liffId = '';
+
         await expect(initLiffIfPossible()).resolves.toEqual({
             ready: false,
             reason: 'missing'
         });
+
+        expect(document.getElementById('line-liff-sdk')).toBeNull();
 
         expect(getLiffDiagnosticsSnapshot()).toEqual(expect.objectContaining({
             hasSdk: false,
@@ -96,6 +100,19 @@ describe('lineLiffRuntime', () => {
 
         expect(isLineClient()).toBe(true);
         expect(shouldShowLiffDiagnostics()).toBe(true);
+    });
+
+    test('loads and initializes the SDK when a LINE client requests diagnostics', async () => {
+        setUserAgent('Mozilla/5.0 Line/14.0');
+        const init = jest.fn().mockResolvedValue(undefined);
+        const initializing = initLiffIfPossible();
+        const script = document.getElementById('line-liff-sdk');
+
+        window.liff = { init };
+        script?.dispatchEvent(new Event('load'));
+
+        await expect(initializing).resolves.toEqual({ ready: true });
+        expect(init).toHaveBeenCalledWith({ liffId: 'test-liff' });
     });
 
     test('reports safe diagnostics without raw profile or token data', () => {

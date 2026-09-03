@@ -35,7 +35,7 @@ npm 提供的唯一修正是強制升級 `react-router-dom@7.18.3`。這是主�
 ## 相容性與驗證
 
 - `npm ci`：通過，未出現 peer dependency 或 lockfile 衝突。
-- `CI=1 npm test -- --watchAll=false`：75 suites／399 tests 全數通過。
+- `CI=1 npm test -- --watchAll=false`：75 suites／400 tests 全數通過（含後續合併前 review 新增的非 LINE clipboard fallback 回歸測試）。
 - `npm run build`：通過，無 Browserslist 過期警告。
 - `gh-pages --version`：6.3.0。
 - Bundle：main JS 69.46 kB gzip（-486 B）、CSS 43.65 kB gzip（-433 B）；async chunks 21.93 kB、3.35 kB、1.14 kB。

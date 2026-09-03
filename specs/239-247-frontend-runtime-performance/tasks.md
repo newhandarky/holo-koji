@@ -39,13 +39,14 @@
 ## Phase 6 — 驗收與 Closeout
 
 - [X] T019 執行 LIFF、route、GameRoom／WebSocket／抽牌／發牌 focused regression tests。
-- [X] T020 使用 Node 22.13.0 執行 `CI=1 npm test -- --watchAll=false`；75 suites／399 tests 通過。
+- [X] T020 使用 Node 22.13.0 執行 `CI=1 npm test -- --watchAll=false`；75 suites／400 tests 通過（含合併前 review 補上的非 LINE clipboard fallback 回歸測試）。
 - [X] T021 使用 Node 22.13.0 執行 `npm run build`，記錄 async chunks 與 gzip 差異。
 - [X] T022 重跑三次行動 Lighthouse 取中位數並記錄 FCP、LCP、TBT、CLS；桌機執行一次 smoke。
 - [X] T023 執行 320、375、768、1024、1440 與 reduced-motion 最小瀏覽器 smoke。
 - [X] T024 執行 `gitnexus_detect_changes()`，核對 affected symbols／flows 與預期相符。
 - [X] T025 更新本文件勾選，並將最終效能結果與回退項目記錄於 `performance-results.md`。
 - [ ] T026 由使用者完成詳細 UI 視覺品質確認後才合併。
+- [X] T027 合併前 review 修正非 LINE 分享先等待 LIFF SDK、可能失去 clipboard user activation 的回歸；focused 26 suites／140 tests、完整 75 suites／400 tests 與 production build 通過。
 
 ## Dependencies
 

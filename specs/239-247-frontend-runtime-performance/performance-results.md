@@ -69,7 +69,7 @@ Baseline 三次 performance score 為 98／99／99；最終三次皆為 100。�
 
 - Focused GameRoom 圖片／流程回歸：3 suites、50 tests 通過。
 - LIFF／route 聚焦回歸：7 suites、84 tests 通過。
-- 完整測試：75 suites、399 tests 通過。
+- 完整測試：75 suites、400 tests 通過（含合併前 review 新增的非 LINE clipboard fallback 回歸測試）。
 - `npm run build`：成功。
 - 320、375、768、1024、1440：Lobby 掛載、建立／加入控制可見，且無水平溢位。
 - `prefers-reduced-motion: reduce`：媒體條件成功套用，Lobby 維持掛載且無水平溢位。
@@ -96,7 +96,16 @@ Baseline 三次 performance score 為 98／99／99；最終三次皆為 100。�
 - [ ] 使用者以實際 LINE 登入／綁定／邀請／分享環境完成手動確認。
 - [ ] 使用者完成 GameRoom、bottom sheet、載入 fallback 與圖片視覺品質的詳細 UI 驗收。
 
+## 合併前 Review 修正
+
+- 一般非 LINE 瀏覽器的分享意圖改為先判斷 client，立即執行 clipboard fallback，不再等待 LIFF SDK 下載／初始化而消耗 user activation。
+- LINE client 仍維持按需載入 SDK、載入失敗後 clipboard fallback，以及後續明確呼叫可重試。
+- GitNexus upstream impact 為 LOW；直接影響範圍限於 `handleShareRoomInvite` 與邀請測試。
+- Review 後 focused regression：26 suites／140 tests 通過；完整測試：75 suites／400 tests 通過；production build 成功，main JS 相較 review 前再減少 10 B gzip。
+
 ## 非阻擋警告
 
 - Build 顯示 `caniuse-lite` 資料已 8 個月未更新；本 spec 不升級依賴，未執行自動更新。
 - `npm install` 報告 64 個既有 audit findings（11 low、17 moderate、33 high、3 critical）；未執行可能造成破壞性升級的 `npm audit fix`，應另開依賴安全維護工作處理。
+
+> 以上為效能實作完成當時的歷史快照；後續已由 `specs/248-256-dependency-security-maintenance/` 更新 Browserslist 並將 audit 降至 38 項、0 critical。

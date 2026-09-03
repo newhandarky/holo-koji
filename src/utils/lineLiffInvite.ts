@@ -68,7 +68,7 @@ export const shareRoomInvite = async (roomId: string): Promise<InviteOutcome> =>
     const inviteUrl = resolveInviteUrl(roomId);
     const message = `一起玩銀座十字路！房間編號：${roomId}。點此加入對戰`;
 
-    if (!config.liffId || !isSupportedLiffOrigin()) {
+    if (!config.liffId || !isSupportedLiffOrigin() || !canUseLineClient()) {
         const copied = await writeClipboard(inviteUrl);
         return copied
             ? { mode: 'copy' as const, url: inviteUrl }
@@ -89,13 +89,6 @@ export const shareRoomInvite = async (roomId: string): Promise<InviteOutcome> =>
         return copied
             ? { mode: 'copy' as const, url: inviteUrl }
             : { mode: 'unavailable' as const, url: inviteUrl, reason: 'liff-init-failed' };
-    }
-
-    if (!canUseLineClient()) {
-        const copied = await writeClipboard(inviteUrl);
-        return copied
-            ? { mode: 'copy' as const, url: inviteUrl }
-            : { mode: 'unavailable' as const, url: inviteUrl, reason: 'not-line-client' };
     }
 
     if (!canUseShareTargetPicker()) {

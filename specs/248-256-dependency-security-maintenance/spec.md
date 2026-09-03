@@ -56,7 +56,7 @@ Node 22.13.0 下的 `npm audit` 顯示 64 項 findings：11 low、17 moderate、
 
 - `npm audit`：64（11 low／17 moderate／33 high／3 critical）降至 38（9 low／10 moderate／19 high／0 critical）。
 - `npm audit --omit=dev`：2 moderate，皆來自 React Router 6；production tree 沒有 high 或 critical。
-- `npm ci`、75 suites／399 tests、production build 與 `gh-pages --version` 均通過。
+- `npm ci`、75 suites／400 tests、production build 與 `gh-pages --version` 均通過；400 tests 包含後續合併前 review 新增的非 LINE clipboard fallback 回歸測試。
 - Build 未再輸出 Browserslist 過期警告；實際解析為 Browserslist 4.28.8、caniuse-lite 1.0.30001810。
 - Main JS gzip 69.46 kB（-486 B）、CSS 43.65 kB（-433 B）；三個既有 async chunks 保留。
 - 詳細證據、殘留風險與後續遷移建議見 `audit-results.md`。

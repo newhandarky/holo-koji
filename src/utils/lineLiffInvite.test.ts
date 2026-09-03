@@ -8,6 +8,7 @@ import {
 
 const originalLocation = window.location;
 const originalClipboard = navigator.clipboard;
+const originalUserAgent = navigator.userAgent;
 const originalLiffId = config.liffId;
 const originalWebAppUrl = config.webAppUrl;
 
@@ -25,11 +26,19 @@ const setClipboard = (writeText: jest.Mock) => {
     });
 };
 
+const setUserAgent = (value: string) => {
+    Object.defineProperty(navigator, 'userAgent', {
+        configurable: true,
+        value
+    });
+};
+
 describe('lineLiffInvite', () => {
     beforeEach(() => {
         config.liffId = 'test-liff';
         config.webAppUrl = 'https://game.example.test/holo-koji';
         setLocation('https://game.example.test/holo-koji/');
+        setUserAgent('Mozilla/5.0');
         setClipboard(jest.fn().mockResolvedValue(undefined));
         delete window.liff;
         __resetLiffRuntimeForTests();
@@ -46,6 +55,7 @@ describe('lineLiffInvite', () => {
             configurable: true,
             value: originalClipboard
         });
+        setUserAgent(originalUserAgent);
         delete window.liff;
         __resetLiffRuntimeForTests();
     });
@@ -67,11 +77,26 @@ describe('lineLiffInvite', () => {
     });
 
     test('copies browser invite URL when an explicit LIFF SDK load fails', async () => {
+        setUserAgent('Mozilla/5.0 Line/14.0');
         const writeText = jest.fn().mockResolvedValue(undefined);
         setClipboard(writeText);
         const sharing = shareRoomInvite('ROOM01');
         document.getElementById('line-liff-sdk')?.dispatchEvent(new Event('error'));
 
+        await expect(sharing).resolves.toEqual({
+            mode: 'copy',
+            url: 'https://game.example.test/holo-koji/?roomId=ROOM01'
+        });
+        expect(writeText).toHaveBeenCalledWith('https://game.example.test/holo-koji/?roomId=ROOM01');
+    });
+
+    test('copies immediately outside LINE without requesting the LIFF SDK', async () => {
+        const writeText = jest.fn().mockResolvedValue(undefined);
+        setClipboard(writeText);
+
+        const sharing = shareRoomInvite('ROOM01');
+
+        expect(document.getElementById('line-liff-sdk')).toBeNull();
         await expect(sharing).resolves.toEqual({
             mode: 'copy',
             url: 'https://game.example.test/holo-koji/?roomId=ROOM01'

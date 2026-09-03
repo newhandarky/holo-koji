@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import { GameProvider } from './contexts/GameContext';
 import Lobby from './pages/Lobby';
-import GameRoom from './pages/GameRoom';
-import DiagnosticsPage from './pages/Diagnostics';
-import LineCallbackPage from './pages/LineCallback';
 import { initLiffIfPossible, shouldShowLiffDiagnostics } from './utils/lineLiff';
 import config from './config/environment';
 import { shouldUseHashRouter } from './utils/routerMode';
+
+const GameRoom = React.lazy(() => import('./pages/GameRoom'));
+const DiagnosticsPage = React.lazy(() => import('./pages/Diagnostics'));
+const LineCallbackPage = React.lazy(() => import('./pages/LineCallback'));
+
+const RouteLoadingStatus = () => (
+  <div className="lobby-background" role="status" aria-live="polite">
+    <div className="container-fluid px-3 px-md-4 py-4 py-md-5">
+      頁面載入中…
+    </div>
+  </div>
+);
 
 // App 根元件：負責路由與全域狀態掛載
 function App() {
@@ -108,22 +117,24 @@ function App() {
           </div>
         </div>
       )}
-      {isLineCallbackQuery ? (
-        <BrowserRouter future={routerFuture}>
-          <LineCallbackPage onReturnToLobby={returnFromLineCallback} />
-        </BrowserRouter>
-      ) : (
-      <Router future={routerFuture}>
-        <Routes>
-          {/* 大廳頁面 */}
-          <Route path="/" element={<Lobby />} />
-          <Route path="/line/callback" element={<LineCallbackPage />} />
-          <Route path="/diagnostics" element={<DiagnosticsPage />} />
-          {/* 遊戲房間頁面 */}
-          <Route path="/game/:roomId" element={<GameRoom />} />
-        </Routes>
-      </Router>
-      )}
+      <Suspense fallback={<RouteLoadingStatus />}>
+        {isLineCallbackQuery ? (
+          <BrowserRouter future={routerFuture}>
+            <LineCallbackPage onReturnToLobby={returnFromLineCallback} />
+          </BrowserRouter>
+        ) : (
+          <Router future={routerFuture}>
+            <Routes>
+              {/* 大廳頁面 */}
+              <Route path="/" element={<Lobby />} />
+              <Route path="/line/callback" element={<LineCallbackPage />} />
+              <Route path="/diagnostics" element={<DiagnosticsPage />} />
+              {/* 遊戲房間頁面 */}
+              <Route path="/game/:roomId" element={<GameRoom />} />
+            </Routes>
+          </Router>
+        )}
+      </Suspense>
     </GameProvider>
   );
 }

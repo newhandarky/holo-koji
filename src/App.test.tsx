@@ -31,21 +31,22 @@ describe('App routing', () => {
     expect(screen.getByText('Mock Lobby Page')).toBeInTheDocument();
   });
 
-  test('renders diagnostics page on diagnostics route', () => {
+  test('renders diagnostics page on diagnostics route', async () => {
     window.history.pushState({}, '', '/diagnostics');
     render(<App />);
 
-    expect(screen.getByText('Mock Diagnostics Page')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('頁面載入中…');
+    expect(await screen.findByText('Mock Diagnostics Page')).toBeInTheDocument();
   });
 
-  test('renders line callback page from callback query', () => {
+  test('renders line callback page from callback query', async () => {
     window.history.pushState({}, '', '/?lineCallback=1&code=abc&state=state');
     render(<App />);
 
-    expect(screen.getByText('Mock Line Callback')).toBeInTheDocument();
+    expect(await screen.findByText('Mock Line Callback')).toBeInTheDocument();
   });
 
-  test('does not initialize LIFF on line login callback query', () => {
+  test('does not initialize LIFF on line login callback query', async () => {
     config.webAppUrl = window.location.origin;
     const init = jest.fn().mockResolvedValue(undefined);
     window.liff = { init };
@@ -53,7 +54,7 @@ describe('App routing', () => {
     window.history.pushState({}, '', '/?lineCallback=1&code=abc&state=state');
     render(<App />);
 
-    expect(screen.getByText('Mock Line Callback')).toBeInTheDocument();
+    expect(await screen.findByText('Mock Line Callback')).toBeInTheDocument();
     expect(init).not.toHaveBeenCalled();
   });
 
@@ -69,6 +70,13 @@ describe('App routing', () => {
     expect(screen.getByText('Mock Lobby Page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
     expect(window.location.search).toBe('');
+  });
+
+  test('renders game room through its lazy route', async () => {
+    window.history.pushState({}, '', '/game/ROOM01');
+    render(<App />);
+
+    expect(await screen.findByText('Mock Game Room')).toBeInTheDocument();
   });
 
   test('resolves router mode for browser and github pages hosts', () => {

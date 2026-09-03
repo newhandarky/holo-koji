@@ -3,7 +3,7 @@
 **Feature Branch**: `codex/248-256-dependency-security-maintenance`
 **Base Commit**: `680f7bd`
 **Created**: 2026-09-03
-**Status**: In Progress
+**Status**: Implemented — pending manual merge approval
 **Track**: `maintenance`
 
 ## 變更背景
@@ -22,7 +22,7 @@ Node 22.13.0 下的 `npm audit` 顯示 64 項 findings：11 low、17 moderate、
 
 - MUST 使用 Node 22.13.0 執行安裝、audit、測試與 build。
 - MUST 將 `gh-pages` 升級至 6.3.0，並驗證 deploy CLI 可執行。
-- MUST 將 React Router 6 更新至包含 advisory 修正的 6.30.6，不升級 Router 7。
+- MUST 將 React Router 6 更新至 6.30.6，以取得可留在主版本 6 的修正；新揭露且涵蓋所有 Router 6 版本的 findings 則記錄為 Router 7 遷移 blocker。
 - MUST 套用不需要 `--force` 的 npm transitive 安全更新，並同步 `package-lock.json`。
 - MUST 更新 Browserslist 資料，使 production build 不再顯示資料過期警告。
 - MUST 將只用於 build、型別與測試的 direct packages 移至 `devDependencies`。
@@ -51,6 +51,15 @@ Node 22.13.0 下的 `npm audit` 顯示 64 項 findings：11 low、17 moderate、
 - `CI=1 npm test -- --watchAll=false` 與 `npm run build` 通過。
 - Build 不再輸出 Browserslist 資料過期警告。
 - Bundle 尺寸與 async chunk 結構沒有非預期回歸。
+
+## 實作結果
+
+- `npm audit`：64（11 low／17 moderate／33 high／3 critical）降至 38（9 low／10 moderate／19 high／0 critical）。
+- `npm audit --omit=dev`：2 moderate，皆來自 React Router 6；production tree 沒有 high 或 critical。
+- `npm ci`、75 suites／399 tests、production build 與 `gh-pages --version` 均通過。
+- Build 未再輸出 Browserslist 過期警告；實際解析為 Browserslist 4.28.8、caniuse-lite 1.0.30001810。
+- Main JS gzip 69.46 kB（-486 B）、CSS 43.65 kB（-433 B）；三個既有 async chunks 保留。
+- 詳細證據、殘留風險與後續遷移建議見 `audit-results.md`。
 
 ## 不在這次範圍的事項
 

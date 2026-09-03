@@ -84,6 +84,7 @@ const GeishaCard: React.FC<Props> = ({
                         src={imageUrl}
                         alt={`${geisha.name} 角色圖`}
                         loading="lazy"
+                        decoding="async"
                         onError={() => setImageFailed(true)}
                     />
                 ) : (
@@ -106,7 +107,10 @@ const GeishaCard: React.FC<Props> = ({
                                                 className="geisha-card__slot-icon-image"
                                                 src={itemIcon.imageUrl}
                                                 alt={itemIcon.label}
+                                                width={64}
+                                                height={64}
                                                 loading="lazy"
+                                                decoding="async"
                                             />
                                         ) : (
                                             <span className={`geisha-card__slot-icon-glyph ${itemIcon.accentClassName}`}>

@@ -81,6 +81,10 @@ export const GameRoomInfoPanel = ({
                                                     className="player-avatar"
                                                     src={getPlayerAvatar(player.id)}
                                                     alt={`${getPlayerDisplayName(player.id)} 頭像`}
+                                                    width={28}
+                                                    height={28}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                 />
                                             )}
                                             <strong>{getPlayerDisplayName(player.id)}</strong>
@@ -114,7 +118,15 @@ export const GameRoomInfoPanel = ({
                                                     disabled={!replayEligible}
                                                     aria-label={`${actionItem.label}${used ? '（已使用）' : '（未使用）'}`}
                                                 >
-                                                    <img className="game-info-action__icon" src={actionItem.iconUrl} alt={actionItem.label} />
+                                                    <img
+                                                        className="game-info-action__icon"
+                                                        src={actionItem.iconUrl}
+                                                        alt={actionItem.label}
+                                                        width={38}
+                                                        height={38}
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
                                                     <span className="game-info-action__label">{actionItem.label}</span>
                                                 </button>
                                             );

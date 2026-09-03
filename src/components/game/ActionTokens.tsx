@@ -74,6 +74,10 @@ const ActionTokens: React.FC<Props> = ({ tokens, onAction, disabled, usedCards, 
                                 className="action-token__icon"
                                 src={actionIconMap[token.type]}
                                 alt={token.type}
+                                width={100}
+                                height={100}
+                                loading="lazy"
+                                decoding="async"
                             />
                         </button>
                         {isOpen && renderUsedCards(cards)}

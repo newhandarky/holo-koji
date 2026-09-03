@@ -45,6 +45,10 @@ export const GameRoomWaitingPanel = ({
                                 className="player-avatar"
                                 src={displayAvatar}
                                 alt={`${displayName} 頭像`}
+                                width={28}
+                                height={28}
+                                loading="lazy"
+                                decoding="async"
                             />
                         )}
                         <p className='mb-0'>你是：

@@ -65,13 +65,13 @@
 
 ## 驗證清單
 
-- [ ] 320px 最小 smoke。
-- [ ] 375px 最小 smoke。
-- [ ] 768px 最小 smoke。
-- [ ] 1024px 最小 smoke。
-- [ ] 1440px 最小 smoke。
-- [ ] `prefers-reduced-motion: reduce` smoke。
-- [ ] keyboard focus 與 screen reader status 語意檢查。
+- [x] 320px 最小 smoke。
+- [x] 375px 最小 smoke。
+- [x] 768px 最小 smoke。
+- [x] 1024px 最小 smoke。
+- [x] 1440px 最小 smoke。
+- [x] `prefers-reduced-motion: reduce` smoke。
+- [x] keyboard focus 與 screen reader status 語意檢查（fallback 不主動移動焦點，並以 `role="status"`／`aria-live="polite"` 呈現）。
 - [ ] 使用者完成詳細 UI 視覺品質驗收。
 
 > 本 repo 沒有 Storybook；因此不建立 Storybook 展示矩陣，以既有 Jest integration tests、production build 與上述瀏覽器 smoke 取代。

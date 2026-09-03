@@ -2,7 +2,7 @@
 
 **Feature Branch**: `codex/239-247-frontend-runtime-performance`  
 **Created**: 2026-09-03  
-**Status**: In Progress  
+**Status**: Implemented — Pending Manual UI Review
 **Track**: `maintenance`
 
 ## 變更背景
